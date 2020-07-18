@@ -63,7 +63,11 @@ public:
     /// Set up initial conditions
     /**
      */
-    virtual void initialize(LevelData<FArrayBox>& a_Phi);
+    virtual void initialize(LevelData<FArrayBox>& a_U);
+
+    virtual void initialize2(RealVect& a_dx,
+                             LevelData<FArrayBox>& a_Phi,
+                             LevelData<FArrayBox>& a_zbed) override;
 
     /// Set boundary fluxes
     /**

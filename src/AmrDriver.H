@@ -26,85 +26,69 @@
 class AmrDriver
 {
 public:
-    /// Default constructor
     /** At the moment, there is only one constructor, which defines itself
-        based on an inputs file.  (This may change, of course)
+        based on an inputs file.
     */
     AmrDriver();
 
-    /// destructor
-    /** destructor
-     */
+    /* destructor */
     virtual ~AmrDriver();
 
-    /// set default values before initialization
+    /* set default values before initialization */
     void setDefaults();
 
-    /// initializes object based on inputs data passed in through parmParse
-    /** initializes new object based on data in ParmParse database.  This
-        may change to a more explicit initialization if it's thought to be
-        a good idea.
-    */
+    /* initializes new object based on data in ParmParse database */
     void initialize();
 
-    /// set domain size (in meters)
+    /* set domain size (in meters) */
     void setDomainSize(const RealVect& a_domainSize)
     {
         m_domainSize = a_domainSize;
     }
 
-    /// set IBC
+    /* set Init and Boundary Conditions */
     void setIBC(BasicIBC* a_IBC);
 
-    /// advance solution until either max_time or max_step are reached
-    /**
-     */
+    /* advance the solution until either max_time or max_step are reached */
     void run(Real a_max_time, int a_max_step);
 
-    /// compute one timestep
+    /* compute one timestep */
     void timeStep(Real a_dt);
 
-    /// compute fluxes
+    /* compute fluxes */
     void computeFluxes(Vector<LevelData<FluxBox>*>& a_vectFluxes, Real a_dt);
 
-    void updatePhi(Vector<LevelData<FArrayBox>*>& a_new_phi,
-                   const Vector<LevelData<FArrayBox>*>& a_old_phi,
+    void updateHead(Vector<LevelData<FArrayBox>*>& a_new_head,
+                   const Vector<LevelData<FArrayBox>*>& a_old_head,
                    const Vector<LevelData<FluxBox>*>& a_fluxes,
                    Real a_dt);
 
-    /// do regridding
+    /* regridding */
     void regrid();
 
-    /// is this object defined and initialized?
-    /**
-     */
-    bool isDefined() const;
 
 #ifdef CH_USE_HDF5
 
-    /// write hdf5 plotfile to the standard location
     /** writes plotfile to the standard location; filename is
         <plot_root>.<step>.<DIM>d.hdf5
      */
     void writePlotFile();
 
-    /// write checkpoint file out for later restarting
     /** writes checkpoint data to the standard location; filename is
         <check_root>.<step>.<DIM>d.hdf5
      */
     void writeCheckpointFile() const;
 
-    /// read checkpoint file for restart
     /** read checkpoint data from file pointed to by a_handle
      */
     void readCheckpointFile(HDF5Handle& a_handle);
 
-    /// set up for restart
+    /* set up for restart */
     void restart(string& a_restart_file);
 
 #endif
 
-    /// set current solution time
+    /* set current solution time */
     void setTime(Real a_time)
     {
         m_time = a_time;
@@ -123,6 +107,12 @@ public:
     int finestLevel() const
     {
         return m_finest_level;
+    }
+
+    /* is this object defined and initialized? */
+    bool isDefined() const
+    {
+        return m_is_defined;
     }
 
     const RealVect dx(int a_level) const
@@ -145,20 +135,31 @@ public:
         return m_amrDx;
     }
 
-    const LevelData<FArrayBox>* phi(int a_level) const
+    /* Access functions */
+    const LevelData<FArrayBox>* gapheight(int a_level) const
     {
-        return m_phi[a_level];
+        return m_gapheight[a_level];
     };
 
-    Vector<LevelData<FArrayBox>*>& amrPhi()
+    Vector<LevelData<FArrayBox>*>& amrGapheight()
     {
-        return m_phi;
+        return m_gapheight;
     }
 
-    /// set physical parameters (useful when calling from another driver)
+    const LevelData<FArrayBox>* head(int a_level) const
+    {
+        return m_head[a_level];
+    };
+
+    Vector<LevelData<FArrayBox>*>& amrHead()
+    {
+        return m_head;
+    }
+
+    /* set physical parameters (useful when calling from another driver) */
     void setPhysicalConstants(Real a_gravity);
 
-    // accessor for AMR grids
+    /* accessor for AMR grids */
     const Vector<DisjointBoxLayout>& amrGrids() const
     {
         return m_amrGrids;
@@ -195,11 +196,6 @@ protected:
     /// compute timestep at initial time
     Real computeInitialDt();
 
-#if 0
-  /// set up BC's based on parmparse inputs
-  void setupBCs();
-#endif
-
     /// IBC
     BasicIBC* m_IBCPtr;
 
@@ -232,18 +228,17 @@ protected:
     /// max box size
     int m_max_box_size;
 
-    /// max box size for level 0 (defaults to max_box_size)
     /** this allows a different max box size for the level 0 domain,
         which can be useful since the number of boxes on level 0 is often
         driven by load balancing concerns, while max_box_size on other levels
         is generally driven by issues of cache size, etc) */
     int m_max_base_grid_size;
 
-    /// regrid interval
+    /* regrid interval */
     int m_regrid_interval;
     int m_n_regrids;
 
-    /// stores tags from previous regrids
+    /* stores tags from previous regrids */
     Vector<IntVectSet> m_vectTags;
 
     /// tag on grad(phi)?
@@ -304,19 +299,40 @@ protected:
     /// maximum amount cfl number may grow in one timestep
     Real m_max_dt_grow;
 
-    // current step
+    /* current step */
     int m_cur_step;
 
-    /// current old-time data
-    Vector<LevelData<FArrayBox>*> m_old_phi;
+    /** Model outputs include spatio temporal fields of Hydraulic head,  effective  Pressure,  
+        subglacial  gap  height  (the  effective  geometry  representative  of  an  entire  element),  
+        depth-integrated  water  flux,  and degree of channelization */
+    /* current old-time data */
+    /* */
+    Vector<LevelData<FArrayBox>*> m_old_head;               // Hydraulic head
+    Vector<LevelData<FArrayBox>*> m_old_gapheight;          // Subglacial height
+    /* */
+    Vector<LevelData<FArrayBox>*> m_old_Pw;                 // Water pressure
+    Vector<LevelData<FArrayBox>*> m_old_qw;                 // Water flux
+    Vector<LevelData<FArrayBox>*> m_old_Re;                 // Reynolds number
+    Vector<LevelData<FArrayBox>*> m_old_meltRate;           // Melting rate
 
-    /// new-time data
-    Vector<LevelData<FArrayBox>*> m_phi;
+    /* new-time data */
+    /* */
+    Vector<LevelData<FArrayBox>*> m_head;                   // Hydraulic head
+    Vector<LevelData<FArrayBox>*> m_gapheight;              // Subglacial height
+    /* */
+    Vector<LevelData<FArrayBox>*> m_Pw;                     // Water pressure
+    Vector<LevelData<FArrayBox>*> m_qw;                     // Water flux
+    Vector<LevelData<FArrayBox>*> m_Re;                     // Reynolds number
+    Vector<LevelData<FArrayBox>*> m_meltRate;               // Melting rate
 
-    /// how verbose should we be?
+    /* Time-constant parameters */
+    Vector<LevelData<FArrayBox>*> m_bedelevation;           //
+    Vector<LevelData<FArrayBox>*> m_overburdenpress;        // rhoi*g*H
+
+    /* verbosity level */
     int m_verbosity;
 
-    /// is this object initialized?
+    /* is this object initialized? */
     bool m_is_defined;
 
     ///
@@ -351,8 +367,8 @@ protected:
     // physical constant -- gravity
     Real m_gravity;
 
-    /// num ghost cells
-    int m_num_phi_ghost;
+    /* num ghost cells */
+    int m_num_head_ghost;
 
 private:
     template <class T>

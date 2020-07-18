@@ -117,35 +117,68 @@ DerivedIBC::new_thicknessIBC()
     return static_cast<BasicIBC*>(retval);
 }
 
-/// Set up initial conditions
-/**
+/** Set up initial conditions 
  */
 void
-DerivedIBC::initialize(LevelData<FArrayBox>& a_U)
+DerivedIBC::initialize(LevelData<FArrayBox>& a_head)
 {
     // for now, just initialize to a square subregion
-    Real phiHi = 1.0;
-    Real phiLo = 0.0;
-    IntVect regionLo = (m_domain.domainBox().bigEnd()) / 4;
-    IntVect regionHi = 3 * (m_domain.domainBox().bigEnd()) / 4;
+    Real HeadInit = 0.01;
+    Real GapInit  = 0.01;
+    Real slope = 0.02;    
+    IntVect regionLo = m_domain.domainBox().bigEnd();
+    IntVect regionHi = m_domain.domainBox().bigEnd();
 
-    DataIterator dit = a_U.dataIterator();
+    DataIterator dit = a_head.dataIterator();
     for (dit.begin(); dit.ok(); ++dit)
     {
-        FArrayBox& thisPhi = a_U[dit];
+        FArrayBox& thisHead = a_head[dit];
 
-        BoxIterator bit(thisPhi.box());
+        BoxIterator bit(thisHead.box()); // Default .box() have ghostcells ?
         for (bit.begin(); bit.ok(); ++bit)
         {
             IntVect iv = bit();
             if ((iv > regionLo) && (iv < regionHi))
             {
-                thisPhi(iv, 0) = phiHi;
+                thisHead(iv, 0) = HeadInit;
             }
             else
             {
-                thisPhi(iv, 0) = phiLo;
+                thisHead(iv, 0) = HeadInit * 2.0;
             }
+        } // end loop over cells
+    }     // end loop over boxes
+}
+
+/** Set up initial conditions 
+ */
+void
+DerivedIBC::initialize2(RealVect& a_dx,
+                        LevelData<FArrayBox>& a_head,
+                        LevelData<FArrayBox>& a_zbed)
+{
+
+    BasicIBC::initialize(a_head);    
+    // for now, just initialize to a square subregion
+    Real HeadInit = 0.01;
+    Real GapInit  = 0.01;
+    Real slope = 0.02;    
+    IntVect regionLo = m_domain.domainBox().bigEnd();
+    IntVect regionHi = m_domain.domainBox().bigEnd();
+
+    DataIterator dit = a_head.dataIterator();
+    for (dit.begin(); dit.ok(); ++dit)
+    {
+        FArrayBox& thisHead = a_head[dit];
+        FArrayBox& thiszbed = a_zbed[dit];
+
+        BoxIterator bit(thisHead.box()); // Default .box() have ghostcells ?
+        for (bit.begin(); bit.ok(); ++bit)
+        {
+            IntVect iv = bit();
+            thisHead(iv, 0) = HeadInit;
+            Real elevation = slope*(iv[0]+0.5)*a_dx[0];
+            thiszbed(iv, 0) = elevation;
         } // end loop over cells
     }     // end loop over boxes
 }

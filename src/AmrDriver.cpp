@@ -53,12 +53,6 @@ using std::string;
 // small parameter defining when a norm is "zero"
 #define TINY_NORM 1.0e-8
 
-bool
-AmrDriver::isDefined() const
-{
-    return m_is_defined;
-}
-
 AmrDriver::AmrDriver() : m_IBCPtr(NULL)
 {
     setDefaults();
@@ -91,9 +85,6 @@ AmrDriver::setDefaults()
     m_tags_grow = 0;
     m_tags_grow_dir = IntVect::Zero;
 
-    m_tagOnLapPhi = false;
-    m_laplacian_tagging_val = 1.0;
-
     m_plot_prefix = "plot";
     m_plot_interval = 10000000;
     m_plot_time_interval = 1.0e+12;
@@ -105,7 +96,7 @@ AmrDriver::setDefaults()
     m_check_exit = false;
 
     m_fixed_dt = 0.0;
-    m_num_phi_ghost = 1;
+    m_num_head_ghost = 1;
 
     m_stable_dt = 0.0;
 
@@ -120,12 +111,22 @@ AmrDriver::~AmrDriver()
     }
 
     // clean up memory
-    for (int lev = 0; lev < m_phi.size(); lev++)
+    for (int lev = 0; lev < m_head.size(); lev++)
     {
-        if (m_phi[lev] != NULL)
+        if (m_head[lev] != NULL)
         {
-            delete m_phi[lev];
-            m_phi[lev] = NULL;
+            delete m_head[lev];
+            m_head[lev] = NULL;
+        }
+    }
+
+    // clean up memory
+    for (int lev = 0; lev < m_gapheight.size(); lev++)
+    {
+        if (m_gapheight[lev] != NULL)
+        {
+            delete m_gapheight[lev];
+            m_gapheight[lev] = NULL;
         }
     }
 
@@ -199,7 +200,6 @@ AmrDriver::initialize()
     }
 
     ppAmr.query("cfl", m_cfl);
-
     m_initial_cfl = m_cfl;
     ppAmr.query("initial_cfl", m_initial_cfl);
 
@@ -242,15 +242,6 @@ AmrDriver::initialize()
     if (m_tagOnGradPhi)
     {
         ppAmr.query("tagging_val", m_tagging_val);
-    }
-
-    ppAmr.query("tag_on_Laplacian_phi", m_tagOnLapPhi);
-    isThereATaggingCriterion |= m_tagOnLapPhi;
-
-    // if we set this to be true, require that we also provide the threshold
-    if (m_tagOnLapPhi)
-    {
-        ppAmr.query("laplacian_tagging_val", m_laplacian_tagging_val);
     }
 
     // abort if there isn't a tagging criterion
@@ -435,14 +426,24 @@ AmrDriver::initialize()
         // if we're not restarting
 
         // now set up data holders
-        m_old_phi.resize(m_max_level + 1, NULL);
-        m_phi.resize(m_max_level + 1, NULL);
+        m_old_head.resize(m_max_level + 1, NULL);
+        m_head.resize(m_max_level + 1, NULL);
 
-        // allocate storage for m_old_phi, m_phi, etc
-        for (int lev = 0; lev < m_phi.size(); lev++)
+        m_old_gapheight.resize(m_max_level + 1, NULL);
+        m_gapheight.resize(m_max_level + 1, NULL);
+        
+        m_bedelevation.resize(m_max_level + 1, NULL);
+
+        // allocate storage for m_old..., m_... 
+        for (int lev = 0; lev < m_head.size(); lev++)
         {
-            m_old_phi[lev] = new LevelData<FArrayBox>;
-            m_phi[lev] = new LevelData<FArrayBox>;
+            m_old_head[lev] = new LevelData<FArrayBox>;
+            m_head[lev] = new LevelData<FArrayBox>;
+
+            m_old_gapheight[lev] = new LevelData<FArrayBox>;
+            m_gapheight[lev] = new LevelData<FArrayBox>;
+
+            m_bedelevation[lev] = new LevelData<FArrayBox>;
         }
 
         int finest_level = -1;
@@ -536,13 +537,14 @@ AmrDriver::initialize()
     } // end loop over levels to determine covered levels
 }
 
-/// set BC for thickness advection
+// set BC for thickness advection
 void
 AmrDriver::setIBC(BasicIBC* a_IBC)
 {
     m_IBCPtr = a_IBC->new_thicknessIBC();
 }
 
+/* Main advance function */
 void
 AmrDriver::run(Real a_max_time, int a_max_step)
 {
@@ -615,6 +617,7 @@ AmrDriver::run(Real a_max_time, int a_max_step)
                 }
             }
 
+            /* core */
             timeStep(dt);
 
         } // end of plot_time_interval
@@ -645,6 +648,7 @@ AmrDriver::run(Real a_max_time, int a_max_step)
     }
 }
 
+/* core of advance routine */
 void
 AmrDriver::timeStep(Real a_dt)
 {
@@ -658,22 +662,26 @@ AmrDriver::timeStep(Real a_dt)
                << a_dt << endl;
     }
 
-    // first copy phi into old phi
+    // first copy head and gap into old
     for (int lev = 0; lev <= m_finest_level; lev++)
     {
-        LevelData<FArrayBox>& oldPhi = *m_old_phi[lev];
-        LevelData<FArrayBox>& currentPhi = *m_phi[lev];
+        LevelData<FArrayBox>& oldH     = *m_old_head[lev];
+        LevelData<FArrayBox>& currentH = *m_head[lev];
+
+        LevelData<FArrayBox>& oldB     = *m_old_gapheight[lev];
+        LevelData<FArrayBox>& currentB = *m_gapheight[lev];
 
         // this way we avoid communication and maintain ghost cells...
-        DataIterator dit = oldPhi.dataIterator();
+        DataIterator dit = oldH.dataIterator();
         for (dit.begin(); dit.ok(); ++dit)
         {
-            oldPhi[dit].copy(currentPhi[dit], 0, 0, 1);
+            oldH[dit].copy(currentH[dit], 0, 0, 1);
+            oldB[dit].copy(currentB[dit], 0, 0, 1);
         }
     }
 
     // allocate face-centered storage
-    Vector<LevelData<FluxBox>*> vectFluxes(m_phi.size(), NULL);
+    Vector<LevelData<FluxBox>*> vectFluxes(m_head.size(), NULL);
     for (int lev = m_finest_level; lev >= 0; lev--)
     {
         const DisjointBoxLayout& levelGrids = m_amrGrids[lev];
@@ -686,28 +694,28 @@ AmrDriver::timeStep(Real a_dt)
         // have a ghost cell.
         vectFluxes[lev] = new LevelData<FluxBox>(m_amrGrids[lev], 1, ghostVect);
 
-        LevelData<FArrayBox>& levelOldPhi = *m_old_phi[lev];
+        LevelData<FArrayBox>& levelOldHead = *m_old_head[lev];
 
-        // ensure that ghost cells for phi are filled in
+        // ensure that ghost cells for head are filled in
         if (lev > 0)
         {
-            int nGhost = levelOldPhi.ghostVect()[0];
-            PiecewiseLinearFillPatch phiFiller(
+            int nGhost = levelOldHead.ghostVect()[0];
+            PiecewiseLinearFillPatch headFiller(
                 levelGrids, m_amrGrids[lev - 1], 1, m_amrDomains[lev - 1], m_refinement_ratios[lev - 1], nGhost);
 
             // since we're not subcycling, don't need to interpolate in time
             Real time_interp_coeff = 0.0;
-            phiFiller.fillInterp(levelOldPhi, *m_old_phi[lev - 1], *m_old_phi[lev - 1], time_interp_coeff, 0, 0, 1);
+            headFiller.fillInterp(levelOldHead, *m_old_head[lev - 1], *m_old_head[lev - 1], time_interp_coeff, 0, 0, 1);
         }
         // these are probably unnecessary...
-        levelOldPhi.exchange();
+        levelOldHead.exchange();
     }
 
     // compute flux
     computeFluxes(vectFluxes, a_dt);
 
     // compute div(F) and update solution
-    updatePhi(m_phi, m_old_phi, vectFluxes, a_dt);
+    updateHead(m_head, m_old_head, vectFluxes, a_dt);
 
     // clean up temp storage
     for (int lev = 0; lev <= m_finest_level; lev++)
@@ -798,10 +806,10 @@ AmrDriver::computeFluxes(Vector<LevelData<FluxBox>*>& a_Flux, Real a_dt)
     }
 }
 
-// update phi
+/* update head */
 void
-AmrDriver::updatePhi(Vector<LevelData<FArrayBox>*>& a_new_phi,
-                     const Vector<LevelData<FArrayBox>*>& a_old_phi,
+AmrDriver::updateHead(Vector<LevelData<FArrayBox>*>& a_new_head,
+                     const Vector<LevelData<FArrayBox>*>& a_old_head,
                      const Vector<LevelData<FluxBox>*>& a_vectFluxes,
                      Real a_dt)
 {
@@ -809,8 +817,8 @@ AmrDriver::updatePhi(Vector<LevelData<FArrayBox>*>& a_new_phi,
     {
         DisjointBoxLayout& levelGrids = m_amrGrids[lev];
         LevelData<FluxBox>& levelFlux = *a_vectFluxes[lev];
-        LevelData<FArrayBox>& levelNewPhi = *a_new_phi[lev];
-        LevelData<FArrayBox>& levelOldPhi = *a_old_phi[lev];
+        LevelData<FArrayBox>& levelNewH = *a_new_head[lev];
+        LevelData<FArrayBox>& levelOldH = *a_old_head[lev];
 
         const RealVect& dx = m_amrDx[lev];
 
@@ -819,10 +827,10 @@ AmrDriver::updatePhi(Vector<LevelData<FArrayBox>*>& a_new_phi,
         for (dit.begin(); dit.ok(); ++dit)
         {
             const Box& gridBox = levelGrids[dit];
-            FArrayBox& newPhi = levelNewPhi[dit];
-            FArrayBox& oldPhi = levelOldPhi[dit];
-            FluxBox& thisFlux = levelFlux[dit];
-            newPhi.setVal(0.0);
+            FArrayBox& newH    = levelNewH[dit];
+            FArrayBox& oldH    = levelOldH[dit];
+            FluxBox& thisFlux  = levelFlux[dit];
+            newH.setVal(0.0);
 
             // loop over directions and increment with div(F)
             for (int dir = 0; dir < SpaceDim; dir++)
@@ -830,36 +838,36 @@ AmrDriver::updatePhi(Vector<LevelData<FArrayBox>*>& a_new_phi,
                 // use the divergence from
                 // Chombo/example/fourthOrderMappedGrids/util/DivergenceF.ChF
                 FORT_DIVERGENCE(CHF_CONST_FRA(thisFlux[dir]),
-                                CHF_FRA(newPhi),
+                                CHF_FRA(newH),
                                 CHF_BOX(gridBox),
                                 CHF_CONST_REAL(dx[dir]),
                                 CHF_INT(dir));
             }
 
-            newPhi *= -1 * a_dt;
-            newPhi.plus(oldPhi, 0, 0, 1);
+            newH *= -1 * a_dt;
+            newH.plus(oldH, 0, 0, 1);
 
         } // end loop over grids
     }     // end loop over levels
 
     // average down thickness to coarser levels and fill in ghost cells
     // before calling recomputeGeometry.
-    int phiGhost = a_new_phi[0]->ghostVect()[0];
+    int headGhost = a_new_head[0]->ghostVect()[0];
     // average from the finest level down
     for (int lev = m_finest_level; lev > 0; lev--)
     {
         CoarseAverage averager(m_amrGrids[lev], 1, m_refinement_ratios[lev - 1]);
-        averager.averageToCoarse(*a_new_phi[lev - 1], *a_new_phi[lev]);
+        averager.averageToCoarse(*a_new_head[lev - 1], *a_new_head[lev]);
     }
 
     // now pass back over and do PiecewiseLinearFillPatch
     for (int lev = 1; lev <= m_finest_level; lev++)
     {
         PiecewiseLinearFillPatch filler(
-            m_amrGrids[lev], m_amrGrids[lev - 1], 1, m_amrDomains[lev - 1], m_refinement_ratios[lev - 1], phiGhost);
+            m_amrGrids[lev], m_amrGrids[lev - 1], 1, m_amrDomains[lev - 1], m_refinement_ratios[lev - 1], headGhost);
 
         Real interp_coef = 0;
-        filler.fillInterp(*a_new_phi[lev], *a_new_phi[lev - 1], *a_new_phi[lev - 1], interp_coef, 0, 0, 1);
+        filler.fillInterp(*a_new_head[lev], *a_new_head[lev - 1], *a_new_head[lev - 1], interp_coef, 0, 0, 1);
     }
 
 #if 0
@@ -877,16 +885,16 @@ AmrDriver::updatePhi(Vector<LevelData<FArrayBox>*>& a_new_phi,
     for (int lev = m_finest_level; lev > 0; lev--)
     {
         CoarseAverage averager(m_amrGrids[lev], 1, m_refinement_ratios[lev - 1]);
-        averager.averageToCoarse(*a_new_phi[lev - 1], *a_new_phi[lev]);
+        averager.averageToCoarse(*a_new_head[lev - 1], *a_new_head[lev]);
     }
 
     for (int lev = 1; lev <= m_finest_level; lev++)
     {
         PiecewiseLinearFillPatch filler(
-            m_amrGrids[lev], m_amrGrids[lev - 1], 1, m_amrDomains[lev - 1], m_refinement_ratios[lev - 1], phiGhost);
+            m_amrGrids[lev], m_amrGrids[lev - 1], 1, m_amrDomains[lev - 1], m_refinement_ratios[lev - 1], headGhost);
 
         Real interp_coef = 0;
-        filler.fillInterp(*a_new_phi[lev], *a_new_phi[lev - 1], *a_new_phi[lev - 1], interp_coef, 0, 0, 1);
+        filler.fillInterp(*a_new_head[lev], *a_new_head[lev - 1], *a_new_head[lev - 1], interp_coef, 0, 0, 1);
     }
 }
 
@@ -953,7 +961,6 @@ AmrDriver::regrid()
             {
                 pout() << "AmrDriver::regrid -- grids unchanged" << endl;
             }
-            // return;
         }
 
         // now loop through levels and redefine if necessary
@@ -970,14 +977,14 @@ AmrDriver::regrid()
             m_amrGrids[lev] = newDBL;
 
             // build new storage
-            LevelData<FArrayBox>* old_oldDataPtr = m_old_phi[lev];
-            LevelData<FArrayBox>* old_phiDataPtr = m_phi[lev];
+            LevelData<FArrayBox>* old_oldDataPtr = m_old_head[lev];
+            LevelData<FArrayBox>* old_headDataPtr = m_head[lev];
 
             LevelData<FArrayBox>* new_oldDataPtr =
-                new LevelData<FArrayBox>(newDBL, m_old_phi[0]->nComp(), m_old_phi[0]->ghostVect());
+                new LevelData<FArrayBox>(newDBL, m_old_head[0]->nComp(), m_old_head[0]->ghostVect());
 
-            LevelData<FArrayBox>* new_phiDataPtr =
-                new LevelData<FArrayBox>(newDBL, m_phi[0]->nComp(), m_phi[0]->ghostVect());
+            LevelData<FArrayBox>* new_headDataPtr =
+                new LevelData<FArrayBox>(newDBL, m_head[0]->nComp(), m_head[0]->ghostVect());
 
             // first fill with interpolated data from coarser level
 
@@ -985,8 +992,8 @@ AmrDriver::regrid()
                 // may eventually want to do post-regrid smoothing on this!
                 FineInterp interpolator(newDBL, 1, m_refinement_ratios[lev - 1], m_amrDomains[lev]);
 
-                interpolator.interpToFine(*new_oldDataPtr, *m_old_phi[lev - 1]);
-                interpolator.interpToFine(*new_phiDataPtr, *m_phi[lev - 1]);
+                interpolator.interpToFine(*new_oldDataPtr, *m_old_head[lev - 1]);
+                interpolator.interpToFine(*new_headDataPtr, *m_head[lev - 1]);
             }
 
             // now copy old-grid data on this level into new holder
@@ -995,38 +1002,38 @@ AmrDriver::regrid()
                 if (oldDBL.isClosed())
                 {
                     old_oldDataPtr->copyTo(*new_oldDataPtr);
-                    old_phiDataPtr->copyTo(*new_phiDataPtr);
+                    old_headDataPtr->copyTo(*new_headDataPtr);
                 }
                 // can now delete old data
                 delete old_oldDataPtr;
-                delete old_phiDataPtr;
+                delete old_headDataPtr;
             }
 
             // exchange is necessary to fill periodic ghost cells
             // which aren't filled by the copyTo from oldLevelH
             new_oldDataPtr->exchange();
-            new_phiDataPtr->exchange();
+            new_headDataPtr->exchange();
 
             // now place new holders into multilevel arrays
-            m_old_phi[lev] = new_oldDataPtr;
-            m_phi[lev] = new_phiDataPtr;
+            m_old_head[lev] = new_oldDataPtr;
+            m_head[lev] = new_headDataPtr;
 
         } // end loop over currently defined levels
 
         // now ensure that any remaining levels are null pointers
         // (in case of de-refinement)
-        for (int lev = new_finest_level + 1; lev < m_old_phi.size(); lev++)
+        for (int lev = new_finest_level + 1; lev < m_old_head.size(); lev++)
         {
-            if (m_old_phi[lev] != NULL)
+            if (m_old_head[lev] != NULL)
             {
-                delete m_old_phi[lev];
-                m_old_phi[lev] = NULL;
+                delete m_old_head[lev];
+                m_old_head[lev] = NULL;
             }
 
-            if (m_phi[lev] != NULL)
+            if (m_head[lev] != NULL)
             {
-                delete m_phi[lev];
-                m_phi[lev] = NULL;
+                delete m_head[lev];
+                m_head[lev] = NULL;
             }
 
             DisjointBoxLayout emptyDBL;
@@ -1144,9 +1151,9 @@ AmrDriver::tagCellsLevel(IntVectSet& a_tags, int a_level)
     // stencils at box edges (hopefully good enough),
     // since doing BC's properly is somewhat expensive.
 
-    DataIterator dit = m_phi[a_level]->dataIterator();
+    DataIterator dit = m_head[a_level]->dataIterator();
 
-    LevelData<FArrayBox>& levelPhi = *m_phi[a_level];
+    LevelData<FArrayBox>& levelPhi = *m_head[a_level];
 
     const DisjointBoxLayout& levelGrids = m_amrGrids[a_level];
 
@@ -1192,45 +1199,45 @@ AmrDriver::tagCellsLevel(IntVectSet& a_tags, int a_level)
     }             // end if tag on grad vel
 
     // tag on laplacian(velocity)
-    if (m_tagOnLapPhi)
-    {
-        for (dit.begin(); dit.ok(); ++dit)
-        {
-            FArrayBox lapPhi(levelGrids[dit()], levelPhi.nComp());
-            lapPhi.setVal(0.0);
-            Real alpha = 0;
-            Real beta = 1.0;
+    //if (m_tagOnLapPhi)
+    //{
+    //    for (dit.begin(); dit.ok(); ++dit)
+    //    {
+    //        FArrayBox lapPhi(levelGrids[dit()], levelPhi.nComp());
+    //        lapPhi.setVal(0.0);
+    //        Real alpha = 0;
+    //        Real beta = 1.0;
 
-            // use undivided laplacian (set dx = 1)
-            Real bogusDx = 1.0;
-            Box lapBox = levelPhi[dit].box();
-            lapBox.grow(-2);
-            lapBox &= levelGrids[dit];
-            // assumes that ghost cells boundary conditions are properly set
-            FORT_OPERATORLAP(CHF_FRA(lapPhi),
-                             CHF_FRA(levelPhi[dit]),
-                             CHF_BOX(lapBox),
-                             CHF_CONST_REAL(bogusDx),
-                             CHF_CONST_REAL(alpha),
-                             CHF_CONST_REAL(beta));
+    //        // use undivided laplacian (set dx = 1)
+    //        Real bogusDx = 1.0;
+    //        Box lapBox = levelPhi[dit].box();
+    //        lapBox.grow(-2);
+    //        lapBox &= levelGrids[dit];
+    //        // assumes that ghost cells boundary conditions are properly set
+    //        FORT_OPERATORLAP(CHF_FRA(lapPhi),
+    //                         CHF_FRA(levelPhi[dit]),
+    //                         CHF_BOX(lapBox),
+    //                         CHF_CONST_REAL(bogusDx),
+    //                         CHF_CONST_REAL(alpha),
+    //                         CHF_CONST_REAL(beta));
 
-            // now tag cells based on values
-            BoxIterator bit(lapBox);
+    //        // now tag cells based on values
+    //        BoxIterator bit(lapBox);
 
-            for (bit.begin(); bit.ok(); ++bit)
-            {
-                const IntVect& iv = bit();
-                for (int comp = 0; comp < lapPhi.nComp(); comp++)
-                {
-                    if (fabs(lapPhi(iv, comp)) > m_laplacian_tagging_val)
-                    {
-                        local_tags |= iv;
-                    }
-                }
+    //        for (bit.begin(); bit.ok(); ++bit)
+    //        {
+    //            const IntVect& iv = bit();
+    //            for (int comp = 0; comp < lapPhi.nComp(); comp++)
+    //            {
+    //                if (fabs(lapPhi(iv, comp)) > m_laplacian_tagging_val)
+    //                {
+    //                    local_tags |= iv;
+    //                }
+    //            }
 
-            } // end loop over cells
-        }     // end loop over grids
-    }         // end if tag on laplacian(phi)
+    //        } // end loop over cells
+    //    }     // end loop over grids
+    //}         // end if tag on laplacian(phi)
 
     // now buffer tags
 
@@ -1286,7 +1293,7 @@ AmrDriver::initGrids(int a_finest_level)
 
     levelSetup(0, baseGrids);
 
-    LevelData<FArrayBox>& baseLevelVel = *m_phi[0];
+    LevelData<FArrayBox>& baseLevelVel = *m_head[0];
     DataIterator baseDit = baseGrids.dataIterator();
     for (baseDit.begin(); baseDit.ok(); ++baseDit)
     {
@@ -1295,7 +1302,7 @@ AmrDriver::initGrids(int a_finest_level)
     }
 
     // initialize base level data
-    initData(m_phi);
+    initData(m_head);
 
     int numLevels = 1;
     bool moreLevels = (m_max_level > 0);
@@ -1387,7 +1394,7 @@ AmrDriver::initGrids(int a_finest_level)
         {
             defineSolver();
 
-            initData(m_phi);
+            initData(m_head);
         }
     } // end while more levels to do
 }
@@ -1514,7 +1521,7 @@ AmrDriver::setupFixedGrids(const std::string& a_gridFile)
     // finally set finest level and initialize data on hierarchy
     m_finest_level = gridvect.size() - 1;
 
-    initData(m_phi);
+    initData(m_head);
 }
 
 void
@@ -1522,38 +1529,39 @@ AmrDriver::levelSetup(int a_level, const DisjointBoxLayout& a_grids)
 {
     int nPhiComp = 1;
     IntVect ghostVect = IntVect::Unit;
-    IntVect phiGhostVect = m_num_phi_ghost * IntVect::Unit;
-    m_old_phi[a_level]->define(a_grids, nPhiComp, phiGhostVect);
+    IntVect HeadGhostVect = m_num_head_ghost * IntVect::Unit;
+    m_old_head[a_level]->define(a_grids, nPhiComp, HeadGhostVect);
 
-    if (a_level == 0 || m_phi[a_level] == NULL)
+    if (a_level == 0 || m_head[a_level] == NULL)
     {
-        m_phi[a_level] = new LevelData<FArrayBox>(a_grids, nPhiComp, phiGhostVect);
+        m_head[a_level] = new LevelData<FArrayBox>(a_grids, nPhiComp, HeadGhostVect);
+        m_bedelevation[a_level] = new LevelData<FArrayBox>(a_grids, nPhiComp, HeadGhostVect);
     }
     else
     {
         // do phi a bit differently in order to use previously
         // computed velocity field as an initial guess
         {
-            LevelData<FArrayBox>* newPhiPtr = new LevelData<FArrayBox>(a_grids, nPhiComp, phiGhostVect);
+            LevelData<FArrayBox>* newPhiPtr = new LevelData<FArrayBox>(a_grids, nPhiComp, HeadGhostVect);
 
             // first do interp from coarser level
-            FineInterp phiInterp(a_grids, nPhiComp, m_refinement_ratios[a_level - 1], m_amrDomains[a_level]);
+            FineInterp HeadInterp(a_grids, nPhiComp, m_refinement_ratios[a_level - 1], m_amrDomains[a_level]);
 
-            phiInterp.interpToFine(*newPhiPtr, *m_phi[a_level - 1]);
+            HeadInterp.interpToFine(*newPhiPtr, *m_head[a_level - 1]);
 
             // can only copy from existing level if we're not on the
             // newly created level
             // if (a_level != new_finest_level)
-            if (m_phi[a_level]->isDefined())
+            if (m_head[a_level]->isDefined())
             {
-                m_phi[a_level]->copyTo(*newPhiPtr);
+                m_head[a_level]->copyTo(*newPhiPtr);
             }
 
             // finally, do an exchange (this may wind up being unnecessary)
             newPhiPtr->exchange();
 
-            delete (m_phi[a_level]);
-            m_phi[a_level] = newPhiPtr;
+            delete (m_head[a_level]);
+            m_head[a_level] = newPhiPtr;
         }
     } // end interpolate/copy new velocity
 
@@ -1562,7 +1570,7 @@ AmrDriver::levelSetup(int a_level, const DisjointBoxLayout& a_grids)
 }
 
 void
-AmrDriver::initData(Vector<LevelData<FArrayBox>*>& a_phi)
+AmrDriver::initData(Vector<LevelData<FArrayBox>*>& a_head)
 
 {
     if (m_verbosity > 3)
@@ -1572,36 +1580,37 @@ AmrDriver::initData(Vector<LevelData<FArrayBox>*>& a_phi)
 
     for (int lev = 0; lev <= m_finest_level; lev++)
     {
-        LevelData<FArrayBox>& levelPhi = *m_phi[lev];
+        LevelData<FArrayBox>& levelPhi = *m_head[lev];
+        LevelData<FArrayBox>& levelzBed = *m_bedelevation[lev];
         if (lev > 0)
         {
             // fill the ghost cells of a_vectCoordSys[lev]->getH();
-            LevelData<FArrayBox>& coarsePhi = *m_phi[lev - 1];
+            LevelData<FArrayBox>& coarsePhi = *m_head[lev - 1];
             int nGhost = levelPhi.ghostVect()[0];
-            PiecewiseLinearFillPatch phiFiller(m_amrGrids[lev],
+            PiecewiseLinearFillPatch headFiller(m_amrGrids[lev],
                                                m_amrGrids[lev - 1],
                                                levelPhi.nComp(),
                                                m_amrDomains[lev - 1],
                                                m_refinement_ratios[lev - 1],
                                                nGhost);
-            phiFiller.fillInterp(levelPhi, coarsePhi, coarsePhi, 0.0, 0, 0, 1);
+            headFiller.fillInterp(levelPhi, coarsePhi, coarsePhi, 0.0, 0, 0, 1);
         }
 
         RealVect levelDx = m_amrDx[lev] * RealVect::Unit;
         m_IBCPtr->define(m_amrDomains[lev], levelDx[0]);
         // int refRatio = (lev > 0)?m_refinement_ratios[lev-1]:0;
 
-        m_IBCPtr->initialize(levelPhi);
+        m_IBCPtr->initialize2(levelDx, levelPhi, levelzBed);
 
         // initialize oldPhi to be the current value
-        levelPhi.copyTo(*m_old_phi[lev]);
+        levelPhi.copyTo(*m_old_head[lev]);
     }
 
     // may be necessary to average down here
     for (int lev = m_finest_level; lev > 0; lev--)
     {
-        CoarseAverage avgDown(m_amrGrids[lev], m_phi[lev]->nComp(), m_refinement_ratios[lev - 1]);
-        avgDown.averageToCoarse(*m_phi[lev - 1], *m_phi[lev]);
+        CoarseAverage avgDown(m_amrGrids[lev], m_head[lev]->nComp(), m_refinement_ratios[lev - 1]);
+        avgDown.averageToCoarse(*m_head[lev - 1], *m_head[lev]);
     }
 
 //#define writePlotsImmediately
@@ -1638,7 +1647,7 @@ AmrDriver::computeDt()
         Real dtLev = dt;
         const DisjointBoxLayout& levelGrids = m_amrGrids[lev];
         // pretend phi is velocity here
-        const LevelData<FArrayBox>& levelVel = *m_phi[lev];
+        const LevelData<FArrayBox>& levelVel = *m_head[lev];
         DataIterator levelDit = levelVel.dataIterator();
         for (levelDit.reset(); levelDit.ok(); ++levelDit)
         {
@@ -1710,10 +1719,10 @@ AmrDriver::writePlotFile()
 
     CH_TIME("AmrDriver::writePlotFile");
 
-    // plot comps: phi
-    int numPlotComps = 1;
+    // plot comps: head + bedelevation
+    int numPlotComps = 2;
 
-    // add in grad(phi) if desired
+    // add in grad(head) if desired
     if (m_write_gradPhi)
     {
         numPlotComps += SpaceDim;
@@ -1721,7 +1730,8 @@ AmrDriver::writePlotFile()
 
     // generate data names
 
-    string phiName("phi");
+    string headName("head");
+    string zbedName("bedelevation");
     string xGradName("xGradPhi");
     string yGradName("yGradPhi");
     string zGradName("zGradPhi");
@@ -1729,19 +1739,20 @@ AmrDriver::writePlotFile()
     Vector<string> vectName(numPlotComps);
     // int dThicknessComp;
 
-    vectName[0] = phiName;
+    vectName[0] = headName;
+    vectName[1] = zbedName;
     if (m_write_gradPhi)
     {
-        vectName[1] = xGradName;
-        if (SpaceDim > 1) vectName[2] = yGradName;
-        if (SpaceDim > 2) vectName[3] = zGradName;
+        vectName[2] = xGradName;
+        if (SpaceDim > 1) vectName[3] = yGradName;
+        if (SpaceDim > 2) vectName[4] = zGradName;
     }
 
     Box domain = m_amrDomains[0].domainBox();
     Real dt = 1.;
     int numLevels = m_finest_level + 1;
     // compute plot data
-    Vector<LevelData<FArrayBox>*> plotData(m_phi.size(), NULL);
+    Vector<LevelData<FArrayBox>*> plotData(m_head.size(), NULL);
 
     // ghost vect makes things simpler
     IntVect ghostVect(IntVect::Unit);
@@ -1755,12 +1766,14 @@ AmrDriver::writePlotFile()
     for (int lev = 0; lev < numLevels; lev++)
     {
         // now copy new-time solution into plotData
-        Interval phiComps(0, 0);
-        Interval gradComps(1, SpaceDim);
+        Interval headComps(0, 0);
+        Interval zbedComps(1, 0);
+        Interval gradComps(2, SpaceDim);
 
         LevelData<FArrayBox>& plotDataLev = *plotData[lev];
 
-        const LevelData<FArrayBox>& levelPhi = *m_phi[lev];
+        const LevelData<FArrayBox>& levelPhi = *m_head[lev];
+        const LevelData<FArrayBox>& levelzbed = *m_bedelevation[lev];
         LevelData<FArrayBox> levelGradPhi;
         if (m_write_gradPhi)
         {
@@ -1793,18 +1806,22 @@ AmrDriver::writePlotFile()
             FArrayBox& thisPlotData = plotDataLev[dit];
             int comp = 0;
             const FArrayBox& thisPhi = levelPhi[dit];
+            const FArrayBox& thiszbed = levelzbed[dit];
 
             thisPlotData.copy(thisPhi, 0, comp, 1);
 
             comp++;
-            // now copy for grad(phi)
+            thisPlotData.copy(thiszbed, 0, comp, 1);
+
+            comp++;
+            // now copy for grad(head)
             if (m_write_gradPhi)
             {
                 const FArrayBox& thisGradPhi = levelGradPhi[dit];
                 thisPlotData.copy(thisGradPhi, 0, comp, SpaceDim);
                 comp += SpaceDim;
 
-            } // end if we are writing grad(phi)
+            } // end if we are writing grad(head)
 
         } // end loop over boxes on this level
 
@@ -1872,13 +1889,13 @@ AmrDriver::writeCheckpointFile() const
 
     CH_TIME("AmrDriver::writeCheckpointFile");
 
-    string phiName("phi");
+    string headName("head");
     Vector<string> vectName(1);
     for (int comp = 0; comp < 1; comp++)
     {
         char idx[4];
         sprintf(idx, "%d", comp);
-        vectName[comp] = phiName + string(idx);
+        vectName[comp] = headName + string(idx);
     }
     Box domain = m_amrDomains[0].domainBox();
     // int numLevels = m_finest_level +1;
@@ -1945,7 +1962,7 @@ AmrDriver::writeCheckpointFile() const
         // first generate component name
         char idx[5];
         sprintf(idx, "%04d", comp);
-        compName = phiName + string(idx);
+        compName = headName + string(idx);
         sprintf(compStr, "component_%04d", comp);
         header.m_string[compStr] = compName;
     }
@@ -1984,7 +2001,7 @@ AmrDriver::writeCheckpointFile() const
 
             const IntVect ghost = IntVect::Unit * 2;
 
-            write(handle, *m_phi[lev], "phiData", m_phi[lev]->ghostVect());
+            write(handle, *m_head[lev], "headData", m_head[lev]->ghostVect());
 
         } // end loop over levels
     }
@@ -2122,8 +2139,8 @@ AmrDriver::readCheckpointFile(HDF5Handle& a_handle)
     m_amrDomains.resize(m_max_level + 1);
     m_amrGrids.resize(m_max_level + 1);
     m_amrDx.resize(m_max_level + 1);
-    m_old_phi.resize(m_max_level + 1, NULL);
-    m_phi.resize(m_max_level + 1, NULL);
+    m_old_head.resize(m_max_level + 1, NULL);
+    m_head.resize(m_max_level + 1, NULL);
 
     // now read in level-by-level data
     for (int lev = 0; lev <= max_level_check; lev++)
@@ -2197,26 +2214,26 @@ AmrDriver::readCheckpointFile(HDF5Handle& a_handle)
             m_amrGrids[lev] = levelDBL;
 
             // allocate this level's storage
-            IntVect nGhost = m_num_phi_ghost * IntVect::Unit;
-            m_old_phi[lev] = new LevelData<FArrayBox>(levelDBL, 1, nGhost);
+            IntVect nGhost = m_num_head_ghost * IntVect::Unit;
+            m_old_head[lev] = new LevelData<FArrayBox>(levelDBL, 1, nGhost);
 
-            m_phi[lev] = new LevelData<FArrayBox>(levelDBL, SpaceDim, nGhost);
+            m_head[lev] = new LevelData<FArrayBox>(levelDBL, SpaceDim, nGhost);
 
             // read this level's data
 
-            LevelData<FArrayBox>& old_phi = *m_old_phi[lev];
-            LevelData<FArrayBox> tmpPhi;
-            tmpPhi.define(old_phi);
+            LevelData<FArrayBox>& old_head = *m_old_head[lev];
+            LevelData<FArrayBox> tmpHead;
+            tmpHead.define(old_head);
 
-            int dataStatus = read<FArrayBox>(a_handle, tmpPhi, "phiData", levelDBL);
+            int dataStatus = read<FArrayBox>(a_handle, tmpHead, "headData", levelDBL);
             for (DataIterator dit(levelDBL); dit.ok(); ++dit)
             {
-                old_phi[dit].copy(tmpPhi[dit]);
+                old_head[dit].copy(tmpHead[dit]);
             }
 
             if (dataStatus != 0)
             {
-                MayDay::Error("checkpoint file does not contain phi data");
+                MayDay::Error("checkpoint file does not contain head data");
             }
 
         } // end if this level is defined

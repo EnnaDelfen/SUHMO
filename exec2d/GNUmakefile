@@ -11,10 +11,9 @@ MACHINE = $(shell uname)
 UNAMEM = $(shell uname -m)
 
 DIM=2
-USE_PETSC=FALSE
-MPI=TRUE
+USE_PETSC=TRUE
+MPI=FALSE
 USE_MF=TRUE
-USE_HDF=FALSE
 
 ##
 ## names of Chombo libraries needed by this program, in order of search.

@@ -117,6 +117,10 @@ public:
      */
     virtual void initialize(LevelData<FArrayBox>& a_U) = 0;
 
+    virtual void initialize2(RealVect& a_dx,
+                             LevelData<FArrayBox>& a_Head,
+                             LevelData<FArrayBox>& a_zbed) = 0;
+
     /// Set boundary fluxes
     /**
      */
