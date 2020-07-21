@@ -137,11 +137,11 @@ public:
 
     /* Access functions */
     // m_gapheight
-    const LevelData<FArrayBox>* gapheight(int a_level) const
+    const LevelData<FArrayBox>* gapHeight(int a_level) const
     {
         return m_gapheight[a_level];
     }
-    Vector<LevelData<FArrayBox>*>& amrGapheight()
+    Vector<LevelData<FArrayBox>*>& amrGapHeight()
     {
         return m_gapheight;
     }
@@ -157,13 +157,13 @@ public:
     }
 
     // m_bedelevation
-    const LevelData<FArrayBox>* gapHeight(int a_level) const
+    const LevelData<FArrayBox>* zBed(int a_level) const
     {
-        return m_gapheight[a_level];
+        return m_bedelevation[a_level];
     }
-    Vector<LevelData<FArrayBox>*>& amrGapHeight()
+    Vector<LevelData<FArrayBox>*>& amrZBed()
     {
-        return m_gapheight;
+        return m_bedelevation;
     }
 
     /* set physical parameters (useful when calling from another driver) */
