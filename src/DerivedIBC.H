@@ -65,8 +65,9 @@ public:
      */
     virtual void initialize(LevelData<FArrayBox>& a_U);
 
-    virtual void initialize2(RealVect& a_dx,
-                             LevelData<FArrayBox>& a_Phi,
+    virtual void initializeData(RealVect& a_dx,
+                             LevelData<FArrayBox>& a_Head,
+                             LevelData<FArrayBox>& a_GapHeight,
                              LevelData<FArrayBox>& a_zbed) override;
 
     /// Set boundary fluxes
@@ -111,6 +112,16 @@ protected:
     void setupBCs();
 
     RefCountedPtr<CompGridVTOBC> m_velBCs;
+
+    // Parameters
+    Real m_slope;
+    Real m_H;
+    Real m_gapInit;
+   
+    // Cst of model
+    Real m_rho_ice   = 910.; // kg.m-3
+    Real m_rho_water = 1000.; // kg.m-3
+    Real m_gravity   = 9.8;  // m.s-1
 
 private:
     // Disallowed for all the usual reasons

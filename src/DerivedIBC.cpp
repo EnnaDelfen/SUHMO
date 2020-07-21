@@ -123,9 +123,6 @@ void
 DerivedIBC::initialize(LevelData<FArrayBox>& a_head)
 {
     // for now, just initialize to a square subregion
-    Real HeadInit = 0.01;
-    Real GapInit  = 0.01;
-    Real slope = 0.02;    
     IntVect regionLo = m_domain.domainBox().bigEnd();
     IntVect regionHi = m_domain.domainBox().bigEnd();
 
@@ -140,11 +137,11 @@ DerivedIBC::initialize(LevelData<FArrayBox>& a_head)
             IntVect iv = bit();
             if ((iv > regionLo) && (iv < regionHi))
             {
-                thisHead(iv, 0) = HeadInit;
+                thisHead(iv, 0) = 1.0;
             }
             else
             {
-                thisHead(iv, 0) = HeadInit * 2.0;
+                thisHead(iv, 0) = 2.0;
             }
         } // end loop over cells
     }     // end loop over boxes
@@ -153,32 +150,39 @@ DerivedIBC::initialize(LevelData<FArrayBox>& a_head)
 /** Set up initial conditions 
  */
 void
-DerivedIBC::initialize2(RealVect& a_dx,
+DerivedIBC::initializeData(RealVect& a_dx,
                         LevelData<FArrayBox>& a_head,
+                        LevelData<FArrayBox>& a_gapHeight,
                         LevelData<FArrayBox>& a_zbed)
 {
 
-    BasicIBC::initialize(a_head);    
-    // for now, just initialize to a square subregion
-    Real HeadInit = 0.01;
-    Real GapInit  = 0.01;
-    Real slope = 0.02;    
+    ParmParse ppBC("icbc");
+    ppBC.get("H", m_H);
+    ppBC.get("slope", m_slope);
+    ppBC.get("GapInit", m_gapInit);
+
     IntVect regionLo = m_domain.domainBox().bigEnd();
     IntVect regionHi = m_domain.domainBox().bigEnd();
 
     DataIterator dit = a_head.dataIterator();
     for (dit.begin(); dit.ok(); ++dit)
     {
-        FArrayBox& thisHead = a_head[dit];
-        FArrayBox& thiszbed = a_zbed[dit];
+        FArrayBox& thisHead      = a_head[dit];
+        FArrayBox& thisGapHeight = a_gapHeight[dit];
+        FArrayBox& thiszbed      = a_zbed[dit];
 
         BoxIterator bit(thisHead.box()); // Default .box() have ghostcells ?
         for (bit.begin(); bit.ok(); ++bit)
         {
             IntVect iv = bit();
-            thisHead(iv, 0) = HeadInit;
-            Real elevation = slope*(iv[0]+0.5)*a_dx[0];
-            thiszbed(iv, 0) = elevation;
+            // gapHeight - initially constant 
+            thisGapHeight(iv, 0) = m_gapInit;
+            // Initial Head is such that the water pressure is equal to 50% of the ice overburden pressure
+            Real P_ice        = m_rho_ice * m_gravity * m_H;
+            Real P_water_init = P_ice * 0.5;
+            Real Fact         = 1./(m_rho_water * m_gravity);
+            thiszbed(iv, 0)      = m_slope*(iv[0]+0.5)*a_dx[0];
+            thisHead(iv, 0)      = P_water_init * Fact + thiszbed(iv, 0) ;
         } // end loop over cells
     }     // end loop over boxes
 }
