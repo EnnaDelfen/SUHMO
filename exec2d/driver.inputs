@@ -5,8 +5,10 @@ main.maxTime=0.1
 main.maxStep=1
 
 # problem specific inputs
-suhmo.H=500
-suhmo.slope=0.02
+icbc.H=500
+icbc.slope=0.02
+icbc.ReInit=1000
+icbc.GapInit=0.01
 
 # class AmrDriver.cpp
 # misc
