@@ -142,6 +142,7 @@ AmrDriver::~AmrDriver()
 void
 AmrDriver::initialize()
 {
+    printf("AmrDriver::initialize");
     if (m_verbosity > 3)
     {
         pout() << "AmrDriver::initialize" << endl;
@@ -541,6 +542,7 @@ AmrDriver::initialize()
 void
 AmrDriver::setIBC(BasicIBC* a_IBC)
 {
+    printf("AmrDriver::setIBC");
     m_IBCPtr = a_IBC->new_thicknessIBC();
 }
 
@@ -618,7 +620,7 @@ AmrDriver::run(Real a_max_time, int a_max_step)
             }
 
             /* core */
-            timeStep(dt);
+            //timeStep(dt);
 
         } // end of plot_time_interval
 #ifdef CH_USE_HDF5
@@ -1580,30 +1582,44 @@ AmrDriver::initData(Vector<LevelData<FArrayBox>*>& a_head)
 
     for (int lev = 0; lev <= m_finest_level; lev++)
     {
-        LevelData<FArrayBox>& levelPhi = *m_head[lev];
-        LevelData<FArrayBox>& levelzBed = *m_bedelevation[lev];
+        LevelData<FArrayBox>& levelHead      = *m_head[lev];
+        LevelData<FArrayBox>& levelGapHeight = *m_gapheight[lev];
+        LevelData<FArrayBox>& levelzBed      = *m_bedelevation[lev];
         if (lev > 0)
         {
             // fill the ghost cells of a_vectCoordSys[lev]->getH();
-            LevelData<FArrayBox>& coarsePhi = *m_head[lev - 1];
-            int nGhost = levelPhi.ghostVect()[0];
+            // m_head
+            LevelData<FArrayBox>& coarseHead = *m_head[lev - 1];
+            int nGhost = levelHead.ghostVect()[0];
             PiecewiseLinearFillPatch headFiller(m_amrGrids[lev],
                                                m_amrGrids[lev - 1],
-                                               levelPhi.nComp(),
+                                               levelHead.nComp(),
                                                m_amrDomains[lev - 1],
                                                m_refinement_ratios[lev - 1],
                                                nGhost);
-            headFiller.fillInterp(levelPhi, coarsePhi, coarsePhi, 0.0, 0, 0, 1);
+            headFiller.fillInterp(levelHead, coarseHead, coarseHead, 0.0, 0, 0, 1);
+
+            // m_gapheight
+            LevelData<FArrayBox>& coarseGapHeight = *m_gapheight[lev - 1];
+            //int nGhost = levelGapHeight.ghostVect()[0]; Same number of ghost cells ?
+            PiecewiseLinearFillPatch gapHeightFiller(m_amrGrids[lev],
+                                               m_amrGrids[lev - 1],
+                                               levelGapHeight.nComp(),
+                                               m_amrDomains[lev - 1],
+                                               m_refinement_ratios[lev - 1],
+                                               nGhost);
+            gapHeightFiller.fillInterp(levelGapHeight, coarseGapHeight, coarseGapHeight, 0.0, 0, 0, 1);
         }
 
         RealVect levelDx = m_amrDx[lev] * RealVect::Unit;
         m_IBCPtr->define(m_amrDomains[lev], levelDx[0]);
         // int refRatio = (lev > 0)?m_refinement_ratios[lev-1]:0;
 
-        m_IBCPtr->initialize2(levelDx, levelPhi, levelzBed);
+        m_IBCPtr->initializeData(levelDx, levelHead, levelGapHeight, levelzBed);
 
         // initialize oldPhi to be the current value
-        levelPhi.copyTo(*m_old_head[lev]);
+        levelHead.copyTo(*m_old_head[lev]);
+        levelGapHeight.copyTo(*m_old_gapheight[lev]);
     }
 
     // may be necessary to average down here
@@ -1611,6 +1627,9 @@ AmrDriver::initData(Vector<LevelData<FArrayBox>*>& a_head)
     {
         CoarseAverage avgDown(m_amrGrids[lev], m_head[lev]->nComp(), m_refinement_ratios[lev - 1]);
         avgDown.averageToCoarse(*m_head[lev - 1], *m_head[lev]);
+
+        CoarseAverage avgDown(m_amrGrids[lev], m_gapheight[lev]->nComp(), m_refinement_ratios[lev - 1]);
+        avgDown.averageToCoarse(*m_gapheight[lev - 1], *m_gapheight[lev]);
     }
 
 //#define writePlotsImmediately
@@ -1719,18 +1738,19 @@ AmrDriver::writePlotFile()
 
     CH_TIME("AmrDriver::writePlotFile");
 
-    // plot comps: head + bedelevation
-    int numPlotComps = 2;
+    // plot comps: head + gapHeight + bedelevation
+    int numPlotComps = 3;
 
     // add in grad(head) if desired
-    if (m_write_gradPhi)
-    {
-        numPlotComps += SpaceDim;
-    }
+    //if (m_write_gradPhi)
+    //{
+    //    numPlotComps += SpaceDim;
+    //}
 
     // generate data names
 
     string headName("head");
+    string gapHeightName("gapHeight");
     string zbedName("bedelevation");
     string xGradName("xGradPhi");
     string yGradName("yGradPhi");
@@ -1740,13 +1760,14 @@ AmrDriver::writePlotFile()
     // int dThicknessComp;
 
     vectName[0] = headName;
-    vectName[1] = zbedName;
-    if (m_write_gradPhi)
-    {
-        vectName[2] = xGradName;
-        if (SpaceDim > 1) vectName[3] = yGradName;
-        if (SpaceDim > 2) vectName[4] = zGradName;
-    }
+    vectName[1] = gapHeightName;
+    vectName[2] = zbedName;
+    //if (m_write_gradPhi)
+    //{
+    //    vectName[numPlotComps] = xGradName;
+    //    if (SpaceDim > 1) vectName[numPlotComps + 1] = yGradName;
+    //    if (SpaceDim > 2) vectName[numPlotComps + 2] = zGradName;
+    //}
 
     Box domain = m_amrDomains[0].domainBox();
     Real dt = 1.;
@@ -1766,62 +1787,65 @@ AmrDriver::writePlotFile()
     for (int lev = 0; lev < numLevels; lev++)
     {
         // now copy new-time solution into plotData
-        Interval headComps(0, 0);
-        Interval zbedComps(1, 0);
-        Interval gradComps(2, SpaceDim);
+        //Interval headComps(0, 0);
+        //Interval gapHeightComps(1, 0);
+        //Interval zbedComps(2, 0);
+        //Interval gradComps(numPlotComps, SpaceDim);
 
         LevelData<FArrayBox>& plotDataLev = *plotData[lev];
 
-        const LevelData<FArrayBox>& levelPhi = *m_head[lev];
-        const LevelData<FArrayBox>& levelzbed = *m_bedelevation[lev];
-        LevelData<FArrayBox> levelGradPhi;
-        if (m_write_gradPhi)
-        {
-            levelGradPhi.define(m_amrGrids[lev], SpaceDim, ghostVect);
-            // compute cc gradient here
-            DataIterator dit = levelGradPhi.dataIterator();
-            for (dit.begin(); dit.ok(); ++dit)
-            {
-                const FArrayBox& thisPhi = levelPhi[dit];
-                FArrayBox& thisGrad = levelGradPhi[dit];
-                // just loop over interiors
-                BoxIterator bit(m_amrGrids[lev][dit]);
-                for (bit.begin(); bit.ok(); ++bit)
-                {
-                    IntVect iv = bit();
-                    for (int dir = 0; dir < SpaceDim; dir++)
-                    {
-                        IntVect plusIV = iv + BASISV(dir);
-                        IntVect minusIV = iv - BASISV(dir);
-                        thisGrad(iv, dir) = 0.5 * (thisPhi(plusIV, 0) - thisPhi(minusIV, 0)) / m_amrDx[lev][dir];
-                    }
-                } // end loop over cells
-            }     // end loop over grids
-        }         // end if write_gradPhi
+        const LevelData<FArrayBox>& levelHead      = *m_head[lev];
+        const LevelData<FArrayBox>& levelgapHeight = *m_gapheight[lev];
+        const LevelData<FArrayBox>& levelzbed      = *m_bedelevation[lev];
+        //LevelData<FArrayBox> levelGradPhi;
+        //if (m_write_gradPhi)
+        //{
+        //    levelGradPhi.define(m_amrGrids[lev], SpaceDim, ghostVect);
+        //    // compute cc gradient here
+        //    DataIterator dit = levelGradPhi.dataIterator();
+        //    for (dit.begin(); dit.ok(); ++dit)
+        //    {
+        //        const FArrayBox& thisPhi = levelHead[dit];
+        //        FArrayBox& thisGrad = levelGradPhi[dit];
+        //        // just loop over interiors
+        //        BoxIterator bit(m_amrGrids[lev][dit]);
+        //        for (bit.begin(); bit.ok(); ++bit)
+        //        {
+        //            IntVect iv = bit();
+        //            for (int dir = 0; dir < SpaceDim; dir++)
+        //            {
+        //                IntVect plusIV = iv + BASISV(dir);
+        //                IntVect minusIV = iv - BASISV(dir);
+        //                thisGrad(iv, dir) = 0.5 * (thisPhi(plusIV, 0) - thisPhi(minusIV, 0)) / m_amrDx[lev][dir];
+        //            }
+        //        } // end loop over cells
+        //    }     // end loop over grids
+        //}         // end if write_gradPhi
 
         DataIterator dit = m_amrGrids[lev].dataIterator();
         for (dit.begin(); dit.ok(); ++dit)
         {
-            const Box& gridBox = m_amrGrids[lev][dit];
-            FArrayBox& thisPlotData = plotDataLev[dit];
+            const Box& gridBox        = m_amrGrids[lev][dit];
+            FArrayBox& thisPlotData   = plotDataLev[dit];
             int comp = 0;
-            const FArrayBox& thisPhi = levelPhi[dit];
-            const FArrayBox& thiszbed = levelzbed[dit];
+            const FArrayBox& thisHead       = levelHead[dit];
+            const FArrayBox& thisGapHeight  = levelgapHeight[dit];
+            const FArrayBox& thiszbed       = levelzbed[dit];
 
-            thisPlotData.copy(thisPhi, 0, comp, 1);
-
+            thisPlotData.copy(thisHead, 0, comp, 1);
+            comp++;
+            thisPlotData.copy(thisGapHeight, 0, comp, 1);
             comp++;
             thisPlotData.copy(thiszbed, 0, comp, 1);
-
             comp++;
             // now copy for grad(head)
-            if (m_write_gradPhi)
-            {
-                const FArrayBox& thisGradPhi = levelGradPhi[dit];
-                thisPlotData.copy(thisGradPhi, 0, comp, SpaceDim);
-                comp += SpaceDim;
+            //if (m_write_gradPhi)
+            //{
+            //    const FArrayBox& thisGradPhi = levelGradPhi[dit];
+            //    thisPlotData.copy(thisGradPhi, 0, comp, SpaceDim);
+            //    comp += SpaceDim;
 
-            } // end if we are writing grad(head)
+            //} // end if we are writing grad(head)
 
         } // end loop over boxes on this level
 
