@@ -136,24 +136,34 @@ public:
     }
 
     /* Access functions */
+    // m_gapheight
     const LevelData<FArrayBox>* gapheight(int a_level) const
     {
         return m_gapheight[a_level];
-    };
-
+    }
     Vector<LevelData<FArrayBox>*>& amrGapheight()
     {
         return m_gapheight;
     }
 
+    // m_head
     const LevelData<FArrayBox>* head(int a_level) const
     {
         return m_head[a_level];
-    };
-
+    }
     Vector<LevelData<FArrayBox>*>& amrHead()
     {
         return m_head;
+    }
+
+    // m_bedelevation
+    const LevelData<FArrayBox>* gapHeight(int a_level) const
+    {
+        return m_gapheight[a_level];
+    }
+    Vector<LevelData<FArrayBox>*>& amrGapHeight()
+    {
+        return m_gapheight;
     }
 
     /* set physical parameters (useful when calling from another driver) */
