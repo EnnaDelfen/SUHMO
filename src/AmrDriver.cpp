@@ -63,7 +63,7 @@ AmrDriver::setDefaults()
 {
     // set some bogus values as defaults
     m_is_defined = false;
-    m_verbosity = 1;
+    m_verbosity = 4;
     m_max_level = -1;
     m_finest_level = -1;
     m_tag_cap = 100;
@@ -142,7 +142,6 @@ AmrDriver::~AmrDriver()
 void
 AmrDriver::initialize()
 {
-    printf("AmrDriver::initialize");
     if (m_verbosity > 3)
     {
         pout() << "AmrDriver::initialize" << endl;
@@ -425,17 +424,29 @@ AmrDriver::initialize()
     if (!ppAmr.contains("restart_file"))
     {
         // if we're not restarting
+        if (m_verbosity > 3)
+        {
+            pout() << "AmrDriver::initialize - Initializing data containers" << endl;
+        }
 
-        // now set up data holders
+        //---------------------------------
+        // Set AMR hierarchy vector
+        //---------------------------------
+        // AF: add vars here
+        // Time-dependent variables    
         m_old_head.resize(m_max_level + 1, NULL);
         m_head.resize(m_max_level + 1, NULL);
 
         m_old_gapheight.resize(m_max_level + 1, NULL);
         m_gapheight.resize(m_max_level + 1, NULL);
         
+        // Time constant variables
         m_bedelevation.resize(m_max_level + 1, NULL);
+        m_overburdenpress.resize(m_max_level + 1, NULL);
 
-        // allocate storage for m_old..., m_... 
+        //-------------------------------------------------
+        // For each level, define a collection of FArrayBox
+        //-------------------------------------------------
         for (int lev = 0; lev < m_head.size(); lev++)
         {
             m_old_head[lev] = new LevelData<FArrayBox>;
@@ -445,6 +456,7 @@ AmrDriver::initialize()
             m_gapheight[lev] = new LevelData<FArrayBox>;
 
             m_bedelevation[lev] = new LevelData<FArrayBox>;
+            m_overburdenpress[lev] = new LevelData<FArrayBox>;
         }
 
         int finest_level = -1;
@@ -536,13 +548,17 @@ AmrDriver::initialize()
             }
         }
     } // end loop over levels to determine covered levels
+
+    if (m_verbosity > 3)
+    {
+        pout() << "Done with AmrDriver::initialize" << endl;
+    }
 }
 
 // set BC for thickness advection
 void
 AmrDriver::setIBC(BasicIBC* a_IBC)
 {
-    printf("AmrDriver::setIBC");
     m_IBCPtr = a_IBC->new_thicknessIBC();
 }
 
@@ -620,7 +636,7 @@ AmrDriver::run(Real a_max_time, int a_max_step)
             }
 
             /* core */
-            //timeStep(dt);
+            timeStep(dt);
 
         } // end of plot_time_interval
 #ifdef CH_USE_HDF5
@@ -1290,11 +1306,14 @@ AmrDriver::initGrids(int a_finest_level)
         pout() << "Level 0: " << numCells0 << " cells: " << baseGrids << endl;
     }
 
+    // Set collection of boxes hierarchy, init level 0 to base grid
     m_amrGrids.resize(m_max_level + 1);
     m_amrGrids[0] = baseGrids;
 
+    // levelSetup now create the data container for each box in level 0
     levelSetup(0, baseGrids);
 
+    // AF: really necessary ?
     LevelData<FArrayBox>& baseLevelVel = *m_head[0];
     DataIterator baseDit = baseGrids.dataIterator();
     for (baseDit.begin(); baseDit.ok(); ++baseDit)
@@ -1404,6 +1423,10 @@ AmrDriver::initGrids(int a_finest_level)
 void
 AmrDriver::setupFixedGrids(const std::string& a_gridFile)
 {
+    if (m_verbosity > 3)
+    {
+        pout() << "AmrDriver::setupFixedGrids" << endl;
+    }
     Vector<Vector<Box> > gridvect;
 
     if (procID() == uniqueProc(SerialTask::compute))
@@ -1529,41 +1552,58 @@ AmrDriver::setupFixedGrids(const std::string& a_gridFile)
 void
 AmrDriver::levelSetup(int a_level, const DisjointBoxLayout& a_grids)
 {
+    if (m_verbosity > 3)
+    {
+        pout() << "AmrDriver::levelSetup - level " << endl;
+    }
     int nPhiComp = 1;
     IntVect ghostVect = IntVect::Unit;
     IntVect HeadGhostVect = m_num_head_ghost * IntVect::Unit;
     m_old_head[a_level]->define(a_grids, nPhiComp, HeadGhostVect);
+    m_old_gapheight[a_level]->define(a_grids, nPhiComp, HeadGhostVect);
 
+    // AF: setup struct for level a_level
     if (a_level == 0 || m_head[a_level] == NULL)
     {
+        // First pass or first level
         m_head[a_level] = new LevelData<FArrayBox>(a_grids, nPhiComp, HeadGhostVect);
+        m_gapheight[a_level] = new LevelData<FArrayBox>(a_grids, nPhiComp, HeadGhostVect);
         m_bedelevation[a_level] = new LevelData<FArrayBox>(a_grids, nPhiComp, HeadGhostVect);
+        m_overburdenpress[a_level] = new LevelData<FArrayBox>(a_grids, nPhiComp, HeadGhostVect);
     }
     else
     {
+        // AF: not here yet but at some point to do
         // do phi a bit differently in order to use previously
         // computed velocity field as an initial guess
         {
-            LevelData<FArrayBox>* newPhiPtr = new LevelData<FArrayBox>(a_grids, nPhiComp, HeadGhostVect);
+            LevelData<FArrayBox>* newHeadPtr = new LevelData<FArrayBox>(a_grids, nPhiComp, HeadGhostVect);
+            LevelData<FArrayBox>* newGapHeightPtr = new LevelData<FArrayBox>(a_grids, nPhiComp, HeadGhostVect);
 
             // first do interp from coarser level
             FineInterp HeadInterp(a_grids, nPhiComp, m_refinement_ratios[a_level - 1], m_amrDomains[a_level]);
+            FineInterp GapHeightInterp(a_grids, nPhiComp, m_refinement_ratios[a_level - 1], m_amrDomains[a_level]);
 
-            HeadInterp.interpToFine(*newPhiPtr, *m_head[a_level - 1]);
+            HeadInterp.interpToFine(*newHeadPtr, *m_head[a_level - 1]);
+            GapHeightInterp.interpToFine(*newGapHeightPtr, *m_gapheight[a_level - 1]);
 
             // can only copy from existing level if we're not on the
             // newly created level
             // if (a_level != new_finest_level)
             if (m_head[a_level]->isDefined())
             {
-                m_head[a_level]->copyTo(*newPhiPtr);
+                m_head[a_level]->copyTo(*newHeadPtr);
+                m_gapheight[a_level]->copyTo(*newGapHeightPtr);
             }
 
             // finally, do an exchange (this may wind up being unnecessary)
-            newPhiPtr->exchange();
+            newHeadPtr->exchange();
+            newGapHeightPtr->exchange();
 
             delete (m_head[a_level]);
-            m_head[a_level] = newPhiPtr;
+            delete (m_gapheight[a_level]);
+            m_head[a_level] = newHeadPtr;
+            m_gapheight[a_level] = newGapHeightPtr;
         }
     } // end interpolate/copy new velocity
 
@@ -1585,8 +1625,10 @@ AmrDriver::initData(Vector<LevelData<FArrayBox>*>& a_head)
         LevelData<FArrayBox>& levelHead      = *m_head[lev];
         LevelData<FArrayBox>& levelGapHeight = *m_gapheight[lev];
         LevelData<FArrayBox>& levelzBed      = *m_bedelevation[lev];
+        LevelData<FArrayBox>& levelPi        = *m_overburdenpress[lev];
         if (lev > 0)
         {
+            // AF: deal with multiple levels later
             // fill the ghost cells of a_vectCoordSys[lev]->getH();
             // m_head
             LevelData<FArrayBox>& coarseHead = *m_head[lev - 1];
@@ -1615,7 +1657,7 @@ AmrDriver::initData(Vector<LevelData<FArrayBox>*>& a_head)
         m_IBCPtr->define(m_amrDomains[lev], levelDx[0]);
         // int refRatio = (lev > 0)?m_refinement_ratios[lev-1]:0;
 
-        m_IBCPtr->initializeData(levelDx, levelHead, levelGapHeight, levelzBed);
+        m_IBCPtr->initializeData(levelDx, levelHead, levelGapHeight, levelzBed, levelPi);
 
         // initialize oldPhi to be the current value
         levelHead.copyTo(*m_old_head[lev]);
@@ -1627,9 +1669,6 @@ AmrDriver::initData(Vector<LevelData<FArrayBox>*>& a_head)
     {
         CoarseAverage avgDown(m_amrGrids[lev], m_head[lev]->nComp(), m_refinement_ratios[lev - 1]);
         avgDown.averageToCoarse(*m_head[lev - 1], *m_head[lev]);
-
-        CoarseAverage avgDown(m_amrGrids[lev], m_gapheight[lev]->nComp(), m_refinement_ratios[lev - 1]);
-        avgDown.averageToCoarse(*m_gapheight[lev - 1], *m_gapheight[lev]);
     }
 
 //#define writePlotsImmediately
@@ -1673,6 +1712,7 @@ AmrDriver::computeDt()
             int p = 0;
             const Box& gridBox = levelGrids[levelDit];
             Real maxVel = 1.0 + levelVel[levelDit].norm(gridBox, p, 0, 1);
+            maxVel = max(maxVel,1.0);    
             Real localDt = m_amrDx[lev][0] / maxVel;
             dtLev = min(dtLev, localDt);
         }
@@ -1736,10 +1776,8 @@ AmrDriver::writePlotFile()
         pout() << "AmrDriver::writePlotFile" << endl;
     }
 
-    CH_TIME("AmrDriver::writePlotFile");
-
-    // plot comps: head + gapHeight + bedelevation
-    int numPlotComps = 3;
+    // plot comps: head + gapHeight + bedelevation + overburdenPress
+    int numPlotComps = 4;
 
     // add in grad(head) if desired
     //if (m_write_gradPhi)
@@ -1752,6 +1790,7 @@ AmrDriver::writePlotFile()
     string headName("head");
     string gapHeightName("gapHeight");
     string zbedName("bedelevation");
+    string piName("overburdenPress");
     string xGradName("xGradPhi");
     string yGradName("yGradPhi");
     string zGradName("zGradPhi");
@@ -1762,6 +1801,7 @@ AmrDriver::writePlotFile()
     vectName[0] = headName;
     vectName[1] = gapHeightName;
     vectName[2] = zbedName;
+    vectName[3] = piName;
     //if (m_write_gradPhi)
     //{
     //    vectName[numPlotComps] = xGradName;
@@ -1787,16 +1827,13 @@ AmrDriver::writePlotFile()
     for (int lev = 0; lev < numLevels; lev++)
     {
         // now copy new-time solution into plotData
-        //Interval headComps(0, 0);
-        //Interval gapHeightComps(1, 0);
-        //Interval zbedComps(2, 0);
-        //Interval gradComps(numPlotComps, SpaceDim);
 
         LevelData<FArrayBox>& plotDataLev = *plotData[lev];
 
         const LevelData<FArrayBox>& levelHead      = *m_head[lev];
         const LevelData<FArrayBox>& levelgapHeight = *m_gapheight[lev];
         const LevelData<FArrayBox>& levelzbed      = *m_bedelevation[lev];
+        const LevelData<FArrayBox>& levelpi        = *m_overburdenpress[lev];
         //LevelData<FArrayBox> levelGradPhi;
         //if (m_write_gradPhi)
         //{
@@ -1831,12 +1868,15 @@ AmrDriver::writePlotFile()
             const FArrayBox& thisHead       = levelHead[dit];
             const FArrayBox& thisGapHeight  = levelgapHeight[dit];
             const FArrayBox& thiszbed       = levelzbed[dit];
+            const FArrayBox& thisPi         = levelpi[dit];
 
             thisPlotData.copy(thisHead, 0, comp, 1);
             comp++;
             thisPlotData.copy(thisGapHeight, 0, comp, 1);
             comp++;
             thisPlotData.copy(thiszbed, 0, comp, 1);
+            comp++;
+            thisPlotData.copy(thisPi, 0, comp, 1);
             comp++;
             // now copy for grad(head)
             //if (m_write_gradPhi)

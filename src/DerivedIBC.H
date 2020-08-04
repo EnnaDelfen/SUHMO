@@ -68,7 +68,8 @@ public:
     virtual void initializeData(RealVect& a_dx,
                              LevelData<FArrayBox>& a_Head,
                              LevelData<FArrayBox>& a_GapHeight,
-                             LevelData<FArrayBox>& a_zbed) override;
+                             LevelData<FArrayBox>& a_zbed,
+                             LevelData<FArrayBox>& a_Pi) override;
 
     /// Set boundary fluxes
     /**

@@ -99,6 +99,7 @@ DerivedIBC::~DerivedIBC()
 void
 DerivedIBC::define(const ProblemDomain& a_domain, const Real& a_dx)
 {
+    pout() << "DerivedIBC::define" << endl;
     PhysIBC::define(a_domain, a_dx);
 }
 
@@ -122,6 +123,7 @@ DerivedIBC::new_thicknessIBC()
 void
 DerivedIBC::initialize(LevelData<FArrayBox>& a_head)
 {
+    pout() << "DerivedIBC::initialize" << endl;
     // for now, just initialize to a square subregion
     IntVect regionLo = m_domain.domainBox().bigEnd();
     IntVect regionHi = m_domain.domainBox().bigEnd();
@@ -153,8 +155,10 @@ void
 DerivedIBC::initializeData(RealVect& a_dx,
                         LevelData<FArrayBox>& a_head,
                         LevelData<FArrayBox>& a_gapHeight,
-                        LevelData<FArrayBox>& a_zbed)
+                        LevelData<FArrayBox>& a_zbed,
+                        LevelData<FArrayBox>& a_Pi)
 {
+    pout() << "DerivedIBC::initializeData" << endl;
 
     ParmParse ppBC("icbc");
     ppBC.get("H", m_H);
@@ -170,6 +174,7 @@ DerivedIBC::initializeData(RealVect& a_dx,
         FArrayBox& thisHead      = a_head[dit];
         FArrayBox& thisGapHeight = a_gapHeight[dit];
         FArrayBox& thiszbed      = a_zbed[dit];
+        FArrayBox& thispi        = a_Pi[dit];
 
         BoxIterator bit(thisHead.box()); // Default .box() have ghostcells ?
         for (bit.begin(); bit.ok(); ++bit)
@@ -183,8 +188,11 @@ DerivedIBC::initializeData(RealVect& a_dx,
             Real Fact         = 1./(m_rho_water * m_gravity);
             thiszbed(iv, 0)      = m_slope*(iv[0]+0.5)*a_dx[0];
             thisHead(iv, 0)      = P_water_init * Fact + thiszbed(iv, 0) ;
+            thispi(iv, 0)        = P_ice;
         } // end loop over cells
     }     // end loop over boxes
+
+    pout() << "Done with DerivedIBC::initializeData" << endl;
 }
 
 /// Set boundary fluxes
