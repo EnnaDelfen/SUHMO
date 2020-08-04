@@ -1650,11 +1650,15 @@ AmrDriver::initData(Vector<LevelData<FArrayBox>*>& a_head)
     {
         LevelData<FArrayBox>& levelHead      = *m_head[lev];
         LevelData<FArrayBox>& levelGapHeight = *m_gapheight[lev];
+        LevelData<FArrayBox>& levelPw        = *m_Pw[lev];
+        LevelData<FArrayBox>& levelqw        = *m_qw[lev];
+        LevelData<FArrayBox>& levelRe        = *m_Re[lev];
+        LevelData<FArrayBox>& levelmR        = *m_meltRate[lev];
         LevelData<FArrayBox>& levelzBed      = *m_bedelevation[lev];
         LevelData<FArrayBox>& levelPi        = *m_overburdenpress[lev];
         if (lev > 0)
         {
-            // AF: deal with multiple levels later
+            // AF: !!! deal with multiple levels later !!!
             // fill the ghost cells of a_vectCoordSys[lev]->getH();
             // m_head
             LevelData<FArrayBox>& coarseHead = *m_head[lev - 1];
@@ -1683,7 +1687,11 @@ AmrDriver::initData(Vector<LevelData<FArrayBox>*>& a_head)
         m_IBCPtr->define(m_amrDomains[lev], levelDx[0]);
         // int refRatio = (lev > 0)?m_refinement_ratios[lev-1]:0;
 
-        m_IBCPtr->initializeData(levelDx, levelHead, levelGapHeight, levelzBed, levelPi);
+        m_IBCPtr->initializeData(levelDx, 
+                                 levelHead, levelGapHeight, 
+                                 levelPw, levelqw,
+                                 levelRe, levelmR,
+                                 levelzBed, levelPi);
 
         // initialize oldPhi to be the current value
         levelHead.copyTo(*m_old_head[lev]);
@@ -1907,10 +1915,10 @@ AmrDriver::writePlotFile()
             const FArrayBox& thisGapHeight  = levelgapHeight[dit];
             const FArrayBox& thiszbed       = levelzbed[dit];
             const FArrayBox& thisPi         = levelpi[dit];
-            const FArrayBox& thisPw         = levelpw[lev];
-            const FArrayBox& thisqw         = levelqw[lev];
-            const FArrayBox& thisRe         = levelRe[lev];
-            const FArrayBox& thismR         = levelmR[lev];
+            const FArrayBox& thisPw         = levelpw[dit];
+            const FArrayBox& thisqw         = levelqw[dit];
+            const FArrayBox& thisRe         = levelRe[dit];
+            const FArrayBox& thismR         = levelmR[dit];
 
             thisPlotData.copy(thisHead, 0, comp, 1);
             comp++;
