@@ -66,8 +66,12 @@ public:
     virtual void initialize(LevelData<FArrayBox>& a_U);
 
     virtual void initializeData(RealVect& a_dx,
-                             LevelData<FArrayBox>& a_Head,
-                             LevelData<FArrayBox>& a_GapHeight,
+                             LevelData<FArrayBox>& a_head,
+                             LevelData<FArrayBox>& a_gapHeight,
+                             LevelData<FArrayBox>& a_Pw,
+                             LevelData<FArrayBox>& a_qw,
+                             LevelData<FArrayBox>& a_Re,
+                             LevelData<FArrayBox>& a_meltRate,
                              LevelData<FArrayBox>& a_zbed,
                              LevelData<FArrayBox>& a_Pi) override;
 
@@ -123,6 +127,8 @@ protected:
     Real m_rho_ice   = 910.; // kg.m-3
     Real m_rho_water = 1000.; // kg.m-3
     Real m_gravity   = 9.8;  // m.s-1
+    Real m_G         = 0.05;   // W.m-2
+    Real m_L         = 3.34e-5; // J.KG-1
 
 private:
     // Disallowed for all the usual reasons

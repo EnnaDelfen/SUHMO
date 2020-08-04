@@ -118,17 +118,33 @@ AmrDriver::~AmrDriver()
             delete m_head[lev];
             m_head[lev] = NULL;
         }
-    }
-
-    // clean up memory
-    for (int lev = 0; lev < m_gapheight.size(); lev++)
-    {
         if (m_gapheight[lev] != NULL)
         {
             delete m_gapheight[lev];
             m_gapheight[lev] = NULL;
         }
+        if (m_Pw[lev] != NULL)
+        {
+            delete m_Pw[lev];
+            m_Pw[lev] = NULL;
+        }
+        if (m_qw[lev] != NULL)
+        {
+            delete m_qw[lev];
+            m_qw[lev] = NULL;
+        }
+        if (m_Re[lev] != NULL)
+        {
+            delete m_Re[lev];
+            m_Re[lev] = NULL;
+        }
+        if (m_meltRate[lev] != NULL)
+        {
+            delete m_meltRate[lev];
+            m_meltRate[lev] = NULL;
+        }
     }
+
 
     if (m_IBCPtr != NULL)
     {
@@ -440,6 +456,11 @@ AmrDriver::initialize()
         m_old_gapheight.resize(m_max_level + 1, NULL);
         m_gapheight.resize(m_max_level + 1, NULL);
         
+        m_Pw.resize(m_max_level + 1, NULL);
+        m_qw.resize(m_max_level + 1, NULL);
+        m_Re.resize(m_max_level + 1, NULL);
+        m_meltRate.resize(m_max_level + 1, NULL);
+        
         // Time constant variables
         m_bedelevation.resize(m_max_level + 1, NULL);
         m_overburdenpress.resize(m_max_level + 1, NULL);
@@ -454,6 +475,11 @@ AmrDriver::initialize()
 
             m_old_gapheight[lev] = new LevelData<FArrayBox>;
             m_gapheight[lev] = new LevelData<FArrayBox>;
+           
+            m_Pw[lev] = new LevelData<FArrayBox>;
+            m_qw[lev] = new LevelData<FArrayBox>;
+            m_Re[lev] = new LevelData<FArrayBox>;
+            m_meltRate[lev] = new LevelData<FArrayBox>;
 
             m_bedelevation[lev] = new LevelData<FArrayBox>;
             m_overburdenpress[lev] = new LevelData<FArrayBox>;
@@ -1777,7 +1803,7 @@ AmrDriver::writePlotFile()
     }
 
     // plot comps: head + gapHeight + bedelevation + overburdenPress
-    int numPlotComps = 4;
+    int numPlotComps = 8;
 
     // add in grad(head) if desired
     //if (m_write_gradPhi)
@@ -1791,6 +1817,10 @@ AmrDriver::writePlotFile()
     string gapHeightName("gapHeight");
     string zbedName("bedelevation");
     string piName("overburdenPress");
+    string pwName("Pw"); 
+    string qwName("Qw"); 
+    string ReName("Re"); 
+    string meltRateName("meltRate"); 
     string xGradName("xGradPhi");
     string yGradName("yGradPhi");
     string zGradName("zGradPhi");
@@ -1802,6 +1832,10 @@ AmrDriver::writePlotFile()
     vectName[1] = gapHeightName;
     vectName[2] = zbedName;
     vectName[3] = piName;
+    vectName[4] = pwName;
+    vectName[5] = qwName;
+    vectName[6] = ReName;
+    vectName[7] = meltRateName;
     //if (m_write_gradPhi)
     //{
     //    vectName[numPlotComps] = xGradName;
@@ -1834,6 +1868,10 @@ AmrDriver::writePlotFile()
         const LevelData<FArrayBox>& levelgapHeight = *m_gapheight[lev];
         const LevelData<FArrayBox>& levelzbed      = *m_bedelevation[lev];
         const LevelData<FArrayBox>& levelpi        = *m_overburdenpress[lev];
+        const LevelData<FArrayBox>& levelpw        = *m_Pw[lev];
+        const LevelData<FArrayBox>& levelqw        = *m_qw[lev];
+        const LevelData<FArrayBox>& levelRe        = *m_Re[lev];
+        const LevelData<FArrayBox>& levelmR        = *m_meltRate[lev];
         //LevelData<FArrayBox> levelGradPhi;
         //if (m_write_gradPhi)
         //{
@@ -1869,6 +1907,10 @@ AmrDriver::writePlotFile()
             const FArrayBox& thisGapHeight  = levelgapHeight[dit];
             const FArrayBox& thiszbed       = levelzbed[dit];
             const FArrayBox& thisPi         = levelpi[dit];
+            const FArrayBox& thisPw         = levelpw[lev];
+            const FArrayBox& thisqw         = levelqw[lev];
+            const FArrayBox& thisRe         = levelRe[lev];
+            const FArrayBox& thismR         = levelmR[lev];
 
             thisPlotData.copy(thisHead, 0, comp, 1);
             comp++;
@@ -1877,6 +1919,14 @@ AmrDriver::writePlotFile()
             thisPlotData.copy(thiszbed, 0, comp, 1);
             comp++;
             thisPlotData.copy(thisPi, 0, comp, 1);
+            comp++;
+            thisPlotData.copy(thisPw, 0, comp, 1);
+            comp++;
+            thisPlotData.copy(thisqw, 0, comp, 1);
+            comp++;
+            thisPlotData.copy(thisRe, 0, comp, 1);
+            comp++;
+            thisPlotData.copy(thismR, 0, comp, 1);
             comp++;
             // now copy for grad(head)
             //if (m_write_gradPhi)

@@ -155,6 +155,10 @@ void
 DerivedIBC::initializeData(RealVect& a_dx,
                         LevelData<FArrayBox>& a_head,
                         LevelData<FArrayBox>& a_gapHeight,
+                        LevelData<FArrayBox>& a_Pw,
+                        LevelData<FArrayBox>& a_qw,
+                        LevelData<FArrayBox>& a_Re,
+                        LevelData<FArrayBox>& a_meltRate,
                         LevelData<FArrayBox>& a_zbed,
                         LevelData<FArrayBox>& a_Pi)
 {
@@ -173,6 +177,10 @@ DerivedIBC::initializeData(RealVect& a_dx,
     {
         FArrayBox& thisHead      = a_head[dit];
         FArrayBox& thisGapHeight = a_gapHeight[dit];
+        FArrayBox& thisPw        = a_Pw[dit];
+        FArrayBox& thisqw        = a_qw[dit];
+        FArrayBox& thisRe        = a_Re[dit];
+        FArrayBox& thismeltRate  = a_meltRate[dit];
         FArrayBox& thiszbed      = a_zbed[dit];
         FArrayBox& thispi        = a_Pi[dit];
 
@@ -189,6 +197,11 @@ DerivedIBC::initializeData(RealVect& a_dx,
             thiszbed(iv, 0)      = m_slope*(iv[0]+0.5)*a_dx[0];
             thisHead(iv, 0)      = P_water_init * Fact + thiszbed(iv, 0) ;
             thispi(iv, 0)        = P_ice;
+            thisPw(iv, 0)        = m_rho_water * m_gravity * (thisHead(iv, 0)  - thiszbed(iv, 0));
+            // dummy stuff 
+            thisqw(iv, 0)        = 0.0;
+            thisRe(iv, 0)        = 0.0;
+            thismeltRate(iv, 0)  = m_G / m_L;
         } // end loop over cells
     }     // end loop over boxes
 
