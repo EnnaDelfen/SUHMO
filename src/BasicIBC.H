@@ -118,8 +118,12 @@ public:
     virtual void initialize(LevelData<FArrayBox>& a_U) = 0;
 
     virtual void initializeData(RealVect& a_dx,
-                             LevelData<FArrayBox>& a_Head,
-                             LevelData<FArrayBox>& a_GapHeight,
+                             LevelData<FArrayBox>& a_head,
+                             LevelData<FArrayBox>& a_gapHeight,
+                             LevelData<FArrayBox>& a_Pw,
+                             LevelData<FArrayBox>& a_qw,
+                             LevelData<FArrayBox>& a_Re,
+                             LevelData<FArrayBox>& a_meltRate,
                              LevelData<FArrayBox>& a_zbed, 
                              LevelData<FArrayBox>& a_Pi) = 0;
 
