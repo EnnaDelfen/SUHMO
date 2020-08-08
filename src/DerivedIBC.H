@@ -124,8 +124,6 @@ protected:
     Real m_gapInit;
    
     // Cst of model
-    Real m_rho_ice   = 910.; // kg.m-3
-    Real m_rho_water = 1000.; // kg.m-3
     Real m_gravity   = 9.8;  // m.s-1
     Real m_G         = 0.05;   // W.m-2
     Real m_L         = 3.34e-5; // J.KG-1

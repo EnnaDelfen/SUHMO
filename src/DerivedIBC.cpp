@@ -11,6 +11,7 @@
 #include "DerivedIBC.H"
 #include "ParmParse.H"
 #include "FluxBox.H"
+#include "suhmo.H"
 
 #include "NamespaceHeader.H"
 
@@ -162,6 +163,7 @@ DerivedIBC::initializeData(RealVect& a_dx,
                         LevelData<FArrayBox>& a_zbed,
                         LevelData<FArrayBox>& a_Pi)
 {
+    
     pout() << "DerivedIBC::initializeData" << endl;
 
     ParmParse ppBC("icbc");
@@ -191,13 +193,13 @@ DerivedIBC::initializeData(RealVect& a_dx,
             // gapHeight - initially constant 
             thisGapHeight(iv, 0) = m_gapInit;
             // Initial Head is such that the water pressure is equal to 50% of the ice overburden pressure
-            Real P_ice        = m_rho_ice * m_gravity * m_H;
+            Real P_ice        = hydro_params::m_rho_i * m_gravity * m_H;
             Real P_water_init = P_ice * 0.5;
-            Real Fact         = 1./(m_rho_water * m_gravity);
+            Real Fact         = 1./(hydro_params::m_rho_w * m_gravity);
             thiszbed(iv, 0)      = m_slope*(iv[0]+0.5)*a_dx[0];
             thisHead(iv, 0)      = P_water_init * Fact + thiszbed(iv, 0) ;
             thispi(iv, 0)        = P_ice;
-            thisPw(iv, 0)        = m_rho_water * m_gravity * (thisHead(iv, 0)  - thiszbed(iv, 0));
+            thisPw(iv, 0)        = hydro_params::m_rho_w * m_gravity * (thisHead(iv, 0)  - thiszbed(iv, 0));
             // dummy stuff 
             thisqw(iv, 0)        = 0.0;
             thisRe(iv, 0)        = 0.0;

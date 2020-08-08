@@ -45,6 +45,7 @@ using std::string;
 #include "CH_HDF5.H"
 #include "MayDay.H"
 #include "CONSTANTS.H"
+#include "suhmo.H"
 
 #include "NamespaceHeader.H"
 
@@ -61,6 +62,11 @@ AmrDriver::AmrDriver() : m_IBCPtr(NULL)
 void
 AmrDriver::setDefaults()
 {
+    pout() << "AmrDriver::setDefaults()" << endl;
+    //  Default for hydro_params
+    hydro_params::m_rho_i = 980.0;
+    hydro_params::m_rho_w = 1000.0;
+
     // set some bogus values as defaults
     m_is_defined = false;
     m_verbosity = 4;
@@ -722,6 +728,45 @@ AmrDriver::timeStep(Real a_dt)
             oldH[dit].copy(currentH[dit], 0, 0, 1);
             oldB[dit].copy(currentB[dit], 0, 0, 1);
         }
+    }
+
+    // SUHMO time-step
+    // 1 - Solving for the hydrolic head
+
+    // 2 - Time-advance gap height
+    int gh_method = 0; // 0: backward Euler, 1:...
+    for (int lev = m_finest_level; lev >= 0; lev--)
+    {
+        DisjointBoxLayout& levelGrids = m_amrGrids[lev];
+        DataIterator dit = levelGrids.dataIterator();
+    
+        // 2. a : Get the RHS of gh eqs:
+        IntVect nGhost = 0 * IntVect::Unit;    
+        LevelData<FArrayBox> gh_RHS(levelGrids, 1, nGhost);
+        LevelData<FArrayBox>& levelmR = *m_meltRate[lev];
+
+        for (dit.begin(); dit.ok(); ++dit) {
+            const Box& gridBox = levelGrids[dit];
+            FArrayBox& RHS     = gh_RHS[dit];
+            FArrayBox& meltR   = levelmR[dit];
+                
+            // first term
+            RHS.copy(meltR, 0, 0, 1);
+            RHS *= 1.0 / hydro_params::m_rho_i;
+            // second term ...
+            // third term ...
+        }
+
+        // 2. b : update gap height
+        LevelData<FArrayBox>& oldB = *m_old_gapheight[lev];    
+        LevelData<FArrayBox>& newB = *m_gapheight[lev];    
+        for (dit.begin(); dit.ok(); ++dit) {
+            const Box& gridBox = levelGrids[dit];
+            newB[dit].copy(gh_RHS[dit], 0, 0, 1);
+            newB[dit] *= a_dt;
+            newB[dit].plus(oldB[dit], 0, 0, 1);
+        }
+        
     }
 
     // allocate face-centered storage
