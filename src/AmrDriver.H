@@ -37,6 +37,9 @@ public:
     /* set default values before initialization */
     void setDefaults();
 
+    /* set default values for hydro_params */
+    void setParams();
+
     /* initializes new object based on data in ParmParse database */
     void initialize();
 
@@ -167,7 +170,7 @@ public:
     }
 
     /* set physical parameters (useful when calling from another driver) */
-    void setPhysicalConstants(Real a_gravity);
+    //void setPhysicalConstants(Real a_gravity);
 
     /* accessor for AMR grids */
     const Vector<DisjointBoxLayout>& amrGrids() const
@@ -334,6 +337,7 @@ protected:
     Vector<LevelData<FArrayBox>*> m_qw;                     // Water flux
     Vector<LevelData<FArrayBox>*> m_Re;                     // Reynolds number
     Vector<LevelData<FArrayBox>*> m_meltRate;               // Melting rate
+    Vector<LevelData<FArrayBox>*> m_iceheight;              // Subglacial height
 
     /* Time-constant parameters */
     Vector<LevelData<FArrayBox>*> m_bedelevation;           //
@@ -373,9 +377,6 @@ protected:
 
     // used to store a fixed time step > 0 , if desired
     Real m_fixed_dt;
-
-    // physical constant -- gravity
-    Real m_gravity;
 
     /* num ghost cells */
     int m_num_head_ghost;

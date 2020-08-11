@@ -49,6 +49,8 @@ using std::string;
 
 #include "NamespaceHeader.H"
 
+using namespace hydro_params;
+
 // small parameter defining when times are equal
 #define TIME_EPS 1.0e-12
 // small parameter defining when a norm is "zero"
@@ -57,15 +59,40 @@ using std::string;
 AmrDriver::AmrDriver() : m_IBCPtr(NULL)
 {
     setDefaults();
+    setParams();
+}
+
+//  Default for hydro_params
+void
+AmrDriver::setParams()
+{
+    pout() << "AmrDriver::setParams()" << endl;
+
+    // Cst of problem
+    m_rho_i = 980.0;
+    m_rho_w = 1000.0;
+    m_gravity = 9.8;
+    // Problem dependent variables
+    ParmParse ppParams("suhmo");
+    ppParams.get("GeoFlux", m_G);
+    ppParams.get("LatHeat", m_L);
+    ppParams.get("IceHeight", m_H);
+    ppParams.get("WaterViscosity", m_nu);
+    ppParams.get("ct", m_ct);
+    ppParams.get("cw", m_cw);
+    ppParams.get("turbulentParam", m_omega);
+    ppParams.get("SlidingVelocity", m_ub);
+    ppParams.get("br", m_br);
+    ppParams.get("lr", m_lr);
+    ppParams.get("slope", m_slope);
+    ppParams.get("GapInit", m_gapInit);
+    ppParams.get("ReInit", m_ReInit);
 }
 
 void
 AmrDriver::setDefaults()
 {
     pout() << "AmrDriver::setDefaults()" << endl;
-    //  Default for hydro_params
-    hydro_params::m_rho_i = 980.0;
-    hydro_params::m_rho_w = 1000.0;
 
     // set some bogus values as defaults
     m_is_defined = false;
@@ -148,6 +175,21 @@ AmrDriver::~AmrDriver()
         {
             delete m_meltRate[lev];
             m_meltRate[lev] = NULL;
+        }
+        if (m_iceheight[lev] != NULL)
+        {
+            delete m_iceheight[lev];
+            m_iceheight[lev] = NULL;
+        }
+        if (m_bedelevation[lev] != NULL)
+        {
+            delete m_bedelevation[lev];
+            m_bedelevation[lev] = NULL;
+        }
+        if (m_overburdenpress[lev] != NULL)
+        {
+            delete m_overburdenpress[lev];
+            m_overburdenpress[lev] = NULL;
         }
     }
 
@@ -466,7 +508,8 @@ AmrDriver::initialize()
         m_qw.resize(m_max_level + 1, NULL);
         m_Re.resize(m_max_level + 1, NULL);
         m_meltRate.resize(m_max_level + 1, NULL);
-        
+        m_iceheight.resize(m_max_level + 1, NULL);
+
         // Time constant variables
         m_bedelevation.resize(m_max_level + 1, NULL);
         m_overburdenpress.resize(m_max_level + 1, NULL);
@@ -486,6 +529,7 @@ AmrDriver::initialize()
             m_qw[lev] = new LevelData<FArrayBox>;
             m_Re[lev] = new LevelData<FArrayBox>;
             m_meltRate[lev] = new LevelData<FArrayBox>;
+            m_iceheight[lev] = new LevelData<FArrayBox>;
 
             m_bedelevation[lev] = new LevelData<FArrayBox>;
             m_overburdenpress[lev] = new LevelData<FArrayBox>;
@@ -752,7 +796,7 @@ AmrDriver::timeStep(Real a_dt)
                 
             // first term
             RHS.copy(meltR, 0, 0, 1);
-            RHS *= 1.0 / hydro_params::m_rho_i;
+            RHS *= 1.0 / m_rho_i;
             // second term ...
             // third term ...
         }
@@ -1181,11 +1225,11 @@ AmrDriver::regrid()
 }
 
 /// set physical parameters (useful when calling from another driver)
-void
-AmrDriver::setPhysicalConstants(Real a_gravity)
-{
-    m_gravity = a_gravity;
-}
+//void
+//AmrDriver::setPhysicalConstants(Real a_gravity)
+//{
+//    m_gravity = a_gravity;
+//}
 
 void
 AmrDriver::tagCells(Vector<IntVectSet>& a_tags)
@@ -1643,6 +1687,7 @@ AmrDriver::levelSetup(int a_level, const DisjointBoxLayout& a_grids)
         m_qw[a_level] = new LevelData<FArrayBox>(a_grids, nPhiComp, HeadGhostVect);
         m_Re[a_level] = new LevelData<FArrayBox>(a_grids, nPhiComp, HeadGhostVect);
         m_meltRate[a_level] = new LevelData<FArrayBox>(a_grids, nPhiComp, HeadGhostVect);
+        m_iceheight[a_level] = new LevelData<FArrayBox>(a_grids, nPhiComp, HeadGhostVect);
         m_bedelevation[a_level] = new LevelData<FArrayBox>(a_grids, nPhiComp, HeadGhostVect);
         m_overburdenpress[a_level] = new LevelData<FArrayBox>(a_grids, nPhiComp, HeadGhostVect);
     }
@@ -1703,6 +1748,7 @@ AmrDriver::initData(Vector<LevelData<FArrayBox>*>& a_head)
         LevelData<FArrayBox>& levelqw        = *m_qw[lev];
         LevelData<FArrayBox>& levelRe        = *m_Re[lev];
         LevelData<FArrayBox>& levelmR        = *m_meltRate[lev];
+        LevelData<FArrayBox>& levelIceHeight = *m_iceheight[lev];
         LevelData<FArrayBox>& levelzBed      = *m_bedelevation[lev];
         LevelData<FArrayBox>& levelPi        = *m_overburdenpress[lev];
         if (lev > 0)
@@ -1740,7 +1786,8 @@ AmrDriver::initData(Vector<LevelData<FArrayBox>*>& a_head)
                                  levelHead, levelGapHeight, 
                                  levelPw, levelqw,
                                  levelRe, levelmR,
-                                 levelzBed, levelPi);
+                                 levelzBed, levelPi,
+                                 levelIceHeight);
 
         // initialize oldPhi to be the current value
         levelHead.copyTo(*m_old_head[lev]);

@@ -73,7 +73,8 @@ public:
                              LevelData<FArrayBox>& a_Re,
                              LevelData<FArrayBox>& a_meltRate,
                              LevelData<FArrayBox>& a_zbed,
-                             LevelData<FArrayBox>& a_Pi) override;
+                             LevelData<FArrayBox>& a_Pi,
+                             LevelData<FArrayBox>& a_iceHeight) override;
 
     /// Set boundary fluxes
     /**
@@ -117,16 +118,6 @@ protected:
     void setupBCs();
 
     RefCountedPtr<CompGridVTOBC> m_velBCs;
-
-    // Parameters
-    Real m_slope;
-    Real m_H;
-    Real m_gapInit;
-   
-    // Cst of model
-    Real m_gravity   = 9.8;  // m.s-1
-    Real m_G         = 0.05;   // W.m-2
-    Real m_L         = 3.34e-5; // J.KG-1
 
 private:
     // Disallowed for all the usual reasons
