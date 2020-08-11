@@ -199,7 +199,7 @@ DerivedIBC::initializeData(RealVect& a_dx,
             thispi(iv, 0)        = P_ice;
             thisPw(iv, 0)        = hydro_params::m_rho_w * hydro_params::m_gravity * (thisHead(iv, 0)  - thiszbed(iv, 0));
             // dummy stuff 
-            thisRe(iv, 0)        = m_ReInit;
+            thisRe(iv, 0)        = hydro_params::m_ReInit;
             thisqw(iv, 0)        = 0.0;
             thismeltRate(iv, 0)  = hydro_params::m_G / hydro_params::m_L;
         } // end loop over cells

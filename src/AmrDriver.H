@@ -337,7 +337,7 @@ protected:
     Vector<LevelData<FArrayBox>*> m_qw;                     // Water flux
     Vector<LevelData<FArrayBox>*> m_Re;                     // Reynolds number
     Vector<LevelData<FArrayBox>*> m_meltRate;               // Melting rate
-    Vector<LevelData<FArrayBox>*> m_iceheight;              // Subglacial height
+    Vector<LevelData<FArrayBox>*> m_iceheight;              // Ice slab height
 
     /* Time-constant parameters */
     Vector<LevelData<FArrayBox>*> m_bedelevation;           //

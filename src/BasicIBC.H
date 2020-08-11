@@ -125,7 +125,8 @@ public:
                              LevelData<FArrayBox>& a_Re,
                              LevelData<FArrayBox>& a_meltRate,
                              LevelData<FArrayBox>& a_zbed, 
-                             LevelData<FArrayBox>& a_Pi) = 0;
+                             LevelData<FArrayBox>& a_Pi,
+                             LevelData<FArrayBox>& a_iceHeight) = 0;
 
     /// Set boundary fluxes
     /**

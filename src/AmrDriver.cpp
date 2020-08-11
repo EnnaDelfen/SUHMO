@@ -81,9 +81,11 @@ AmrDriver::setParams()
     ppParams.get("ct", m_ct);
     ppParams.get("cw", m_cw);
     ppParams.get("turbulentParam", m_omega);
-    ppParams.get("SlidingVelocity", m_ub);
+    m_ub.resize(SpaceDim, 0);
+    ppParams.getarr("SlidingVelocity", m_ub, 0, SpaceDim);
     ppParams.get("br", m_br);
     ppParams.get("lr", m_lr);
+    ppParams.get("A", m_A);
     ppParams.get("slope", m_slope);
     ppParams.get("GapInit", m_gapInit);
     ppParams.get("ReInit", m_ReInit);
@@ -781,6 +783,10 @@ AmrDriver::timeStep(Real a_dt)
     int gh_method = 0; // 0: backward Euler, 1:...
     for (int lev = m_finest_level; lev >= 0; lev--)
     {
+
+        LevelData<FArrayBox>& leveloldB = *m_old_gapheight[lev];    
+        LevelData<FArrayBox>& levelnewB = *m_gapheight[lev];    
+
         DisjointBoxLayout& levelGrids = m_amrGrids[lev];
         DataIterator dit = levelGrids.dataIterator();
     
@@ -788,27 +794,43 @@ AmrDriver::timeStep(Real a_dt)
         IntVect nGhost = 0 * IntVect::Unit;    
         LevelData<FArrayBox> gh_RHS(levelGrids, 1, nGhost);
         LevelData<FArrayBox>& levelmR = *m_meltRate[lev];
+        LevelData<FArrayBox>& levelPw = *m_Pw[lev];
+        LevelData<FArrayBox>& levelPi = *m_overburdenpress[lev];
 
         for (dit.begin(); dit.ok(); ++dit) {
             const Box& gridBox = levelGrids[dit];
             FArrayBox& RHS     = gh_RHS[dit];
             FArrayBox& meltR   = levelmR[dit];
-                
+            FArrayBox& Pw      = levelPw[dit];
+            FArrayBox& Pressi  = levelPi[dit];
+            FArrayBox& oldB    = leveloldB[dit];
+            FArrayBox& newB    = levelnewB[dit];
+
             // first term
             RHS.copy(meltR, 0, 0, 1);
             RHS *= 1.0 / m_rho_i;
             // second term ...
-            // third term ...
+            Real ub_norm = std::sqrt(m_ub[1]*m_ub[1] + m_ub[2]*m_ub[2]) / m_lr;
+            Real PimPw = 0;
+            BoxIterator bit(meltR.box()); // can use gridBox? 
+            for (bit.begin(); bit.ok(); ++bit) {
+                IntVect iv = bit();
+                if ( oldB(iv,0) < m_br) {
+                    RHS(iv,0) += ub_norm * (m_br - oldB(iv,0));
+                }
+                // third term ... assume  n = 3 !!
+                PimPw = (Pressi(iv,0) - Pw(iv,0));
+                RHS(iv,0) -= m_A * (PimPw) * (PimPw) * (PimPw) * oldB(iv,0);
+            }
+
         }
 
         // 2. b : update gap height
-        LevelData<FArrayBox>& oldB = *m_old_gapheight[lev];    
-        LevelData<FArrayBox>& newB = *m_gapheight[lev];    
         for (dit.begin(); dit.ok(); ++dit) {
             const Box& gridBox = levelGrids[dit];
-            newB[dit].copy(gh_RHS[dit], 0, 0, 1);
-            newB[dit] *= a_dt;
-            newB[dit].plus(oldB[dit], 0, 0, 1);
+            levelnewB[dit].copy(gh_RHS[dit], 0, 0, 1);
+            levelnewB[dit] *= a_dt;
+            levelnewB[dit].plus(leveloldB[dit], 0, 0, 1);
         }
         
     }

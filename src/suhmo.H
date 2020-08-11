@@ -25,9 +25,10 @@ namespace hydro_params {
     Real m_cw;            // Heat capacity of water J.kg-1.K-1
     Real m_omega;         // Parameter controlling nonlinear transition between lam and turbu flow
     // BC
-    Real m_ub;            // m.s-1 Sliding velocity
+    Vector<Real> m_ub;            // m.s-1 Sliding velocity
     Real m_br;            // height between bed bumps m
     Real m_lr;            // spacing between bed bumps m
+    Real m_A;             // Flow law ??
     // Initialization 
     Real m_slope;         // bed slope
     Real m_gapInit;       // subglacial init gap height 
