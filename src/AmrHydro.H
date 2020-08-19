@@ -8,8 +8,8 @@
 */
 #endif
 
-#ifndef AMR_DRIVER_H
-#define AMR_DRIVER_H
+#ifndef AMR_HYDRO_H
+#define AMR_HYDRO_H
 
 #include "LevelData.H"
 #include "FArrayBox.H"
@@ -17,22 +17,23 @@
 #include "PatchGodunov.H"
 #include "BasicIBC.H"
 #include "AdvectPhysics.H"
+#include "suhmo_params.H"
 
 #include "NamespaceHeader.H"
 
 /// framework class to manage non-subcycled AMR model
 /**
  */
-class AmrDriver
+class AmrHydro
 {
 public:
     /** At the moment, there is only one constructor, which defines itself
         based on an inputs file.
     */
-    AmrDriver();
+    AmrHydro();
 
     /* destructor */
-    virtual ~AmrDriver();
+    virtual ~AmrHydro();
 
     /* set default values before initialization */
     void setDefaults();
@@ -380,6 +381,9 @@ protected:
 
     /* num ghost cells */
     int m_num_head_ghost;
+
+    /* SUHMO Params */
+    suhmo_params* m_suhmoParm;
 
 private:
     template <class T>

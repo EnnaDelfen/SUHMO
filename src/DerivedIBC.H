@@ -19,6 +19,7 @@
 #define _DERIVEDIBC_H_
 
 #include "BasicIBC.H"
+#include "suhmo_params.H"
 
 #include "NamespaceHeader.H"
 
@@ -66,15 +67,16 @@ public:
     virtual void initialize(LevelData<FArrayBox>& a_U);
 
     virtual void initializeData(RealVect& a_dx,
-                             LevelData<FArrayBox>& a_head,
-                             LevelData<FArrayBox>& a_gapHeight,
-                             LevelData<FArrayBox>& a_Pw,
-                             LevelData<FArrayBox>& a_qw,
-                             LevelData<FArrayBox>& a_Re,
-                             LevelData<FArrayBox>& a_meltRate,
-                             LevelData<FArrayBox>& a_zbed,
-                             LevelData<FArrayBox>& a_Pi,
-                             LevelData<FArrayBox>& a_iceHeight) override;
+                                suhmo_params params,
+                                LevelData<FArrayBox>& a_head,
+                                LevelData<FArrayBox>& a_gapHeight,
+                                LevelData<FArrayBox>& a_Pw,
+                                LevelData<FArrayBox>& a_qw,
+                                LevelData<FArrayBox>& a_Re,
+                                LevelData<FArrayBox>& a_meltRate,
+                                LevelData<FArrayBox>& a_zbed,
+                                LevelData<FArrayBox>& a_Pi,
+                                LevelData<FArrayBox>& a_iceHeight) override;
 
     /// Set boundary fluxes
     /**

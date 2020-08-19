@@ -23,7 +23,7 @@ using std::cerr;
 using std::endl;
 using std::string;
 
-#include "AmrDriver.H"
+#include "AmrHydro.H"
 
 #include "Box.H"
 #include "Vector.H"
@@ -45,56 +45,32 @@ using std::string;
 #include "CH_HDF5.H"
 #include "MayDay.H"
 #include "CONSTANTS.H"
-#include "suhmo.H"
 
 #include "NamespaceHeader.H"
-
-using namespace hydro_params;
 
 // small parameter defining when times are equal
 #define TIME_EPS 1.0e-12
 // small parameter defining when a norm is "zero"
 #define TINY_NORM 1.0e-8
 
-AmrDriver::AmrDriver() : m_IBCPtr(NULL)
+AmrHydro::AmrHydro() : m_IBCPtr(NULL)
 {
-    setDefaults();
     setParams();
+    setDefaults();
 }
 
 //  Default for hydro_params
 void
-AmrDriver::setParams()
+AmrHydro::setParams()
 {
-    pout() << "AmrDriver::setParams()" << endl;
-
-    // Cst of problem
-    m_rho_i = 980.0;
-    m_rho_w = 1000.0;
-    m_gravity = 9.8;
-    // Problem dependent variables
-    ParmParse ppParams("suhmo");
-    ppParams.get("GeoFlux", m_G);
-    ppParams.get("LatHeat", m_L);
-    ppParams.get("IceHeight", m_H);
-    ppParams.get("WaterViscosity", m_nu);
-    ppParams.get("ct", m_ct);
-    ppParams.get("cw", m_cw);
-    ppParams.get("turbulentParam", m_omega);
-    m_ub.resize(SpaceDim, 0);
-    ppParams.getarr("SlidingVelocity", m_ub, 0, SpaceDim);
-    ppParams.get("br", m_br);
-    ppParams.get("lr", m_lr);
-    ppParams.get("A", m_A);
-    ppParams.get("slope", m_slope);
-    ppParams.get("GapInit", m_gapInit);
-    ppParams.get("ReInit", m_ReInit);
+    m_suhmoParm = new suhmo_params;
+    m_suhmoParm->readInputs();
 }
 
 void
-AmrDriver::setDefaults()
+AmrHydro::setDefaults()
 {
-    pout() << "AmrDriver::setDefaults()" << endl;
+    pout() << "AmrHydro::setDefaults()" << endl;
 
     // set some bogus values as defaults
     m_is_defined = false;
@@ -138,11 +114,11 @@ AmrDriver::setDefaults()
     m_offsetTime = 0.0;
 }
 
-AmrDriver::~AmrDriver()
+AmrHydro::~AmrHydro()
 {
     if (m_verbosity > 4)
     {
-        pout() << "AmrDriver::~AmrDriver()" << endl;
+        pout() << "AmrHydro::~AmrHydro()" << endl;
     }
 
     // clean up memory
@@ -153,10 +129,20 @@ AmrDriver::~AmrDriver()
             delete m_head[lev];
             m_head[lev] = NULL;
         }
+        if (m_old_head[lev] != NULL)
+        {
+            delete m_old_head[lev];
+            m_old_head[lev] = NULL;
+        }
         if (m_gapheight[lev] != NULL)
         {
             delete m_gapheight[lev];
             m_gapheight[lev] = NULL;
+        }
+        if (m_old_gapheight[lev] != NULL)
+        {
+            delete m_old_gapheight[lev];
+            m_old_gapheight[lev] = NULL;
         }
         if (m_Pw[lev] != NULL)
         {
@@ -195,6 +181,8 @@ AmrDriver::~AmrDriver()
         }
     }
 
+    delete m_suhmoParm;
+    m_suhmoParm = NULL;
 
     if (m_IBCPtr != NULL)
     {
@@ -206,11 +194,11 @@ AmrDriver::~AmrDriver()
 }
 
 void
-AmrDriver::initialize()
+AmrHydro::initialize()
 {
     if (m_verbosity > 3)
     {
-        pout() << "AmrDriver::initialize" << endl;
+        pout() << "AmrHydro::initialize" << endl;
     }
 
     // set time to be 0 -- do this now in case it needs to be changed later
@@ -218,7 +206,7 @@ AmrDriver::initialize()
     m_cur_step = 0;
 
     // first, read in info from parmParse file
-    ParmParse ppAmr("AmrDriver");
+    ParmParse ppAmr("AmrHydro");
     Vector<int> ancells(SpaceDim);
     // allows for domains with lower indices which are not positive
     Vector<int> domLoIndex(SpaceDim, 0);
@@ -247,6 +235,7 @@ AmrDriver::initialize()
     ppAmr.query("verbosity", m_verbosity);
     ppAmr.query("block_factor", m_block_factor);
     ppAmr.query("regrid_lbase", m_regrid_lbase);
+    ppAmr.query("regrid_interval", m_regrid_interval);
     ppAmr.query("tagCap", m_tag_cap);
 
     ppAmr.query("block_factor", m_block_factor);
@@ -492,7 +481,7 @@ AmrDriver::initialize()
         // if we're not restarting
         if (m_verbosity > 3)
         {
-            pout() << "AmrDriver::initialize - Initializing data containers" << endl;
+            pout() << "AmrHydro::initialize - Initializing data containers" << endl;
         }
 
         //---------------------------------
@@ -629,24 +618,24 @@ AmrDriver::initialize()
 
     if (m_verbosity > 3)
     {
-        pout() << "Done with AmrDriver::initialize" << endl;
+        pout() << "Done with AmrHydro::initialize" << endl;
     }
 }
 
 // set BC for thickness advection
 void
-AmrDriver::setIBC(BasicIBC* a_IBC)
+AmrHydro::setIBC(BasicIBC* a_IBC)
 {
     m_IBCPtr = a_IBC->new_thicknessIBC();
 }
 
 /* Main advance function */
 void
-AmrDriver::run(Real a_max_time, int a_max_step)
+AmrHydro::run(Real a_max_time, int a_max_step)
 {
     if (m_verbosity > 3)
     {
-        pout() << "AmrDriver::run -- max_time= " << a_max_time << ", max_step = " << a_max_step << endl;
+        pout() << "AmrHydro::run -- max_time= " << a_max_time << ", max_step = " << a_max_step << endl;
     }
 
     Real dt;
@@ -707,7 +696,6 @@ AmrDriver::run(Real a_max_time, int a_max_step)
                 {
                     if (m_verbosity > 2)
                     {
-                        pout() << "AmrDriver::exit on checkpoint" << endl;
                         return;
                     }
                 }
@@ -740,15 +728,15 @@ AmrDriver::run(Real a_max_time, int a_max_step)
 
     if (m_verbosity > 2)
     {
-        pout() << "AmrDriver::run finished" << endl;
+        pout() << "AmrHydro::run finished" << endl;
     }
 }
 
 /* core of advance routine */
 void
-AmrDriver::timeStep(Real a_dt)
+AmrHydro::timeStep(Real a_dt)
 {
-    CH_TIME("AmrDriver::timestep");
+    CH_TIME("AmrHydro::timestep");
 
     if (m_verbosity >= 2)
     {
@@ -791,7 +779,7 @@ AmrDriver::timeStep(Real a_dt)
         DataIterator dit = levelGrids.dataIterator();
     
         // 2. a : Get the RHS of gh eqs:
-        IntVect nGhost = 0 * IntVect::Unit;    
+        IntVect nGhost = m_num_head_ghost * IntVect::Unit;
         LevelData<FArrayBox> gh_RHS(levelGrids, 1, nGhost);
         LevelData<FArrayBox>& levelmR = *m_meltRate[lev];
         LevelData<FArrayBox>& levelPw = *m_Pw[lev];
@@ -808,20 +796,23 @@ AmrDriver::timeStep(Real a_dt)
 
             // first term
             RHS.copy(meltR, 0, 0, 1);
-            RHS *= 1.0 / m_rho_i;
+            RHS *= 1.0 / m_suhmoParm->m_rho_i;
+            pout() <<"First term done..."<< endl;
             // second term ...
-            Real ub_norm = std::sqrt(m_ub[1]*m_ub[1] + m_ub[2]*m_ub[2]) / m_lr;
+            Real ub_norm = std::sqrt(  m_suhmoParm->m_ub[0]*m_suhmoParm->m_ub[0] 
+                                     + m_suhmoParm->m_ub[1]*m_suhmoParm->m_ub[1]) / m_suhmoParm->m_lr;
             Real PimPw = 0;
             BoxIterator bit(meltR.box()); // can use gridBox? 
             for (bit.begin(); bit.ok(); ++bit) {
                 IntVect iv = bit();
-                if ( oldB(iv,0) < m_br) {
-                    RHS(iv,0) += ub_norm * (m_br - oldB(iv,0));
+                if ( oldB(iv,0) < m_suhmoParm->m_br) {
+                    RHS(iv,0) += ub_norm * (m_suhmoParm->m_br - oldB(iv,0));
                 }
                 // third term ... assume  n = 3 !!
                 PimPw = (Pressi(iv,0) - Pw(iv,0));
-                RHS(iv,0) -= m_A * (PimPw) * (PimPw) * (PimPw) * oldB(iv,0);
+                RHS(iv,0) -= m_suhmoParm->m_A * (PimPw) * (PimPw) * (PimPw) * oldB(iv,0);
             }
+            pout() <<"Second and third term done..."<< endl;
 
         }
 
@@ -888,26 +879,9 @@ AmrDriver::timeStep(Real a_dt)
     m_cur_step += 1;
 
 // write diagnostic info, like sum of ice
-#if 0
-  Real sumPhi = computeTotalPhi();
-  Real diffSum = sumPhi - m_lastSumPhi;
-  Real totalDiffSum = sumPhi - m_initialSumPhi;
-  
-  if (m_verbosity > 0) 
-    {
-      pout() << "Step " << m_cur_step << ", time = " << m_time << " ( " << time() << " ) " 
-             << ": sum(phi) = " << sumIce 
-             << " (" << diffSum
-             << " " << totalDiffSum
-             << ")" << endl;
-    }
-  
-  m_lastSumIce = sumIce;
-#endif
-
     if (m_verbosity > 0)
     {
-        pout() << "AmrDriver::timestep " << m_cur_step << " --     end time = "
+        pout() << "AmrHydro::timestep " << m_cur_step << " --     end time = "
                //<< setiosflags(ios::fixed) << setprecision(6) << setw(12)
                << m_time << " ( " << time() << " )"
                //<< " (" << m_time/m_seconds_per_year << " yr)"
@@ -937,7 +911,7 @@ AmrDriver::timeStep(Real a_dt)
 
 // compute half-time face-centered thickness using unsplit PPM
 void
-AmrDriver::computeFluxes(Vector<LevelData<FluxBox>*>& a_Flux, Real a_dt)
+AmrHydro::computeFluxes(Vector<LevelData<FluxBox>*>& a_Flux, Real a_dt)
 {
     for (int lev = 0; lev <= m_finest_level; lev++)
     {
@@ -963,7 +937,7 @@ AmrDriver::computeFluxes(Vector<LevelData<FluxBox>*>& a_Flux, Real a_dt)
 
 /* update head */
 void
-AmrDriver::updateHead(Vector<LevelData<FArrayBox>*>& a_new_head,
+AmrHydro::updateHead(Vector<LevelData<FArrayBox>*>& a_new_head,
                      const Vector<LevelData<FArrayBox>*>& a_old_head,
                      const Vector<LevelData<FluxBox>*>& a_vectFluxes,
                      Real a_dt)
@@ -1055,13 +1029,13 @@ AmrDriver::updateHead(Vector<LevelData<FArrayBox>*>& a_new_head,
 
 // do regridding
 void
-AmrDriver::regrid()
+AmrHydro::regrid()
 {
-    CH_TIME("AmrDriver::regrid");
+    CH_TIME("AmrHydro::regrid");
 
     if (m_verbosity > 3)
     {
-        pout() << "AmrDriver::regrid" << endl;
+        pout() << "AmrHydro::regrid" << endl;
     }
 
     // only do any of this if the max level > 0
@@ -1114,7 +1088,7 @@ AmrDriver::regrid()
         {
             if (m_verbosity > 3)
             {
-                pout() << "AmrDriver::regrid -- grids unchanged" << endl;
+                pout() << "AmrHydro::regrid -- grids unchanged" << endl;
             }
         }
 
@@ -1248,17 +1222,17 @@ AmrDriver::regrid()
 
 /// set physical parameters (useful when calling from another driver)
 //void
-//AmrDriver::setPhysicalConstants(Real a_gravity)
+//AmrHydro::setPhysicalConstants(Real a_gravity)
 //{
 //    m_gravity = a_gravity;
 //}
 
 void
-AmrDriver::tagCells(Vector<IntVectSet>& a_tags)
+AmrHydro::tagCells(Vector<IntVectSet>& a_tags)
 {
     if (m_verbosity > 3)
     {
-        pout() << "AmrDriver::tagCells" << endl;
+        pout() << "AmrHydro::tagCells" << endl;
     }
 
     int top_level = a_tags.size();
@@ -1278,7 +1252,7 @@ AmrDriver::tagCells(Vector<IntVectSet>& a_tags)
     // throw away any coarse level tags outside m_tag_subset
     // if (m_verbosity > 3)
     //   {
-    //     pout() << "AmrDriver::tagCells, subset II" << endl;
+    //     pout() << "AmrHydro::tagCells, subset II" << endl;
     //   }
     // if (m_tag_subset.numPts() > 0)
     //   {
@@ -1294,11 +1268,11 @@ AmrDriver::tagCells(Vector<IntVectSet>& a_tags)
 }
 
 void
-AmrDriver::tagCellsLevel(IntVectSet& a_tags, int a_level)
+AmrHydro::tagCellsLevel(IntVectSet& a_tags, int a_level)
 {
     if (m_verbosity > 4)
     {
-        pout() << "AmrDriver::tagCellsLevel " << a_level << endl;
+        pout() << "AmrHydro::tagCellsLevel " << a_level << endl;
     }
 
     // base tags on undivided gradient of phi
@@ -1407,11 +1381,11 @@ AmrDriver::tagCellsLevel(IntVectSet& a_tags, int a_level)
 }
 
 void
-AmrDriver::tagCellsInit(Vector<IntVectSet>& a_tags)
+AmrHydro::tagCellsInit(Vector<IntVectSet>& a_tags)
 {
     if (m_verbosity > 3)
     {
-        pout() << "AmrDriver::tagCellsInit" << endl;
+        pout() << "AmrHydro::tagCellsInit" << endl;
     }
 
     // default is to just call regular tagging
@@ -1420,11 +1394,11 @@ AmrDriver::tagCellsInit(Vector<IntVectSet>& a_tags)
 }
 
 void
-AmrDriver::initGrids(int a_finest_level)
+AmrHydro::initGrids(int a_finest_level)
 {
     if (m_verbosity > 3)
     {
-        pout() << "AmrDriver::initGrids" << endl;
+        pout() << "AmrHydro::initGrids" << endl;
     }
 
     m_finest_level = 0;
@@ -1558,11 +1532,11 @@ AmrDriver::initGrids(int a_finest_level)
 }
 
 void
-AmrDriver::setupFixedGrids(const std::string& a_gridFile)
+AmrHydro::setupFixedGrids(const std::string& a_gridFile)
 {
     if (m_verbosity > 3)
     {
-        pout() << "AmrDriver::setupFixedGrids" << endl;
+        pout() << "AmrHydro::setupFixedGrids" << endl;
     }
     Vector<Vector<Box> > gridvect;
 
@@ -1687,11 +1661,11 @@ AmrDriver::setupFixedGrids(const std::string& a_gridFile)
 }
 
 void
-AmrDriver::levelSetup(int a_level, const DisjointBoxLayout& a_grids)
+AmrHydro::levelSetup(int a_level, const DisjointBoxLayout& a_grids)
 {
     if (m_verbosity > 3)
     {
-        pout() << "AmrDriver::levelSetup - level " << endl;
+        pout() << "AmrHydro::levelSetup - level " << endl;
     }
     int nPhiComp = 1;
     IntVect ghostVect = IntVect::Unit;
@@ -1754,12 +1728,12 @@ AmrDriver::levelSetup(int a_level, const DisjointBoxLayout& a_grids)
 }
 
 void
-AmrDriver::initData(Vector<LevelData<FArrayBox>*>& a_head)
+AmrHydro::initData(Vector<LevelData<FArrayBox>*>& a_head)
 
 {
     if (m_verbosity > 3)
     {
-        pout() << "AmrDriver::initData" << endl;
+        pout() << "AmrHydro::initData" << endl;
     }
 
     for (int lev = 0; lev <= m_finest_level; lev++)
@@ -1805,6 +1779,7 @@ AmrDriver::initData(Vector<LevelData<FArrayBox>*>& a_head)
         // int refRatio = (lev > 0)?m_refinement_ratios[lev-1]:0;
 
         m_IBCPtr->initializeData(levelDx, 
+                                 *m_suhmoParm,       
                                  levelHead, levelGapHeight, 
                                  levelPw, levelqw,
                                  levelRe, levelmR,
@@ -1835,18 +1810,18 @@ AmrDriver::initData(Vector<LevelData<FArrayBox>*>& a_head)
 }
 
 void
-AmrDriver::defineSolver()
+AmrHydro::defineSolver()
 {
     // just a stub for when we might actually need it...
 }
 
 // compute timestep
 Real
-AmrDriver::computeDt()
+AmrHydro::computeDt()
 {
     if (m_verbosity > 3)
     {
-        pout() << "AmrDriver::computeDt" << endl;
+        pout() << "AmrHydro::computeDt" << endl;
     }
 
     if (m_fixed_dt > TINY_NORM) return m_fixed_dt;
@@ -1905,11 +1880,11 @@ AmrDriver::computeDt()
 }
 
 Real
-AmrDriver::computeInitialDt()
+AmrHydro::computeInitialDt()
 {
     if (m_verbosity > 3)
     {
-        pout() << "AmrDriver::computeInitialDt" << endl;
+        pout() << "AmrHydro::computeInitialDt" << endl;
     }
 
     // for now, just call computeDt;
@@ -1921,11 +1896,11 @@ AmrDriver::computeInitialDt()
 
 /// write hdf5 plotfile to the standard location
 void
-AmrDriver::writePlotFile()
+AmrHydro::writePlotFile()
 {
     if (m_verbosity > 3)
     {
-        pout() << "AmrDriver::writePlotFile" << endl;
+        pout() << "AmrHydro::writePlotFile" << endl;
     }
 
     // plot comps: head + gapHeight + bedelevation + overburdenPress
@@ -2120,14 +2095,14 @@ AmrDriver::writePlotFile()
 
 /// write checkpoint file out for later restarting
 void
-AmrDriver::writeCheckpointFile() const
+AmrHydro::writeCheckpointFile() const
 {
     if (m_verbosity > 3)
     {
-        pout() << "AmrDriver::writeCheckpointfile" << endl;
+        pout() << "AmrHydro::writeCheckpointfile" << endl;
     }
 
-    CH_TIME("AmrDriver::writeCheckpointFile");
+    CH_TIME("AmrHydro::writeCheckpointFile");
 
     string headName("head");
     Vector<string> vectName(1);
@@ -2251,14 +2226,14 @@ AmrDriver::writeCheckpointFile() const
 
 /// read checkpoint file for restart
 void
-AmrDriver::readCheckpointFile(HDF5Handle& a_handle)
+AmrHydro::readCheckpointFile(HDF5Handle& a_handle)
 {
     if (m_verbosity > 3)
     {
-        pout() << "AmrDriver::readCheckpointFile" << endl;
+        pout() << "AmrHydro::readCheckpointFile" << endl;
     }
 
-    CH_TIME("AmrDriver::readCheckpointFile");
+    CH_TIME("AmrHydro::readCheckpointFile");
 
     HDF5HeaderData header;
     header.readFromFile(a_handle);
@@ -2486,11 +2461,11 @@ AmrDriver::readCheckpointFile(HDF5Handle& a_handle)
 
 /// set up for restart
 void
-AmrDriver::restart(string& a_restart_file)
+AmrHydro::restart(string& a_restart_file)
 {
     if (m_verbosity > 3)
     {
-        pout() << "AmrDriver::restart" << endl;
+        pout() << "AmrHydro::restart" << endl;
     }
 
     HDF5Handle handle(a_restart_file, HDF5Handle::OPEN_RDONLY);

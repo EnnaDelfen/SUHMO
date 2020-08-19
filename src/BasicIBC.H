@@ -22,6 +22,7 @@
 #include "PhysIBC.H"
 #include "PetscCompGridVTO.H"
 #include "BCFunc.H"
+#include "suhmo_params.H"
 
 #include "NamespaceHeader.H"
 
@@ -118,15 +119,16 @@ public:
     virtual void initialize(LevelData<FArrayBox>& a_U) = 0;
 
     virtual void initializeData(RealVect& a_dx,
-                             LevelData<FArrayBox>& a_head,
-                             LevelData<FArrayBox>& a_gapHeight,
-                             LevelData<FArrayBox>& a_Pw,
-                             LevelData<FArrayBox>& a_qw,
-                             LevelData<FArrayBox>& a_Re,
-                             LevelData<FArrayBox>& a_meltRate,
-                             LevelData<FArrayBox>& a_zbed, 
-                             LevelData<FArrayBox>& a_Pi,
-                             LevelData<FArrayBox>& a_iceHeight) = 0;
+                                suhmo_params Parms,    
+                                LevelData<FArrayBox>& a_head,
+                                LevelData<FArrayBox>& a_gapHeight,
+                                LevelData<FArrayBox>& a_Pw,
+                                LevelData<FArrayBox>& a_qw,
+                                LevelData<FArrayBox>& a_Re,
+                                LevelData<FArrayBox>& a_meltRate,
+                                LevelData<FArrayBox>& a_zbed, 
+                                LevelData<FArrayBox>& a_Pi,
+                                LevelData<FArrayBox>& a_iceHeight) = 0;
 
     /// Set boundary fluxes
     /**

@@ -11,7 +11,7 @@
 #include "DerivedIBC.H"
 #include "ParmParse.H"
 #include "FluxBox.H"
-#include "suhmo.H"
+#include "AmrHydro.H"
 
 #include "NamespaceHeader.H"
 
@@ -154,15 +154,16 @@ DerivedIBC::initialize(LevelData<FArrayBox>& a_head)
  */
 void
 DerivedIBC::initializeData(RealVect& a_dx,
-                        LevelData<FArrayBox>& a_head,
-                        LevelData<FArrayBox>& a_gapHeight,
-                        LevelData<FArrayBox>& a_Pw,
-                        LevelData<FArrayBox>& a_qw,
-                        LevelData<FArrayBox>& a_Re,
-                        LevelData<FArrayBox>& a_meltRate,
-                        LevelData<FArrayBox>& a_zbed,
-                        LevelData<FArrayBox>& a_Pi,
-                        LevelData<FArrayBox>& a_iceHeight)
+                           suhmo_params Params,     
+                           LevelData<FArrayBox>& a_head,
+                           LevelData<FArrayBox>& a_gapHeight,
+                           LevelData<FArrayBox>& a_Pw,
+                           LevelData<FArrayBox>& a_qw,
+                           LevelData<FArrayBox>& a_Re,
+                           LevelData<FArrayBox>& a_meltRate,
+                           LevelData<FArrayBox>& a_zbed,
+                           LevelData<FArrayBox>& a_Pi,
+                           LevelData<FArrayBox>& a_iceHeight)
 {
     
     pout() << "DerivedIBC::initializeData" << endl;
@@ -188,20 +189,20 @@ DerivedIBC::initializeData(RealVect& a_dx,
         {
             IntVect iv = bit();
             // gapHeight - initially constant 
-            thisGapHeight(iv, 0) = hydro_params::m_gapInit;
+            thisGapHeight(iv, 0) = Params.m_gapInit;
             // Initial Head is such that the water pressure is equal to 50% of the ice overburden pressure
-            thisiceHeight(iv, 0) = hydro_params::m_H;
-            Real P_ice        = hydro_params::m_rho_i * hydro_params::m_gravity * hydro_params::m_H;
+            thisiceHeight(iv, 0) = Params.m_H;
+            Real P_ice        = Params.m_rho_i * Params.m_gravity * Params.m_H;
             Real P_water_init = P_ice * 0.5;
-            Real Fact         = 1./(hydro_params::m_rho_w * hydro_params::m_gravity);
-            thiszbed(iv, 0)      = hydro_params::m_slope*(iv[0]+0.5)*a_dx[0];
+            Real Fact         = 1./(Params.m_rho_w * Params.m_gravity);
+            thiszbed(iv, 0)      = Params.m_slope*(iv[0]+0.5)*a_dx[0];
             thisHead(iv, 0)      = P_water_init * Fact + thiszbed(iv, 0) ;
             thispi(iv, 0)        = P_ice;
-            thisPw(iv, 0)        = hydro_params::m_rho_w * hydro_params::m_gravity * (thisHead(iv, 0)  - thiszbed(iv, 0));
+            thisPw(iv, 0)        = Params.m_rho_w * Params.m_gravity * (thisHead(iv, 0)  - thiszbed(iv, 0));
             // dummy stuff 
-            thisRe(iv, 0)        = hydro_params::m_ReInit;
+            thisRe(iv, 0)        = Params.m_ReInit;
             thisqw(iv, 0)        = 0.0;
-            thismeltRate(iv, 0)  = hydro_params::m_G / hydro_params::m_L;
+            thismeltRate(iv, 0)  = Params.m_G / Params.m_L;
         } // end loop over cells
     }     // end loop over boxes
 
