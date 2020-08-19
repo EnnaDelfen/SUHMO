@@ -18,7 +18,7 @@
 #include "AMRIO.H"
 #include "SPMD.H"
 
-#include "AmrDriver.H"
+#include "AmrHydro.H"
 
 #include "DerivedIBC.H"
 
@@ -76,7 +76,7 @@ main(int argc, char* argv[])
         ppMain.getarr("domain_size", domSize, 0, SpaceDim);
         domainSize = RealVect(D_DECL(domSize[0], domSize[1], domSize[2]));
 
-        AmrDriver amrObject;
+        AmrHydro amrObject;
 
         // ---------------------------------------------
         // set IBC -- this includes initial conditon

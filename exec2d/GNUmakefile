@@ -3,7 +3,7 @@
 ### This makefile produces an executable for each 
 ### name in the `ebase' variable
 include ../mk/Make.defs
-ebase := driver 
+ebase := Suhmo
 
 #set compiler and CHOMBO_HOME
 
@@ -11,7 +11,7 @@ MACHINE = $(shell uname)
 UNAMEM = $(shell uname -m)
 
 DIM=2
-USE_PETSC=TRUE
+USE_PETSC=FALSE
 MPI=FALSE
 USE_MF=TRUE
 
