@@ -138,6 +138,11 @@ public:
     {
         return m_amrDx;
     }
+    
+    const Vector<ProblemDomain>& amrDomains() const
+    {
+        return m_amrDomains;
+    }
 
     /* Access functions */
     // m_gapheight
@@ -333,6 +338,9 @@ protected:
     /* */
     Vector<LevelData<FArrayBox>*> m_head;                   // Hydraulic head
     Vector<LevelData<FArrayBox>*> m_gapheight;              // Subglacial height
+
+    Vector<LevelData<FArrayBox>*> m_gradhead;               // Grad of Hydraulic head
+
     /* */
     Vector<LevelData<FArrayBox>*> m_Pw;                     // Water pressure
     Vector<LevelData<FArrayBox>*> m_qw;                     // Water flux

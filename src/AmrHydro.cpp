@@ -45,6 +45,7 @@ using std::string;
 #include "CH_HDF5.H"
 #include "MayDay.H"
 #include "CONSTANTS.H"
+#include "Gradient.H"
 
 #include "NamespaceHeader.H"
 
@@ -128,6 +129,11 @@ AmrHydro::~AmrHydro()
         {
             delete m_head[lev];
             m_head[lev] = NULL;
+        }
+        if (m_gradhead[lev] != NULL)
+        {
+            delete m_gradhead[lev];
+            m_gradhead[lev] = NULL;
         }
         if (m_old_head[lev] != NULL)
         {
@@ -481,7 +487,7 @@ AmrHydro::initialize()
         // if we're not restarting
         if (m_verbosity > 3)
         {
-            pout() << "AmrHydro::initialize - Initializing data containers" << endl;
+            pout() << "\nAmrHydro::initialize - Initializing data containers" << endl;
         }
 
         //---------------------------------
@@ -491,6 +497,8 @@ AmrHydro::initialize()
         // Time-dependent variables    
         m_old_head.resize(m_max_level + 1, NULL);
         m_head.resize(m_max_level + 1, NULL);
+
+        m_gradhead.resize(m_max_level + 1, NULL);
 
         m_old_gapheight.resize(m_max_level + 1, NULL);
         m_gapheight.resize(m_max_level + 1, NULL);
@@ -512,6 +520,8 @@ AmrHydro::initialize()
         {
             m_old_head[lev] = new LevelData<FArrayBox>;
             m_head[lev] = new LevelData<FArrayBox>;
+            
+            m_gradhead[lev] = new LevelData<FArrayBox>;
 
             m_old_gapheight[lev] = new LevelData<FArrayBox>;
             m_gapheight[lev] = new LevelData<FArrayBox>;
@@ -575,7 +585,7 @@ AmrHydro::initialize()
         if (m_verbosity > 4)
         {
             // write out initial grids
-            pout() << "Level " << lev << " grids: " << levelGrids << endl;
+            pout() << "    Level " << lev << " grids: " << levelGrids << endl;
         }
         LayoutIterator lit = levelGrids.layoutIterator();
         for (lit.begin(); lit.ok(); ++lit)
@@ -618,7 +628,7 @@ AmrHydro::initialize()
 
     if (m_verbosity > 3)
     {
-        pout() << "Done with AmrHydro::initialize" << endl;
+        pout() << "Done with AmrHydro::initialize\n" << endl;
     }
 }
 
@@ -740,13 +750,19 @@ AmrHydro::timeStep(Real a_dt)
 
     if (m_verbosity >= 2)
     {
-        pout() << "Timestep " << m_cur_step << " Advancing solution from time " << m_time << " ( " << time()
+        pout() << "-- Timestep " << m_cur_step << " Advancing solution from time " << m_time << " ( " << time()
                << ")"
                   " with dt = "
                << a_dt << endl;
     }
 
-    // first copy head and gap into old
+    // tmp data holders
+    //IntVect HeadGhostVect = m_num_head_ghost * IntVect::Unit;
+    //Vector<LevelData<FArrayBox>*> a_q_cc;
+    //a_q_cc.resize(m_max_level + 1, NULL);
+
+    // first copy head and gap into old and create tmp vectors
+    pout() <<"   ...Copy current into old "<< endl;
     for (int lev = 0; lev <= m_finest_level; lev++)
     {
         LevelData<FArrayBox>& oldH     = *m_old_head[lev];
@@ -755,73 +771,168 @@ AmrHydro::timeStep(Real a_dt)
         LevelData<FArrayBox>& oldB     = *m_old_gapheight[lev];
         LevelData<FArrayBox>& currentB = *m_gapheight[lev];
 
+        LevelData<FArrayBox>& levelgradH    = *m_gradhead[lev];
+
         // this way we avoid communication and maintain ghost cells...
         DataIterator dit = oldH.dataIterator();
         for (dit.begin(); dit.ok(); ++dit)
         {
             oldH[dit].copy(currentH[dit], 0, 0, 1);
             oldB[dit].copy(currentB[dit], 0, 0, 1);
+
+            // debug
+            levelgradH[dit].setVal(0.0);
+            FArrayBox& gradH   = levelgradH[dit];
+            BoxIterator bit(gradH.box()); // can use gridBox? 
+            for (bit.begin(); bit.ok(); ++bit) {
+                IntVect iv = bit();
+            }
         }
+
+        //a_q_cc[lev] = new LevelData<FArrayBox>(m_amrGrids[lev], 1, HeadGhostVect);
     }
 
     // SUHMO time-step
-    // 1 - Solving for the hydrolic head
+    // 1 - Solving for the hydraulic head
+    pout() <<"   ...Solve for h ! "<< endl;
+    //for (int lev = m_finest_level; lev >= 0; lev--)
+    //{
+    //    LevelData<FArrayBox>& currentH = *m_head[lev];
+    //    //LevelData<FArrayBox>& gradH    = *m_gradhead[lev];
+
+    //}
 
     // 2 - Time-advance gap height
+    pout() <<"   ...Solve for b ! "<< endl;
     int gh_method = 0; // 0: backward Euler, 1:...
     for (int lev = m_finest_level; lev >= 0; lev--)
     {
+        LevelData<FArrayBox>& leveloldB  = *m_old_gapheight[lev];    
+        LevelData<FArrayBox>& levelnewB  = *m_gapheight[lev];    
 
-        LevelData<FArrayBox>& leveloldB = *m_old_gapheight[lev];    
-        LevelData<FArrayBox>& levelnewB = *m_gapheight[lev];    
+        LevelData<FArrayBox>& levelcurrentH = *m_head[lev];
+        LevelData<FArrayBox>& levelgradH    = *m_gradhead[lev];
 
-        DisjointBoxLayout& levelGrids = m_amrGrids[lev];
+        LevelData<FArrayBox>& levelmR       = *m_meltRate[lev];
+        LevelData<FArrayBox>& levelPw       = *m_Pw[lev];
+        LevelData<FArrayBox>& levelPi       = *m_overburdenpress[lev];
+        LevelData<FArrayBox>& levelQw       = *m_qw[lev]; 
+        LevelData<FArrayBox>& levelRe       = *m_Re[lev]; 
+        LevelData<FArrayBox>& levelzBed     = *m_bedelevation[lev];
+
+        DisjointBoxLayout& levelGrids    = m_amrGrids[lev];
         DataIterator dit = levelGrids.dataIterator();
-    
-        // 2. a : Get the RHS of gh eqs:
-        IntVect nGhost = m_num_head_ghost * IntVect::Unit;
-        LevelData<FArrayBox> gh_RHS(levelGrids, 1, nGhost);
-        LevelData<FArrayBox>& levelmR = *m_meltRate[lev];
-        LevelData<FArrayBox>& levelPw = *m_Pw[lev];
-        LevelData<FArrayBox>& levelPi = *m_overburdenpress[lev];
-
+        IntVect nGhost   = m_num_head_ghost * IntVect::Unit;
+  
+        // Update water pressure
+        pout() <<"        Update water pressure "<< endl;
         for (dit.begin(); dit.ok(); ++dit) {
+            FArrayBox& Pw      = levelPw[dit];
+            FArrayBox& newH    = levelcurrentH[dit];
+            FArrayBox& zbed    = levelzBed[dit];
+
+            Pw.copy(newH, 0, 0, 1);
+            Pw.minus(zbed, 0, 0, 1);
+            Pw *= m_suhmoParm->m_rho_w * m_suhmoParm->m_gravity;;
+        }
+        
+        // Compute gradients at CC
+        pout() <<"        Compute grad(h) and grad(Pw) "<< endl;
+        // should those grad be def on a box WITHOUT ghost cells ?
+        LevelData<FArrayBox> levelgradPw(levelGrids, 1*SpaceDim, nGhost);
+        LevelData<FArrayBox>* crsePsiPtr = NULL;
+        LevelData<FArrayBox>* finePsiPtr = NULL;
+        int nRefCrse=-1;
+        int nRefFine=-1;
+        // one level only for now ...
+        //if (lev > 0) {
+        //    ...
+        //}
+        //if (lev < m_level) {
+        //    ...
+        //}
+        Real dx = m_amrDx[lev][0];  
+        Gradient::compGradientCC(levelgradH, levelcurrentH,
+                                 crsePsiPtr, finePsiPtr,
+                                 dx, nRefCrse, nRefFine,
+                                 m_amrDomains[lev]);
+        Gradient::compGradientCC(levelgradPw, levelPw,
+                                 crsePsiPtr, finePsiPtr,
+                                 dx, nRefCrse, nRefFine,
+                                 m_amrDomains[lev]);
+
+        // 2. a : Get the RHS of gh eqs:
+        pout() <<"        Compute water flux (with old time Re), recompute Re and the meting rate"<< endl;
+        pout() <<"        Finally update RHS (using old time b info, expl Euler scheme)"<< endl;
+        LevelData<FArrayBox> gh_RHS(levelGrids, 1, nGhost);
+        for (dit.begin(); dit.ok(); ++dit) {
+            FArrayBox& oldB    = leveloldB[dit];
+
+            FArrayBox& gradH   = levelgradH[dit];
+
             const Box& gridBox = levelGrids[dit];
-            FArrayBox& RHS     = gh_RHS[dit];
+
             FArrayBox& meltR   = levelmR[dit];
             FArrayBox& Pw      = levelPw[dit];
             FArrayBox& Pressi  = levelPi[dit];
-            FArrayBox& oldB    = leveloldB[dit];
-            FArrayBox& newB    = levelnewB[dit];
+            FArrayBox& Qwater  = levelQw[dit];
+            FArrayBox& Re      = levelRe[dit];
 
+            FArrayBox& gradPw  = levelgradPw[dit];
+            FArrayBox& RHS     = gh_RHS[dit];
+
+            BoxIterator bit(meltR.box()); // can use gridBox? 
+            for (bit.begin(); bit.ok(); ++bit) {
+                IntVect iv = bit();
+                // Update water flux, using old-time Re
+                Real num_q = - oldB(iv, 0) * oldB(iv, 0) * oldB(iv, 0) * m_suhmoParm->m_gravity * gradH(iv, 0);
+                Real denom_q = 12.0 * m_suhmoParm->m_nu * (1 + m_suhmoParm->m_omega * Re(iv, 0));
+                Qwater(iv, 0) = num_q/denom_q;
+                num_q = - oldB(iv, 0) * oldB(iv, 0) * oldB(iv, 0) * m_suhmoParm->m_gravity * gradH(iv, 1);
+                Qwater(iv, 1) = num_q/denom_q;
+                // Update Re
+                Re(iv, 0) = std::sqrt( Qwater(iv, 0) * Qwater(iv, 0) + Qwater(iv, 1) * Qwater(iv, 1)) / m_suhmoParm->m_nu;
+                // Update melting rate
+                meltR(iv, 0)  = m_suhmoParm->m_G / m_suhmoParm->m_L;
+                //meltR(iv, 0) += term in ub and stress  <-- TODO
+                meltR(iv, 0) -= m_suhmoParm->m_rho_w * m_suhmoParm->m_gravity * (
+                                    Qwater(iv, 0) * gradH(iv, 0) + 
+                                    Qwater(iv, 1) * gradH(iv, 1) ); 
+                meltR(iv, 0) -=  m_suhmoParm->m_ct * m_suhmoParm->m_cw * m_suhmoParm->m_rho_w * (
+                                    Qwater(iv, 0) * gradPw(iv, 0) + 
+                                    Qwater(iv, 1) * gradPw(iv, 1) );
+            }
+            
+            // gap height b RHS
             // first term
             RHS.copy(meltR, 0, 0, 1);
             RHS *= 1.0 / m_suhmoParm->m_rho_i;
-            pout() <<"First term done..."<< endl;
             // second term ...
             Real ub_norm = std::sqrt(  m_suhmoParm->m_ub[0]*m_suhmoParm->m_ub[0] 
                                      + m_suhmoParm->m_ub[1]*m_suhmoParm->m_ub[1]) / m_suhmoParm->m_lr;
-            Real PimPw = 0;
-            BoxIterator bit(meltR.box()); // can use gridBox? 
             for (bit.begin(); bit.ok(); ++bit) {
                 IntVect iv = bit();
                 if ( oldB(iv,0) < m_suhmoParm->m_br) {
                     RHS(iv,0) += ub_norm * (m_suhmoParm->m_br - oldB(iv,0));
                 }
                 // third term ... assume  n = 3 !!
-                PimPw = (Pressi(iv,0) - Pw(iv,0));
+                Real PimPw = (Pressi(iv,0) - Pw(iv,0));
                 RHS(iv,0) -= m_suhmoParm->m_A * (PimPw) * (PimPw) * (PimPw) * oldB(iv,0);
             }
-            pout() <<"Second and third term done..."<< endl;
 
         }
 
+        pout() <<"        Update gap height with expl Euler scheme"<< endl;
         // 2. b : update gap height
         for (dit.begin(); dit.ok(); ++dit) {
-            const Box& gridBox = levelGrids[dit];
-            levelnewB[dit].copy(gh_RHS[dit], 0, 0, 1);
-            levelnewB[dit] *= a_dt;
-            levelnewB[dit].plus(leveloldB[dit], 0, 0, 1);
+
+            FArrayBox& oldB    = leveloldB[dit];
+            FArrayBox& newB    = levelnewB[dit];
+            FArrayBox& RHS     = gh_RHS[dit];
+
+            newB.copy(RHS, 0, 0, 1);
+            newB *= a_dt;
+            newB.plus(oldB, 0, 0, 1);
         }
         
     }
@@ -881,7 +992,7 @@ AmrHydro::timeStep(Real a_dt)
 // write diagnostic info, like sum of ice
     if (m_verbosity > 0)
     {
-        pout() << "AmrHydro::timestep " << m_cur_step << " --     end time = "
+        pout() << "VERBOSE: AmrHydro::timestep " << m_cur_step << " --     end time = "
                //<< setiosflags(ios::fixed) << setprecision(6) << setw(12)
                << m_time << " ( " << time() << " )"
                //<< " (" << m_time/m_seconds_per_year << " yr)"
@@ -1220,13 +1331,6 @@ AmrHydro::regrid()
     } // end if max level > 0 in the first place
 }
 
-/// set physical parameters (useful when calling from another driver)
-//void
-//AmrHydro::setPhysicalConstants(Real a_gravity)
-//{
-//    m_gravity = a_gravity;
-//}
-
 void
 AmrHydro::tagCells(Vector<IntVectSet>& a_tags)
 {
@@ -1414,7 +1518,7 @@ AmrHydro::initGrids(int a_finest_level)
     if (m_verbosity > 3)
     {
         long long numCells0 = baseGrids.numCells();
-        pout() << "Level 0: " << numCells0 << " cells: " << baseGrids << endl;
+        pout() << "    Level 0: " << numCells0 << " cells: " << baseGrids << endl;
     }
 
     // Set collection of boxes hierarchy, init level 0 to base grid
@@ -1678,9 +1782,10 @@ AmrHydro::levelSetup(int a_level, const DisjointBoxLayout& a_grids)
     {
         // First pass or first level
         m_head[a_level] = new LevelData<FArrayBox>(a_grids, nPhiComp, HeadGhostVect);
+        m_gradhead[a_level] = new LevelData<FArrayBox>(a_grids, SpaceDim*nPhiComp, HeadGhostVect);
         m_gapheight[a_level] = new LevelData<FArrayBox>(a_grids, nPhiComp, HeadGhostVect);
         m_Pw[a_level] = new LevelData<FArrayBox>(a_grids, nPhiComp, HeadGhostVect);
-        m_qw[a_level] = new LevelData<FArrayBox>(a_grids, nPhiComp, HeadGhostVect);
+        m_qw[a_level] = new LevelData<FArrayBox>(a_grids, SpaceDim*nPhiComp, HeadGhostVect);
         m_Re[a_level] = new LevelData<FArrayBox>(a_grids, nPhiComp, HeadGhostVect);
         m_meltRate[a_level] = new LevelData<FArrayBox>(a_grids, nPhiComp, HeadGhostVect);
         m_iceheight[a_level] = new LevelData<FArrayBox>(a_grids, nPhiComp, HeadGhostVect);
@@ -1904,7 +2009,7 @@ AmrHydro::writePlotFile()
     }
 
     // plot comps: head + gapHeight + bedelevation + overburdenPress
-    int numPlotComps = 8;
+    int numPlotComps = 9;
 
     // add in grad(head) if desired
     //if (m_write_gradPhi)
@@ -1919,10 +2024,10 @@ AmrHydro::writePlotFile()
     string zbedName("bedelevation");
     string piName("overburdenPress");
     string pwName("Pw"); 
-    string qwName("Qw"); 
+    string qwName("Qw_x"); 
     string ReName("Re"); 
     string meltRateName("meltRate"); 
-    string xGradName("xGradPhi");
+    string xGradName("GradHead_x");
     string yGradName("yGradPhi");
     string zGradName("zGradPhi");
 
@@ -1937,6 +2042,7 @@ AmrHydro::writePlotFile()
     vectName[5] = qwName;
     vectName[6] = ReName;
     vectName[7] = meltRateName;
+    vectName[8] = xGradName;
     //if (m_write_gradPhi)
     //{
     //    vectName[numPlotComps] = xGradName;
@@ -1966,6 +2072,7 @@ AmrHydro::writePlotFile()
         LevelData<FArrayBox>& plotDataLev = *plotData[lev];
 
         const LevelData<FArrayBox>& levelHead      = *m_head[lev];
+        const LevelData<FArrayBox>& levelGradHead  = *m_gradhead[lev];
         const LevelData<FArrayBox>& levelgapHeight = *m_gapheight[lev];
         const LevelData<FArrayBox>& levelzbed      = *m_bedelevation[lev];
         const LevelData<FArrayBox>& levelpi        = *m_overburdenpress[lev];
@@ -2005,6 +2112,7 @@ AmrHydro::writePlotFile()
             FArrayBox& thisPlotData   = plotDataLev[dit];
             int comp = 0;
             const FArrayBox& thisHead       = levelHead[dit];
+            const FArrayBox& thisGradHead   = levelGradHead[dit];
             const FArrayBox& thisGapHeight  = levelgapHeight[dit];
             const FArrayBox& thiszbed       = levelzbed[dit];
             const FArrayBox& thisPi         = levelpi[dit];
@@ -2028,6 +2136,8 @@ AmrHydro::writePlotFile()
             thisPlotData.copy(thisRe, 0, comp, 1);
             comp++;
             thisPlotData.copy(thismR, 0, comp, 1);
+            comp++;
+            thisPlotData.copy(thisGradHead, 0, comp, 1);
             comp++;
             // now copy for grad(head)
             //if (m_write_gradPhi)

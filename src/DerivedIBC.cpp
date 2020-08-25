@@ -197,16 +197,17 @@ DerivedIBC::initializeData(RealVect& a_dx,
             Real Fact         = 1./(Params.m_rho_w * Params.m_gravity);
             thiszbed(iv, 0)      = Params.m_slope*(iv[0]+0.5)*a_dx[0];
             thisHead(iv, 0)      = P_water_init * Fact + thiszbed(iv, 0) ;
-            thispi(iv, 0)        = P_ice;
+            thispi(iv, 0)        = P_ice; // cst for now ...
             thisPw(iv, 0)        = Params.m_rho_w * Params.m_gravity * (thisHead(iv, 0)  - thiszbed(iv, 0));
             // dummy stuff 
             thisRe(iv, 0)        = Params.m_ReInit;
             thisqw(iv, 0)        = 0.0;
+            thisqw(iv, 1)        = 0.0;
             thismeltRate(iv, 0)  = Params.m_G / Params.m_L;
         } // end loop over cells
     }     // end loop over boxes
 
-    pout() << "Done with DerivedIBC::initializeData" << endl;
+    pout() << "(Done with DerivedIBC::initializeData)" << endl;
 }
 
 /// Set boundary fluxes
