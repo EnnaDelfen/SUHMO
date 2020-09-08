@@ -18,6 +18,10 @@
 #include "BasicIBC.H"
 #include "AdvectPhysics.H"
 #include "suhmo_params.H"
+#include "MultilevelLinearOp.H"
+#include "BiCGStabSolver.H"
+#include "CellToEdge.H"
+#include "VCAMRPoissonOp2.H"
 
 #include "NamespaceHeader.H"
 
@@ -351,6 +355,10 @@ protected:
     /* Time-constant parameters */
     Vector<LevelData<FArrayBox>*> m_bedelevation;           //
     Vector<LevelData<FArrayBox>*> m_overburdenpress;        // rhoi*g*H
+
+
+    /* Solver */
+    //VCAMRPoissonOp2Factory* m_poisson_h;
 
     /* verbosity level */
     int m_verbosity;
