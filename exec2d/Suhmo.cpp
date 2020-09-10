@@ -20,7 +20,7 @@
 
 #include "AmrHydro.H"
 
-#include "DerivedIBC.H"
+#include "HydroIBC.H"
 
 #ifdef CH_USE_PETSC
 #include "petsc.h"
@@ -83,19 +83,24 @@ main(int argc, char* argv[])
         // and boundary conditions
         // ---------------------------------------------
 
-        BasicIBC* thisIBC;
+        //BasicIBC* thisIBC;
 
-        std::string problem_type;
-        ppMain.get("problem_type", problem_type);
-        if (problem_type == "basic")
-        {
-            DerivedIBC* newIBC = new DerivedIBC();
-            thisIBC = dynamic_cast<BasicIBC*>(newIBC);
-        }
-        else
-        {
-            MayDay::Error("bad problem type");
-        }
+        //std::string problem_type;
+        //ppMain.get("problem_type", problem_type);
+        //if (problem_type == "basic")
+        //{
+        //    DerivedIBC* newIBC = new DerivedIBC();
+        //    thisIBC = dynamic_cast<BasicIBC*>(newIBC);
+        //} 
+        //else if (problem_type == "hydro")
+        //{
+        HydroIBC* thisIBC = new HydroIBC();
+        //    thisIBC = dynamic_cast<BasicIBC*>(newIBC);
+        //} 
+        //else
+        //{
+        //    MayDay::Error("bad problem type");
+        //}
 
         amrObject.setIBC(thisIBC);
 
