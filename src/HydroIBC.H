@@ -9,36 +9,69 @@
 #endif
 
 //
-//  DerivedIBC.H
+//  HydroIBC.H
 // ============
 //
 // PhysIBC-derived class for basic (simple) IBC
 //
 
-#ifndef _DERIVEDIBC_H_
-#define _DERIVEDIBC_H_
+#ifndef _HYDROIBC_H_
+#define _HYDROIBC_H_
 
-#include "BasicIBC.H"
+#include "PhysIBC.H"
+#include "BCFunc.H"
 #include "suhmo_params.H"
 
 #include "NamespaceHeader.H"
+
+//class VCPoissonParameters
+//{
+//public:
+//
+//  void getPoissonParameters (VCPoissonParameters&  a_params);
+//
+//  IntVect      nCells;
+//  int          maxGridSize;
+//  int          blockFactor;
+//  int          bufferSize;
+//  Real         fillRatio;
+//  Real         refineThresh;
+//  int          domBcType;
+//  int          maxLevel;
+//  int          numLevels;
+//  Vector<int>  refRatio;
+//  ProblemDomain coarsestDomain;
+//  Real         coarsestDx;
+//  RealVect     domainLength;
+//  RealVect     probLo;
+//  RealVect     probHi;
+//  Real         alpha;
+//  Real         beta;
+//};
+
+class GlobalBCRS  
+{
+public: 
+    static std::vector<int> s_bcLo, s_bcHi; 
+    static bool             s_areBCsParsed;
+};
 
 /// Physical/domain initial and boundary conditions
 /**
 
  */
-class DerivedIBC : public BasicIBC
+class HydroIBC : public PhysIBC
 {
 public:
     /// Constructor
     /**
      */
-    DerivedIBC();
+    HydroIBC();
 
     /// Destructor
     /**
      */
-    virtual ~DerivedIBC();
+    virtual ~HydroIBC();
 
     /// Define the object
     /**
@@ -49,23 +82,15 @@ public:
 
     /// Factory method - this object is its own factory
     /**
-       Return a pointer to a new BasicIBC object with
+       Returns a pointer to a new HydroIBC object with
        m_isDefined = false (i.e., its define() must be called before it
        is used).
      */
-    virtual BasicIBC* new_thicknessIBC();
-
-#if 0
-  /// set boundary phi
-  void setBoundaryPhi(Real a_boundaryThickness)
-  { m_boundaryPhi = a_boundaryPhi; }
-#endif
+    virtual HydroIBC* new_headIBC();
 
     /// Set up initial conditions
     /**
      */
-    virtual void initialize(LevelData<FArrayBox>& a_U);
-
     virtual void initializeData(RealVect& a_dx,
                                 suhmo_params params,
                                 LevelData<FArrayBox>& a_head,
@@ -78,39 +103,18 @@ public:
                                 LevelData<FArrayBox>& a_Pi,
                                 LevelData<FArrayBox>& a_iceHeight) override;
 
-    /// Set boundary fluxes
-    /**
-     */
-    virtual void primBC(FArrayBox& a_WGdnv,
-                        const FArrayBox& a_Wextrap,
-                        const FArrayBox& a_W,
-                        const int& a_dir,
-                        const Side::LoHiSide& a_side,
-                        const Real& a_time);
 
-    /// Set boundary slopes
-    /**
-       The boundary slopes in a_dW are already set to one sided difference
-       approximations.  If this function doesn't change them they will be
-       used for the slopes at the boundaries.
-     */
-    virtual void setBdrySlopes(FArrayBox& a_dW, const FArrayBox& a_W, const int& a_dir, const Real& a_time);
+    AMRLevelOpFactory<LevelData<FArrayBox> >*
+    defineOperatorFactory(
+                      const Vector<DisjointBoxLayout>&             a_grids,
+                      Vector<RefCountedPtr<LevelData<FArrayBox> > >& a_aCoef,
+                      Vector<RefCountedPtr<LevelData<FluxBox> > >& a_bCoef,
+                      ProblemDomain& coarsestDomain,
+                      Vector<int>& refRatio,
+                      Real& coarsestDx);
 
-    /// Adjust boundary fluxes to account for artificial viscosity
-    /**
-     */
-    virtual void
-    artViscBC(FArrayBox& a_F, const FArrayBox& a_U, const FArrayBox& a_divVel, const int& a_dir, const Real& a_time);
-
-    /// return boundary condition for Ice velocity solve
-    /**
-     */
-    virtual RefCountedPtr<CompGridVTOBC> velocitySolveBC();
 
 protected:
-    // phi at domain boundaries
-    Real m_boundaryPhi;
-
     RealVect m_domainSize;
 
     // have bc's been set up?
@@ -119,17 +123,18 @@ protected:
     /// set up bc's based on parmparse inputs
     void setupBCs();
 
-    RefCountedPtr<CompGridVTOBC> m_velBCs;
+    // poisson ??
+    VCAMRPoissonOp2Factory* m_poissonOpF_head;
 
 private:
     // Disallowed for all the usual reasons
-    void operator=(const DerivedIBC& a_input)
+    void operator=(const HydroIBC& a_input)
     {
         MayDay::Error("invalid operator");
     }
 
     // Disallowed for all the usual reasons
-    DerivedIBC(const DerivedIBC& a_input)
+    HydroIBC(const HydroIBC& a_input)
     {
         MayDay::Error("invalid operator");
     }
