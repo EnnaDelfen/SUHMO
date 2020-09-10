@@ -196,8 +196,6 @@ AmrHydro::~AmrHydro()
         m_IBCPtr = NULL;
     }
     
-    //delete m_poisson_h; 
-
     // that should be it!
 }
 
@@ -209,26 +207,22 @@ AmrHydro::initialize()
         pout() << "AmrHydro::initialize" << endl;
     }
 
-    // set time to be 0 -- do this now in case it needs to be changed later
+    // time stepping
     m_time = 0.0;
     m_cur_step = 0;
 
-    // first, read in info from parmParse file
     ParmParse ppAmr("AmrHydro");
+    // num cells in each dir
     Vector<int> ancells(SpaceDim);
     // allows for domains with lower indices which are not positive
     Vector<int> domLoIndex(SpaceDim, 0);
-    // slc : SpaceDim == 2 implies poor-mans multidim mode, in which we still
-    // care about the number of vertical layers.
-    Vector<Real> domsize(SpaceDim);
-
     // assumption is that domains are not periodic
     bool is_periodic[SpaceDim];
     for (int dir = 0; dir < SpaceDim; dir++) is_periodic[dir] = false;
     Vector<int> is_periodic_int(SpaceDim, 0);
 
+    // max level
     ppAmr.get("maxLevel", m_max_level);
-
     if (m_max_level > 0)
     {
         m_refinement_ratios.resize(m_max_level, -1);
@@ -241,11 +235,11 @@ AmrHydro::initialize()
     }
 
     ppAmr.query("verbosity", m_verbosity);
+
     ppAmr.query("block_factor", m_block_factor);
     ppAmr.query("regrid_lbase", m_regrid_lbase);
     ppAmr.query("regrid_interval", m_regrid_interval);
     ppAmr.query("tagCap", m_tag_cap);
-
     ppAmr.query("block_factor", m_block_factor);
     ppAmr.query("max_box_size", m_max_box_size);
     m_max_base_grid_size = m_max_box_size;
@@ -287,7 +281,6 @@ AmrHydro::initialize()
     ppAmr.query("nestingRadius", m_nesting_radius);
 
     ppAmr.query("tags_grow", m_tags_grow);
-
     {
         Vector<int> tgd(SpaceDim, 0);
         ppAmr.queryarr("tags_grow_dir", tgd, 0, tgd.size());
@@ -296,40 +289,35 @@ AmrHydro::initialize()
             m_tags_grow_dir[dir] = tgd[dir];
         }
     }
-
     bool isThereATaggingCriterion = false;
     ppAmr.query("tag_on_phi", m_tagOnGradPhi);
     isThereATaggingCriterion |= m_tagOnGradPhi;
-
     // if we set this to be true, require that we also provide the threshold
     if (m_tagOnGradPhi)
     {
         ppAmr.query("tagging_val", m_tagging_val);
     }
-
     // abort if there isn't a tagging criterion
     if (m_max_level > 0 && !isThereATaggingCriterion)
     {
         MayDay::Error("No Tagging criterion defined");
     }
 
-    // now set up problem domains
+    // Set up problem domains
     {
         IntVect loVect = IntVect(D_DECL(domLoIndex[0], domLoIndex[1], domLoIndex[3]));
-        IntVect hiVect(
-            D_DECL(domLoIndex[0] + ancells[0] - 1, domLoIndex[1] + ancells[1] - 1, domLoIndex[2] + ancells[2] - 1));
-
+        IntVect hiVect( D_DECL(domLoIndex[0] + ancells[0] - 1, 
+                               domLoIndex[1] + ancells[1] - 1, 
+                               domLoIndex[2] + ancells[2] - 1));
         ProblemDomain baseDomain(loVect, hiVect);
-        // now set periodicity
+        // Periodicity
         for (int dir = 0; dir < SpaceDim; dir++) baseDomain.setPeriodic(dir, is_periodic[dir]);
 
-        // now set up vector of domains
+        // Set up vector of domains
         m_amrDomains.resize(m_max_level + 1);
         m_amrDx.resize(m_max_level + 1);
-
         m_amrDomains[0] = baseDomain;
         m_amrDx[0] = m_domainSize[0] / baseDomain.domainBox().size(0) * RealVect::Unit;
-
         for (int lev = 1; lev <= m_max_level; lev++)
         {
             m_amrDomains[lev] = refine(m_amrDomains[lev - 1], m_refinement_ratios[lev - 1]);
@@ -337,11 +325,10 @@ AmrHydro::initialize()
         }
     } // leaving problem domain setup scope
 
+    // Tagging crap, see later
     std::string tagSubsetBoxesFile = "";
     m_vectTagSubset.resize(m_max_level);
-
     ppAmr.query("tagSubsetBoxesFile", tagSubsetBoxesFile);
-
     if (tagSubsetBoxesFile != "")
     {
         if (procID() == uniqueProc(SerialTask::compute))
@@ -353,7 +340,6 @@ AmrHydro::initialize()
                 pout() << "Can't open " << tagSubsetBoxesFile << std::endl;
                 MayDay::Error("Cannot open refine boxes file");
             }
-
             for (int lev = 0; lev < m_max_level; lev++)
             {
                 // allowable tokens to identify levels in tag subset file
@@ -477,18 +463,15 @@ AmrHydro::initialize()
     // check to see if we're using predefined grids
     bool usePredefinedGrids = false;
     std::string gridFile;
-    if (ppAmr.contains("gridsFile"))
-    {
+    if (ppAmr.contains("gridsFile")) {
         usePredefinedGrids = true;
         ppAmr.get("gridsFile", gridFile);
     }
 
     // check to see if we're restarting from a checkpoint file
-    if (!ppAmr.contains("restart_file"))
-    {
-        // if we're not restarting
-        if (m_verbosity > 3)
-        {
+    if (!ppAmr.contains("restart_file")) {
+        // we are restarting from a checkpoint file
+        if (m_verbosity > 3) {
             pout() << "\nAmrHydro::initialize - Initializing data containers" << endl;
         }
 
@@ -518,8 +501,7 @@ AmrHydro::initialize()
         //-------------------------------------------------
         // For each level, define a collection of FArrayBox
         //-------------------------------------------------
-        for (int lev = 0; lev < m_head.size(); lev++)
-        {
+        for (int lev = 0; lev < m_head.size(); lev++) {
             m_old_head[lev] = new LevelData<FArrayBox>;
             m_head[lev] = new LevelData<FArrayBox>;
             
@@ -539,20 +521,13 @@ AmrHydro::initialize()
         }
 
         int finest_level = -1;
-        if (usePredefinedGrids)
-        {
+        if (usePredefinedGrids) {
             setupFixedGrids(gridFile);
-        }
-        else
-        {
+        } else {
             // now create  grids
             initGrids(finest_level);
         }
-
-        // that should be it
-    }
-    else
-    {
+    } else {
         // we're restarting from a checkpoint file
         string restart_file;
         ppAmr.get("restart_file", restart_file);
@@ -563,15 +538,13 @@ AmrHydro::initialize()
         // once we've set up everything, this lets us over-ride the
         // time and step number in the restart checkpoint file with
         // one specified in the inputs
-        if (ppAmr.contains("restart_time"))
-        {
+        if (ppAmr.contains("restart_time")) {
             Real restart_time;
             ppAmr.get("restart_time", restart_time);
             m_time = restart_time;
         }
 
-        if (ppAmr.contains("restart_step"))
-        {
+        if (ppAmr.contains("restart_step")) {
             int restart_step;
             ppAmr.get("restart_step", restart_step);
             m_cur_step = restart_step;
@@ -581,8 +554,7 @@ AmrHydro::initialize()
 
     // set up counter of number of cells
     m_num_cells.resize(m_max_level + 1, 0);
-    for (int lev = 0; lev <= m_finest_level; lev++)
-    {
+    for (int lev = 0; lev <= m_finest_level; lev++) {
         const DisjointBoxLayout& levelGrids = m_amrGrids[lev];
         if (m_verbosity > 4)
         {
@@ -590,8 +562,7 @@ AmrHydro::initialize()
             pout() << "    Level " << lev << " grids: " << levelGrids << endl;
         }
         LayoutIterator lit = levelGrids.layoutIterator();
-        for (lit.begin(); lit.ok(); ++lit)
-        {
+        for (lit.begin(); lit.ok(); ++lit) {
             const Box& thisBox = levelGrids.get(lit());
             m_num_cells[lev] += thisBox.numPts();
         }
@@ -599,36 +570,25 @@ AmrHydro::initialize()
 
     // finally, set up covered_level flags
     m_covered_level.resize(m_max_level + 1, 0);
-
     // note that finest level can't be covered.
-    for (int lev = m_finest_level - 1; lev >= 0; lev--)
-    {
-        // if the next finer level is covered, then this one is too.
-        if (m_covered_level[lev + 1] == 1)
-        {
+    for (int lev = m_finest_level - 1; lev >= 0; lev--) {
+        if (m_covered_level[lev + 1] == 1) {
+            // if the next finer level is covered, then this one is too.
             m_covered_level[lev] = 1;
-        }
-        else
-        {
+        } else {
             // see if the grids finer than this level completely cover it
             IntVectSet fineUncovered(m_amrDomains[lev + 1].domainBox());
             const DisjointBoxLayout& fineGrids = m_amrGrids[lev + 1];
-
             LayoutIterator lit = fineGrids.layoutIterator();
-            for (lit.begin(); lit.ok(); ++lit)
-            {
+            for (lit.begin(); lit.ok(); ++lit) {
                 const Box& thisBox = fineGrids.get(lit());
                 fineUncovered.minus_box(thisBox);
             }
-
-            if (fineUncovered.isEmpty())
-            {
+            if (fineUncovered.isEmpty()) {
                 m_covered_level[lev] = 1;
             }
         }
     } // end loop over levels to determine covered levels
-
-    //m_poisson_h = new VCAMRPoissonOp2Factory;
 
     if (m_verbosity > 3)
     {
@@ -636,41 +596,35 @@ AmrHydro::initialize()
     }
 }
 
-// set BC for thickness advection
+// set BC for head ?
 void
-AmrHydro::setIBC(BasicIBC* a_IBC)
+AmrHydro::setIBC(HydroIBC* a_IBC)
 {
-    m_IBCPtr = a_IBC->new_thicknessIBC();
+    m_IBCPtr = a_IBC->new_headIBC();
 }
 
 /* Main advance function */
 void
 AmrHydro::run(Real a_max_time, int a_max_step)
 {
-    if (m_verbosity > 3)
-    {
+    if (m_verbosity > 3) {
         pout() << "AmrHydro::run -- max_time= " << a_max_time << ", max_step = " << a_max_step << endl;
     }
 
     Real dt;
     // only call computeInitialDt if we're not doing restart
-    if (!m_do_restart)
-    {
+    if (!m_do_restart) {
         dt = computeInitialDt();
-    }
-    else
-    {
+    } else {
         dt = computeDt();
     }
 
     // advance solution until done
     if (!(m_plot_time_interval > TIME_EPS) || m_plot_time_interval > a_max_time) m_plot_time_interval = a_max_time;
 
-    while (a_max_time > m_time && (m_cur_step < a_max_step))
-    {
+    while (a_max_time > m_time && (m_cur_step < a_max_step)) {
         Real next_plot_time = m_plot_time_interval * (1.0 + Real(int((m_time / m_plot_time_interval))));
-        if (!(next_plot_time > m_time))
-        {
+        if (!(next_plot_time > m_time)) {
             // trap case where machine precision results in (effectively)
             // m_plot_time_interval * (1.0 + Real(int((m_time/m_plot_time_interval)))) == m_time
             next_plot_time += m_plot_time_interval;
@@ -678,38 +632,31 @@ AmrHydro::run(Real a_max_time, int a_max_step)
 
         next_plot_time = std::min(next_plot_time, a_max_time);
 
-        while ((next_plot_time > m_time) && (m_cur_step < a_max_step) && (dt > TIME_EPS))
-        {
+        while ((next_plot_time > m_time) && (m_cur_step < a_max_step) && (dt > TIME_EPS)) {
             // dump plotfile before regridding
-            if ((m_cur_step % m_plot_interval == 0) && m_plot_interval > 0)
-            {
+            if ((m_cur_step % m_plot_interval == 0) && m_plot_interval > 0) {
 #ifdef CH_USE_HDF5
                 writePlotFile();
 #endif
             }
 
-            if ((m_cur_step != 0) && (m_cur_step % m_regrid_interval == 0))
-            {
+            if ((m_cur_step != 0) && (m_cur_step % m_regrid_interval == 0)) {
                 regrid();
             }
 
-            if (m_cur_step != 0)
-            {
+            if (m_cur_step != 0) {
                 // compute dt after regridding in case number of levels has changed
                 dt = computeDt();
             }
 
             if (next_plot_time - m_time + TIME_EPS < dt) dt = std::max(2 * TIME_EPS, next_plot_time - m_time);
 
-            if ((m_cur_step % m_check_interval == 0) && (m_check_interval > 0) && (m_cur_step != m_restart_step))
-            {
+            if ((m_cur_step % m_check_interval == 0) && (m_check_interval > 0) && (m_cur_step != m_restart_step)) {
 #ifdef CH_USE_HDF5
                 writeCheckpointFile();
 #endif
-                if (m_cur_step > 0 && m_check_exit)
-                {
-                    if (m_verbosity > 2)
-                    {
+                if (m_cur_step > 0 && m_check_exit) {
+                    if (m_verbosity > 2) {
                         return;
                     }
                 }
@@ -885,21 +832,24 @@ AmrHydro::timeStep(Real a_dt)
             }
         }
     }
+   
+    //Real coarsestDx = m_amrDx[0][0];  
+    //BCHolder bc(ConstDiriNeumBC(IntVect::Zero, RealVect::Zero,  IntVect::Zero, RealVect::Zero));
+    //poissonOpFactory->define(m_amrDomains[0],
+    //                      m_amrGrids,
+    //                      m_refinement_ratios,
+    //                      coarsestDx, 
+    //                      &bc,
+    //                      0.0,
+    //                      aCoef,
+    //                      -1.0, 
+    //                      bCoef); 
+    //RefCountedPtr< AMRLevelOpFactory<LevelData<FArrayBox> > > opFactoryPtr(poissonOpFactory);
 
-    VCAMRPoissonOp2Factory* poissonOpFactory = new VCAMRPoissonOp2Factory;
-    Real coarsestDx = m_amrDx[0][0];  
-    BCHolder bc(ConstDiriNeumBC(IntVect::Zero, RealVect::Zero,  IntVect::Zero, RealVect::Zero));
-    poissonOpFactory->define(m_amrDomains[0],
-                          m_amrGrids,
-                          m_refinement_ratios,
-                          coarsestDx, 
-                          bc,
-                          0.0,
-                          aCoef,
-                          -1.0, 
-                          bCoef); 
-
-    RefCountedPtr< AMRLevelOpFactory<LevelData<FArrayBox> > > opFactoryPtr(poissonOpFactory);
+    RefCountedPtr< AMRLevelOpFactory<LevelData<FArrayBox> > > opFactoryPtr
+          = RefCountedPtr<AMRLevelOpFactory<LevelData<FArrayBox> > >
+              (defineOperatorFactory(m_amrGrids, aCoef, bCoef,
+                                     m_amrDomains[0], m_refinement_ratios, coarsestDx));
 
     MultilevelLinearOp<FArrayBox> poissonOp;
     // options ?
@@ -2039,19 +1989,19 @@ AmrHydro::computeDt()
     for (int lev = 0; lev <= m_finest_level; lev++)
     {
         Real dtLev = dt;
-        const DisjointBoxLayout& levelGrids = m_amrGrids[lev];
-        // pretend phi is velocity here
-        const LevelData<FArrayBox>& levelVel = *m_head[lev];
-        DataIterator levelDit = levelVel.dataIterator();
-        for (levelDit.reset(); levelDit.ok(); ++levelDit)
-        {
-            int p = 0;
-            const Box& gridBox = levelGrids[levelDit];
-            Real maxVel = 1.0 + levelVel[levelDit].norm(gridBox, p, 0, 1);
-            maxVel = max(maxVel,1.0);    
-            Real localDt = m_amrDx[lev][0] / maxVel;
-            dtLev = min(dtLev, localDt);
-        }
+        //// pretend phi is velocity here --> totally wrong for problem at hand ...
+        //const DisjointBoxLayout& levelGrids = m_amrGrids[lev];
+        //const LevelData<FArrayBox>& levelVel = *m_head[lev];
+        //DataIterator levelDit = levelVel.dataIterator();
+        //for (levelDit.reset(); levelDit.ok(); ++levelDit)
+        //{
+        //    int p = 0;
+        //    const Box& gridBox = levelGrids[levelDit];
+        //    Real maxVel = 1.0 + levelVel[levelDit].norm(gridBox, p, 0, 1);
+        //    maxVel = max(maxVel,1.0);    
+        //    Real localDt = m_amrDx[lev][0] / maxVel;
+        //    dtLev = min(dtLev, localDt);
+        //}
 
         dt = min(dt, dtLev);
     }
@@ -2645,8 +2595,7 @@ AmrHydro::readCheckpointFile(HDF5Handle& a_handle)
             // allocate this level's storage
             IntVect nGhost = m_num_head_ghost * IntVect::Unit;
             m_old_head[lev] = new LevelData<FArrayBox>(levelDBL, 1, nGhost);
-
-            m_head[lev] = new LevelData<FArrayBox>(levelDBL, SpaceDim, nGhost);
+            m_head[lev]     = new LevelData<FArrayBox>(levelDBL, SpaceDim, nGhost);
 
             // read this level's data
 
