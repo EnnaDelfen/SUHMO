@@ -14,16 +14,20 @@
 #include "LevelData.H"
 #include "FArrayBox.H"
 #include "RealVect.H"
-#include "PatchGodunov.H"
-#include "BasicIBC.H"
-#include "AdvectPhysics.H"
+#include "HydroIBC.H"
 #include "suhmo_params.H"
 #include "MultilevelLinearOp.H"
 #include "BiCGStabSolver.H"
 #include "CellToEdge.H"
-#include "VCAMRPoissonOp2.H"
 
 #include "NamespaceHeader.H"
+
+class GlobalBCRS  
+{
+public: 
+    static std::vector<int> s_bcLo, s_bcHi; 
+    static bool             s_areBCsParsed;
+};
 
 /// framework class to manage non-subcycled AMR model
 /**
@@ -55,7 +59,7 @@ public:
     }
 
     /* set Init and Boundary Conditions */
-    void setIBC(BasicIBC* a_IBC);
+    void setIBC(HydroIBC* a_IBC);
 
     /* advance the solution until either max_time or max_step are reached */
     void run(Real a_max_time, int a_max_step);
@@ -220,7 +224,7 @@ protected:
     Real computeInitialDt();
 
     /// IBC
-    BasicIBC* m_IBCPtr;
+    HydroIBC* m_IBCPtr;
 
     /// max number of levels
     int m_max_level;

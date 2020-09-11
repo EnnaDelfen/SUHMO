@@ -54,6 +54,155 @@ using std::string;
 // small parameter defining when a norm is "zero"
 #define TINY_NORM 1.0e-8
 
+std::vector<int>  GlobalBCRS::s_bcLo = std::vector<int>();
+std::vector<int>  GlobalBCRS::s_bcHi = std::vector<int>();
+bool              GlobalBCRS::s_areBCsParsed= false;
+
+void ParseNeumannValue(Real* pos,
+                       int* dir, 
+                       Side::LoHiSide* side, 
+                       Real* a_values)
+{
+    ParmParse pp;
+    Real bcVal = 0.0;
+    if ( dir == 0 ) {
+       if (*side == Side::Lo) {
+          pp.get("x.lo_neumann_val",bcVal);
+       } else { 
+          pp.get("x.hi_neumann_val",bcVal);
+       }    
+    } else if ( *dir == 1 ) {
+       if (*side == Side::Lo) {
+          pp.get("y.lo_neumann_val",bcVal);
+       } else { 
+          pp.get("y.hi_neumann_val",bcVal);
+       }    
+    }
+    a_values[0]=bcVal;
+}
+
+void ParseDirichletValue(Real* pos,
+                         int* dir, 
+                         Side::LoHiSide* side, 
+                         Real* a_values)
+{
+    ParmParse pp;
+    Real bcVal = 0.0;
+    if ( *dir == 0 ) {
+       if (*side == Side::Lo) {
+          pp.get("x.lo_dirich_val",bcVal);
+       } else { 
+          pp.get("x.hi_dirich_val",bcVal);
+       }    
+    } else if ( *dir == 1 ) {
+       if (*side == Side::Lo) {
+          pp.get("y.lo_dirich_val",bcVal);
+       } else { 
+          pp.get("y.hi_dirich_val",bcVal);
+       }    
+    }
+    a_values[0]=bcVal;
+    pout() << "Dirich BC val at " << pos[0] << "," << pos[1] << " : " << a_values[0] << endl;
+}
+
+void 
+mixBCValues(FArrayBox& a_state,
+            const Box& a_valid,
+            const ProblemDomain& a_domain,
+            Real a_dx,
+            bool a_homogeneous)
+{
+  // If box is outside of domain bounds ?
+  if(!a_domain.domainBox().contains(a_state.box())) {
+
+      if (!GlobalBCRS::s_areBCsParsed) {
+          ParmParse ppBC("bc");
+          ppBC.getarr("lo_bc", GlobalBCRS::s_bcLo, 0, SpaceDim);
+          ppBC.getarr("hi_bc", GlobalBCRS::s_bcHi, 0, SpaceDim);
+          GlobalBCRS::s_areBCsParsed = true;
+      }
+
+      Box valid = a_valid;
+      for(int dir=0; dir<CH_SPACEDIM; ++dir) {
+          // don't do anything if periodic -- should be perio in y dir 1
+          //if (!a_domain.isPeriodic(dir)) {
+              Box ghostBoxLo = adjCellBox(valid, dir, Side::Lo, 1);
+              Box ghostBoxHi = adjCellBox(valid, dir, Side::Hi, 1);
+              // box of ghost cells is outside of domain bounds ?
+              if(!a_domain.domainBox().contains(ghostBoxLo)) {
+                  if (GlobalBCRS::s_bcLo[dir] == 0) {
+                      pout() << "const diri bcs lo for direction " << dir << endl;
+		              DiriBC(a_state,
+		                     valid,
+		                     a_dx,
+		                     a_homogeneous,
+		                     ParseDirichletValue,
+		                     dir,
+		                     Side::Lo);
+                  } else if (GlobalBCRS::s_bcLo[dir] == 1) {
+                      //pout() << "const neum bcs lo for direction " << dir << endl;
+		              NeumBC(a_state,
+		                     valid,
+		                     a_dx,
+		                     a_homogeneous,
+		                     ParseNeumannValue,
+		                     dir,
+		                     Side::Lo);
+                  }
+              }
+              // box of ghost cells is outside of domain bounds ?
+              if(!a_domain.domainBox().contains(ghostBoxHi)) {
+                  if (GlobalBCRS::s_bcHi[dir] == 0) {
+                      pout() << "const diri bcs hi for direction " << dir << endl;
+		              DiriBC(a_state,
+		                     valid,
+		                     a_dx,
+		                     a_homogeneous,
+		                     ParseDirichletValue,
+		                     dir,
+		                     Side::Hi);
+                  } else if (GlobalBCRS::s_bcLo[dir] == 1) {
+                      //pout() << "const neum bcs lo for direction " << dir << endl;
+		              NeumBC(a_state,
+		                     valid,
+		                     a_dx,
+		                     a_homogeneous,
+		                     ParseNeumannValue,
+		                     dir,
+                             Side::Hi);
+                  }
+              }
+          //} // end if is not periodic in ith direction
+      } // end dir loop
+  }
+}
+
+AMRLevelOpFactory<LevelData<FArrayBox> >* 
+defineOperatorFactory(
+                      const Vector<DisjointBoxLayout>&               a_grids,
+                      Vector<RefCountedPtr<LevelData<FArrayBox> > >& a_aCoef,
+                      Vector<RefCountedPtr<LevelData<FluxBox> > >&   a_bCoef,
+                      ProblemDomain& coarsestDomain,
+                      Vector<int>& refRatio,
+                      Real& coarsestDx)
+{
+    VCAMRPoissonOp2Factory* m_poissonOpF_head = new VCAMRPoissonOp2Factory;
+
+    BCHolder bc(ConstDiriNeumBC(IntVect::Unit, RealVect::Zero,  IntVect::Unit, RealVect::Zero));
+
+    m_poissonOpF_head->define(coarsestDomain,
+                      a_grids,
+                      refRatio,
+                      coarsestDx,
+                      bc,//&mixBCValues,
+                      0.0,
+                      a_aCoef,
+                      -1.0,
+                      a_bCoef);
+
+    return (AMRLevelOpFactory<LevelData<FArrayBox> >*) m_poissonOpF_head;
+}
+
 AmrHydro::AmrHydro() : m_IBCPtr(NULL)
 {
     setParams();
@@ -600,7 +749,7 @@ AmrHydro::initialize()
 void
 AmrHydro::setIBC(HydroIBC* a_IBC)
 {
-    m_IBCPtr = a_IBC->new_headIBC();
+    m_IBCPtr = a_IBC->new_hydroIBC();
 }
 
 /* Main advance function */
@@ -723,9 +872,11 @@ AmrHydro::timeStep(Real a_dt)
     // Stuff for OpLin
     Vector<RefCountedPtr<LevelData<FArrayBox> > > aCoef(m_max_level + 1);
     Vector<RefCountedPtr<LevelData<FluxBox> > > bCoef(m_max_level + 1);
+    // probably useless
     //Vector<ProblemDomain> vectDomains(m_max_level + 1); 
     //Vector<RealVect> vectDx(m_max_level + 1);  
-
+    //ProblemDomain domLev(m_amrDomains[0]);
+    //RealVect dxLev = m_amrDx[0];
     // first copy head and gap into old and create tmp vectors
     pout() <<"   ...Copy current into old "<< endl;
     for (int lev = 0; lev <= m_finest_level; lev++)
@@ -750,12 +901,16 @@ AmrHydro::timeStep(Real a_dt)
         }
 
         // Head RHS
-        RHS_h[lev] = new LevelData<FArrayBox>(m_amrGrids[lev], 1, HeadGhostVect);
+        RHS_h[lev] = new LevelData<FArrayBox>(m_amrGrids[lev], 1, IntVect::Zero);
         // Stuff for OpLin
         aCoef[lev] = RefCountedPtr<LevelData<FArrayBox> >(new LevelData<FArrayBox>(m_amrGrids[lev], 1, IntVect::Zero));
         bCoef[lev] = RefCountedPtr<LevelData<FluxBox> >(new LevelData<FluxBox>(m_amrGrids[lev], 1, IntVect::Zero));
-        //vectDomains[lev] = m_amrDomains[lev];
-        //vectDx[lev] = m_amrDx[lev];
+        //PROBABLY USELESS
+        //vectDomains[lev] = domLev;
+        //vectDx[lev] = dxLev;
+        //prepare dx, domain for next lev
+        //dxLev /=      m_refinement_ratios[lev];
+        //domLev.refine(m_refinement_ratios[lev]);
     }
 
     // SUHMO time-step
@@ -778,14 +933,13 @@ AmrHydro::timeStep(Real a_dt)
         LevelData<FArrayBox>& levelPi    = *m_overburdenpress[lev];
         LevelData<FArrayBox>& levelRe    = *m_Re[lev]; 
 
-        DisjointBoxLayout& levelGrids    = m_amrGrids[lev];
-        LevelData<FArrayBox> levelbcoef_cc(levelGrids, 1*SpaceDim, IntVect::Zero);
+        LevelData<FArrayBox> levelbcoef_cc(m_amrGrids[lev], 1, IntVect::Unit);
 
-        //DataIterator dit = levelacoef.dataIterator();
-        DataIterator dit = levelGrids.dataIterator();
+        DataIterator dit = levelacoef.dataIterator();
         for (dit.begin(); dit.ok(); ++dit) {
 
             FArrayBox& oldB    = leveloldB[dit];
+
             FArrayBox& aC      = levelacoef[dit];
             FArrayBox& bC_cc   = levelbcoef_cc[dit];
 
@@ -818,22 +972,22 @@ AmrHydro::timeStep(Real a_dt)
 
             RHS.setVal(0.0);
             // second term ...
-            Real ub_norm = std::sqrt(  m_suhmoParm->m_ub[0]*m_suhmoParm->m_ub[0] 
-                                     + m_suhmoParm->m_ub[1]*m_suhmoParm->m_ub[1]) / m_suhmoParm->m_lr;
-            BoxIterator bit(RHS.box()); // can use gridBox? 
-            for (bit.begin(); bit.ok(); ++bit) {
-                IntVect iv = bit();
-                if ( oldB(iv,0) < m_suhmoParm->m_br) {
-                    RHS(iv,0) -= ub_norm * (m_suhmoParm->m_br - oldB(iv,0));
-                }
-                // third term ... assume  n = 3 !!
-                Real PimPw = (Pressi(iv,0) - Pw(iv,0));
-                RHS(iv,0) += m_suhmoParm->m_A * (PimPw) * (PimPw) * (PimPw) * oldB(iv,0);
-            }
+            //Real ub_norm = std::sqrt(  m_suhmoParm->m_ub[0]*m_suhmoParm->m_ub[0] 
+            //                         + m_suhmoParm->m_ub[1]*m_suhmoParm->m_ub[1]) / m_suhmoParm->m_lr;
+            //BoxIterator bit(RHS.box()); // can use gridBox? 
+            //for (bit.begin(); bit.ok(); ++bit) {
+            //    IntVect iv = bit();
+            //    if ( oldB(iv,0) < m_suhmoParm->m_br) {
+            //        RHS(iv,0) -= ub_norm * (m_suhmoParm->m_br - oldB(iv,0));
+            //    }
+            //    // third term ... assume  n = 3 !!
+            //    Real PimPw = (Pressi(iv,0) - Pw(iv,0));
+            //    RHS(iv,0) += m_suhmoParm->m_A * (PimPw) * (PimPw) * (PimPw) * oldB(iv,0);
+            //}
         }
     }
    
-    //Real coarsestDx = m_amrDx[0][0];  
+    Real coarsestDx = m_amrDx[0][0];  
     //BCHolder bc(ConstDiriNeumBC(IntVect::Zero, RealVect::Zero,  IntVect::Zero, RealVect::Zero));
     //poissonOpFactory->define(m_amrDomains[0],
     //                      m_amrGrids,
@@ -862,6 +1016,7 @@ AmrHydro::timeStep(Real a_dt)
     bool homogeneousBC = false;  
     solver.define(&poissonOp, homogeneousBC); 
     solver.m_normType = 0;
+    solver.m_verbosity = 5;
     solver.m_eps = 1.0e-7;
     solver.m_imax = 10;
 

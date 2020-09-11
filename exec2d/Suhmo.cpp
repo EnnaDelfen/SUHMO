@@ -82,25 +82,7 @@ main(int argc, char* argv[])
         // set IBC -- this includes initial conditon
         // and boundary conditions
         // ---------------------------------------------
-
-        //BasicIBC* thisIBC;
-
-        //std::string problem_type;
-        //ppMain.get("problem_type", problem_type);
-        //if (problem_type == "basic")
-        //{
-        //    DerivedIBC* newIBC = new DerivedIBC();
-        //    thisIBC = dynamic_cast<BasicIBC*>(newIBC);
-        //} 
-        //else if (problem_type == "hydro")
-        //{
         HydroIBC* thisIBC = new HydroIBC();
-        //    thisIBC = dynamic_cast<BasicIBC*>(newIBC);
-        //} 
-        //else
-        //{
-        //    MayDay::Error("bad problem type");
-        //}
 
         amrObject.setIBC(thisIBC);
 

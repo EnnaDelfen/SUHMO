@@ -1,8 +1,20 @@
 # main - driver.cpp
 main.domain_size=1000.00 1000.00 # physical dimensions of domain
 main.problem_type=basic
-main.maxTime=0.0001
-main.maxStep=3
+main.maxTime=2.0
+main.maxStep=1
+
+# bc
+bc.lo_bc = 1 1
+bc.hi_bc = 0 1
+x.lo_dirich_val = 111
+x.hi_dirich_val = 222
+y.lo_dirich_val = 111
+y.hi_dirich_val = 111
+x.lo_neumann_val = 0 
+x.hi_neumann_val = 0 
+y.lo_neumann_val = 0 
+y.hi_neumann_val = 0 
 
 # problem specific inputs
 suhmo.GeoFlux = 0.05
@@ -46,7 +58,7 @@ AmrHydro.tagging_val=1.0
 AmrHydro.cfl=0.5
 AmrHydro.initial_cfl=0.5
 AmrHydro.max_dt_grow_factor=1.1
-AmrHydro.fixed_dt=0.00001 # over-ride dynamic dt computation 
+AmrHydro.fixed_dt=1.0 # over-ride dynamic dt computation 
 AmrHydro.offsetTime=0.0
 # Typically -1 for never, 0 for last step only, or integer interval (number of steps)
 # Plot and output

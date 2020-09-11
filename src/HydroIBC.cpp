@@ -11,13 +11,9 @@
 #include "HydroIBC.H"
 #include "ParmParse.H"
 #include "FluxBox.H"
-#include "AmrHydro.H"
+//#include "AmrHydro.H"
 
 #include "NamespaceHeader.H"
-
-std::vector<int>  GlobalBCRS::s_bcLo = std::vector<int>();
-std::vector<int>  GlobalBCRS::s_bcHi = std::vector<int>();
-bool              GlobalBCRS::s_areBCsParsed= false;
 
 void
 zeroBCValue(Real* pos, 
@@ -27,101 +23,6 @@ zeroBCValue(Real* pos,
 {
     a_values[0] = 0.0;
 }
-
-void ParseNeumannValue(Real* pos,
-            int* dir, 
-            Side::LoHiSide* side, 
-            Real* a_values)
-{
-    ParmParse pp;
-    Real bcVal;
-    pp.get("Neumann_bc_value",bcVal);
-    a_values[0]=bcVal;
-}
-
-void ParseDirichletValue(Real* pos,
-            int* dir, 
-            Side::LoHiSide* side, 
-            Real* a_values)
-{
-    ParmParse pp;
-    Real bcVal;
-    pp.get("Dirichlet_bc_value",bcVal);
-    a_values[0]=bcVal;
-}
-
-void 
-mixBCValues(FArrayBox& a_state,
-                const Box& a_valid,
-                const ProblemDomain& a_domain,
-                Real a_dx,
-                bool a_homogeneous)
-{
-  // If box is outside of domain bounds ?
-  if(!a_domain.domainBox().contains(a_state.box())) {
-
-      if (!GlobalBCRS::s_areBCsParsed) {
-          ParmParse ppBC("bc");
-          ppBC.getarr("lo_bc", GlobalBCRS::s_bcLo, 0, SpaceDim);
-          ppBC.getarr("hi_bc", GlobalBCRS::s_bcHi, 0, SpaceDim);
-          GlobalBCRS::s_areBCsParsed = true;
-      }
-
-      Box valid = a_valid;
-      for(int dir=0; dir<CH_SPACEDIM; ++dir) {
-          // don't do anything if periodic -- should be perio in y dir 1
-          if (!a_domain.isPeriodic(dir)) {
-              Box ghostBoxLo = adjCellBox(valid, dir, Side::Lo, 1);
-              Box ghostBoxHi = adjCellBox(valid, dir, Side::Hi, 1);
-              // box of ghost cells is outside of domain bounds ?
-              if(!a_domain.domainBox().contains(ghostBoxLo)) {
-                  if (GlobalBCRS::s_bcLo[i] == 0) {
-                      pout() << "const diri bcs lo for direction " << i << endl;
-		              DiriBC(a_state,
-		                 valid,
-		                 a_dx,
-		                 a_homogeneous,
-		                 ParseDirichletValue,
-		                 dir,
-		                 Side::Lo);
-                  } else if (GlobalBCRS::s_bcLo[i] == 1) {
-                      pout() << "const neum bcs lo for direction " << i << endl;
-		              NeumBC(a_state,
-		                 valid,
-		                 a_dx,
-		                 a_homogeneous,
-		                 ParseNeumannValue,
-		                 dir,
-		                 Side::Lo);
-                  }
-              }
-              // box of ghost cells is outside of domain bounds ?
-              if(!a_domain.domainBox().contains(ghostBoxHi)) {
-                  if (GlobalBCRS::s_bcHi[i] == 0) {
-                      pout() << "const diri bcs hi for direction " << i << endl;
-		              DiriBC(a_state,
-		                 valid,
-		                 a_dx,
-		                 a_homogeneous,
-		                 ParseDirichletValue,
-		                 dir,
-		                 Side::Hi);
-                  } else if (GlobalBCRS::s_bcLo[i] == 1) {
-                      pout() << "const neum bcs lo for direction " << i << endl;
-		              NeumBC(a_state,
-		                 valid,
-		                 a_dx,
-		                 a_homogeneous,
-		                 ParseNeumannValue,
-		                 dir,
-                         Side::Hi);
-                  }
-              }
-          } // end if is not periodic in ith direction
-      } // end dir loop
-  }
-}
-
 
 // Indicate that define() hasn't been called
 // set default thickness at domain edge to be zero
@@ -151,7 +52,7 @@ HydroIBC::define(const ProblemDomain& a_domain, const Real& a_dx)
    its define() must be called before it is used).
 */
 HydroIBC*
-HydroIBC::new_headIBC()
+HydroIBC::new_hydroIBC()
 {
     HydroIBC* retval = new HydroIBC();
 
@@ -215,33 +116,49 @@ HydroIBC::initializeData(RealVect& a_dx,
         } // end loop over cells
     }     // end loop over boxes
 
-    m_poissonOpF_head = new VCAMRPoissonOp2Factory;
-
     pout() << "(Done with HydroIBC::initializeData)" << endl;
 }
 
 
-AMRLevelOpFactory<LevelData<FArrayBox> >* 
-HydroIBC::defineOperatorFactory(
-                      const Vector<DisjointBoxLayout>&               a_grids,
-                      Vector<RefCountedPtr<LevelData<FArrayBox> > >& a_aCoef,
-                      Vector<RefCountedPtr<LevelData<FluxBox> > >&   a_bCoef,
-                      ProblemDomain& coarsestDomain,
-                      Vector<int>& refRatio,
-                      Real& coarsestDx)
+/// Set boundary fluxes
+/**
+ */
+void
+HydroIBC::primBC(FArrayBox& a_WGdnv,
+                 const FArrayBox& a_Wextrap,
+                 const FArrayBox& a_W,
+                 const int& a_dir,
+                 const Side::LoHiSide& a_side,
+                 const Real& a_time)
 {
+}
 
-    m_poissonOpF_head->define(coarsestDomain,
-                      a_grids,
-                      refRatio,
-                      coarsestDx,
-                      &mixBCValues,
-                      0.0,
-                      a_aCoef,
-                      -1.0,
-                      a_bCoef);
+/** Set up initial conditions 
+ */
+void
+HydroIBC::initialize(LevelData<FArrayBox>& a_head)
+{
+}
 
-    return (AMRLevelOpFactory<LevelData<FArrayBox> >*) m_poissonOpF_head;
+void
+HydroIBC::setBdrySlopes(FArrayBox& a_dW, const FArrayBox& a_W, const int& a_dir, const Real& a_time)
+{
+    // one-sided differences sounds fine with me, so do nothing...
+}
+
+/// Adjust boundary fluxes to account for artificial viscosity
+/**
+ */
+void
+HydroIBC::artViscBC(FArrayBox& a_F,
+                    const FArrayBox& a_U,
+                    const FArrayBox& a_divVel,
+                    const int& a_dir,
+                    const Real& a_time)
+{
+    // don't anticipate being here -- if we wind up here, need to
+    // give it some thought
+    MayDay::Error("HydroIBC::artViscBC not implemented");
 }
 
 #include "NamespaceFooter.H"

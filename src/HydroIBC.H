@@ -21,6 +21,8 @@
 #include "PhysIBC.H"
 #include "BCFunc.H"
 #include "suhmo_params.H"
+#include "AMRMultiGrid.H"
+#include "VCAMRPoissonOp2.H"
 
 #include "NamespaceHeader.H"
 
@@ -49,13 +51,6 @@
 //  Real         beta;
 //};
 
-class GlobalBCRS  
-{
-public: 
-    static std::vector<int> s_bcLo, s_bcHi; 
-    static bool             s_areBCsParsed;
-};
-
 /// Physical/domain initial and boundary conditions
 /**
 
@@ -82,15 +77,27 @@ public:
 
     /// Factory method - this object is its own factory
     /**
+       Return a pointer to a new PhysIBC object with m_isDefined = false (i.e.,
+       its define() must be called before it is used).
+     */
+    virtual PhysIBC* new_physIBC()
+    {
+        return static_cast<PhysIBC*>(new_hydroIBC());
+    }
+
+    /// Factory method - this object is its own factory
+    /**
        Returns a pointer to a new HydroIBC object with
        m_isDefined = false (i.e., its define() must be called before it
        is used).
      */
-    virtual HydroIBC* new_headIBC();
+    virtual HydroIBC* new_hydroIBC();
 
     /// Set up initial conditions
     /**
      */
+    virtual void initialize(LevelData<FArrayBox>& a_U);
+
     virtual void initializeData(RealVect& a_dx,
                                 suhmo_params params,
                                 LevelData<FArrayBox>& a_head,
@@ -101,17 +108,32 @@ public:
                                 LevelData<FArrayBox>& a_meltRate,
                                 LevelData<FArrayBox>& a_zbed,
                                 LevelData<FArrayBox>& a_Pi,
-                                LevelData<FArrayBox>& a_iceHeight) override;
+                                LevelData<FArrayBox>& a_iceHeight);
 
 
-    AMRLevelOpFactory<LevelData<FArrayBox> >*
-    defineOperatorFactory(
-                      const Vector<DisjointBoxLayout>&             a_grids,
-                      Vector<RefCountedPtr<LevelData<FArrayBox> > >& a_aCoef,
-                      Vector<RefCountedPtr<LevelData<FluxBox> > >& a_bCoef,
-                      ProblemDomain& coarsestDomain,
-                      Vector<int>& refRatio,
-                      Real& coarsestDx);
+    /// Set boundary fluxes
+    /**
+     */
+    virtual void primBC(FArrayBox& a_WGdnv,
+                        const FArrayBox& a_Wextrap,
+                        const FArrayBox& a_W,
+                        const int& a_dir,
+                        const Side::LoHiSide& a_side,
+                        const Real& a_time);
+
+    /// Set boundary slopes
+    /**
+       The boundary slopes in a_dW are already set to one sided difference
+       approximations.  If this function doesn't change them they will be
+       used for the slopes at the boundaries.
+     */
+    virtual void setBdrySlopes(FArrayBox& a_dW, const FArrayBox& a_W, const int& a_dir, const Real& a_time);
+
+    /// Adjust boundary fluxes to account for artificial viscosity
+    /**
+     */
+    virtual void
+    artViscBC(FArrayBox& a_F, const FArrayBox& a_U, const FArrayBox& a_divVel, const int& a_dir, const Real& a_time);
 
 
 protected:
@@ -119,12 +141,6 @@ protected:
 
     // have bc's been set up?
     bool m_isBCsetUp;
-
-    /// set up bc's based on parmparse inputs
-    void setupBCs();
-
-    // poisson ??
-    VCAMRPoissonOp2Factory* m_poissonOpF_head;
 
 private:
     // Disallowed for all the usual reasons
