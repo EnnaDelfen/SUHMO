@@ -857,26 +857,36 @@ AmrHydro::timeStep(Real a_dt)
     }
     
     /* Sketch of loops: Fig 1 of Sommers */
-    // FIRST LOOP: h calc
-    //     Solve for h using all old qtities
-    //     Update water pressure
-    // Compute grad(h) and grad(Pw)
-    // Update water flux, using old-time Re
-    // Update Re
-    // Update melting rate
+    // NOTE: all computation done at CC. When edge qties needed, use CC->Edge
+    // I Copy new h and new b into old h and old b
+    // II BIG OUTER LOOP: h and b ...
+    //     III SMALL OUTER LOOP: h calc
+    //         Solve for h using all old qtities -- dunno if necessary yet
+    //         Update water pressure Pw=f(h)
+    //         Compute grad(h) and grad(Pw)
+    //         IV INNER LOOP: Re/Qw !!
+    //             Update VECTOR Qw = f(Re, grad(h))
+    //             Update Re = f(Qw)
+    //         Update melting rate = f(Qw, grad(h), grad(Pw))
+    //         Form RHS for h
+    //         Compute bCoeff_cc
+    //         bCoeff_cc -> bCoeff via CC->Edge
+    //         Solve for h again
+    //     Form RHS for b
+    //     Solve for b using Forward Euler simple scheme
+    //  
+    /* End comments */
 
-    // tmp data holders
     IntVect HeadGhostVect = m_num_head_ghost * IntVect::Unit;
+
+    /* Stuff for OpLin */
+    // RHS for head solve - local qti
     Vector<LevelData<FArrayBox>*> RHS_h;
     RHS_h.resize(m_max_level + 1, NULL);
-    // Stuff for OpLin
+    // alpha*aCoef(x)*I - beta*Div(bCoef(x)*Grad) -- note for us: alpha = 0 beta = 1 
     Vector<RefCountedPtr<LevelData<FArrayBox> > > aCoef(m_max_level + 1);
     Vector<RefCountedPtr<LevelData<FluxBox> > > bCoef(m_max_level + 1);
-    // probably useless
-    //Vector<ProblemDomain> vectDomains(m_max_level + 1); 
-    //Vector<RealVect> vectDx(m_max_level + 1);  
-    //ProblemDomain domLev(m_amrDomains[0]);
-    //RealVect dxLev = m_amrDx[0];
+
     // first copy head and gap into old and create tmp vectors
     pout() <<"   ...Copy current into old "<< endl;
     for (int lev = 0; lev <= m_finest_level; lev++)
@@ -905,12 +915,6 @@ AmrHydro::timeStep(Real a_dt)
         // Stuff for OpLin
         aCoef[lev] = RefCountedPtr<LevelData<FArrayBox> >(new LevelData<FArrayBox>(m_amrGrids[lev], 1, IntVect::Zero));
         bCoef[lev] = RefCountedPtr<LevelData<FluxBox> >(new LevelData<FluxBox>(m_amrGrids[lev], 1, IntVect::Zero));
-        //PROBABLY USELESS
-        //vectDomains[lev] = domLev;
-        //vectDx[lev] = dxLev;
-        //prepare dx, domain for next lev
-        //dxLev /=      m_refinement_ratios[lev];
-        //domLev.refine(m_refinement_ratios[lev]);
     }
 
     // SUHMO time-step
@@ -972,18 +976,18 @@ AmrHydro::timeStep(Real a_dt)
 
             RHS.setVal(0.0);
             // second term ...
-            //Real ub_norm = std::sqrt(  m_suhmoParm->m_ub[0]*m_suhmoParm->m_ub[0] 
-            //                         + m_suhmoParm->m_ub[1]*m_suhmoParm->m_ub[1]) / m_suhmoParm->m_lr;
-            //BoxIterator bit(RHS.box()); // can use gridBox? 
-            //for (bit.begin(); bit.ok(); ++bit) {
-            //    IntVect iv = bit();
-            //    if ( oldB(iv,0) < m_suhmoParm->m_br) {
-            //        RHS(iv,0) -= ub_norm * (m_suhmoParm->m_br - oldB(iv,0));
-            //    }
-            //    // third term ... assume  n = 3 !!
-            //    Real PimPw = (Pressi(iv,0) - Pw(iv,0));
-            //    RHS(iv,0) += m_suhmoParm->m_A * (PimPw) * (PimPw) * (PimPw) * oldB(iv,0);
-            //}
+            Real ub_norm = std::sqrt(  m_suhmoParm->m_ub[0]*m_suhmoParm->m_ub[0] 
+                                     + m_suhmoParm->m_ub[1]*m_suhmoParm->m_ub[1]) / m_suhmoParm->m_lr;
+            BoxIterator bit(RHS.box()); // can use gridBox? 
+            for (bit.begin(); bit.ok(); ++bit) {
+                IntVect iv = bit();
+                if ( oldB(iv,0) < m_suhmoParm->m_br) {
+                    RHS(iv,0) -= ub_norm * (m_suhmoParm->m_br - oldB(iv,0));
+                }
+                // third term ... assume  n = 3 !!
+                Real PimPw = (Pressi(iv,0) - Pw(iv,0));
+                RHS(iv,0) += m_suhmoParm->m_A * (PimPw) * (PimPw) * (PimPw) * oldB(iv,0);
+            }
         }
     }
    
