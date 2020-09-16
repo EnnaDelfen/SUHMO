@@ -75,6 +75,33 @@ public:
                    const Vector<LevelData<FluxBox>*>& a_fluxes,
                    Real a_dt);
 
+    void aCoeff_bCoeff_CC(LevelData<FArrayBox>&  levelacoef, 
+                           LevelData<FArrayBox>&  levelbcoef_cc, 
+                           LevelData<FArrayBox>&  levelRe, 
+                           LevelData<FArrayBox>&  levelB);
+
+    void CalcRHS_head(LevelData<FArrayBox>& levelRHS_h, 
+                       LevelData<FArrayBox>& levelPi, 
+                       LevelData<FArrayBox>& levelPw, 
+                       LevelData<FArrayBox>& levelmR, 
+                       LevelData<FArrayBox>& levelB);
+
+    void CalcRHS_gapHeight(LevelData<FArrayBox>& levelRHS_b, 
+                       LevelData<FArrayBox>& levelPi, 
+                       LevelData<FArrayBox>& levelPw, 
+                       LevelData<FArrayBox>& levelmR, 
+                       LevelData<FArrayBox>& levelB);
+
+    void SolveForHead(
+                      const Vector<DisjointBoxLayout>&               a_grids,
+                      Vector<RefCountedPtr<LevelData<FArrayBox> > >& a_aCoef,
+                      Vector<RefCountedPtr<LevelData<FluxBox> > >&   a_bCoef,
+                      ProblemDomain& coarsestDomain,
+                      Vector<int>& refRatio,
+                      Real& coarsestDx,
+                      Vector<LevelData<FArrayBox>*>& a_head, 
+                      Vector<LevelData<FArrayBox>*>& a_RHS);
+
     /* regridding */
     void regrid();
 

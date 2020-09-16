@@ -43,6 +43,7 @@ using std::string;
 #include "DivergenceF_F.H"
 #include "AMRUtilF_F.H"
 #include "CH_HDF5.H"
+#include "computeNorm.H" 
 #include "MayDay.H"
 #include "CONSTANTS.H"
 #include "Gradient.H"
@@ -177,20 +178,46 @@ mixBCValues(FArrayBox& a_state,
   }
 }
 
-AMRLevelOpFactory<LevelData<FArrayBox> >* 
-defineOperatorFactory(
+//AMRLevelOpFactory<LevelData<FArrayBox> >* 
+//defineOperatorFactory(
+//                      const Vector<DisjointBoxLayout>&               a_grids,
+//                      Vector<RefCountedPtr<LevelData<FArrayBox> > >& a_aCoef,
+//                      Vector<RefCountedPtr<LevelData<FluxBox> > >&   a_bCoef,
+//                      ProblemDomain& coarsestDomain,
+//                      Vector<int>& refRatio,
+//                      Real& coarsestDx)
+//{
+//    VCAMRPoissonOp2Factory* poissonOpF_head = new VCAMRPoissonOp2Factory;
+//
+//    BCHolder bc(ConstDiriNeumBC(IntVect::Unit, RealVect::Zero,  IntVect::Unit, RealVect::Zero));
+//    poissonOpF_head->define(coarsestDomain,
+//                      a_grids,
+//                      refRatio,
+//                      coarsestDx,
+//                      bc,//&mixBCValues,
+//                      0.0,
+//                      a_aCoef,
+//                      -1.0,
+//                      a_bCoef);
+//
+//    return (AMRLevelOpFactory<LevelData<FArrayBox> >*) poissonOpF_head;
+//}
+
+void
+AmrHydro::SolveForHead(
                       const Vector<DisjointBoxLayout>&               a_grids,
                       Vector<RefCountedPtr<LevelData<FArrayBox> > >& a_aCoef,
                       Vector<RefCountedPtr<LevelData<FluxBox> > >&   a_bCoef,
                       ProblemDomain& coarsestDomain,
                       Vector<int>& refRatio,
-                      Real& coarsestDx)
+                      Real& coarsestDx,
+                      Vector<LevelData<FArrayBox>*>& a_head, 
+                      Vector<LevelData<FArrayBox>*>& a_RHS)
 {
-    VCAMRPoissonOp2Factory* m_poissonOpF_head = new VCAMRPoissonOp2Factory;
+    VCAMRPoissonOp2Factory* poissonOpF_head = new VCAMRPoissonOp2Factory;
 
     BCHolder bc(ConstDiriNeumBC(IntVect::Unit, RealVect::Zero,  IntVect::Unit, RealVect::Zero));
-
-    m_poissonOpF_head->define(coarsestDomain,
+    poissonOpF_head->define(coarsestDomain,
                       a_grids,
                       refRatio,
                       coarsestDx,
@@ -200,7 +227,24 @@ defineOperatorFactory(
                       -1.0,
                       a_bCoef);
 
-    return (AMRLevelOpFactory<LevelData<FArrayBox> >*) m_poissonOpF_head;
+    RefCountedPtr< AMRLevelOpFactory<LevelData<FArrayBox> > > opFactoryPtr(poissonOpF_head);
+
+    MultilevelLinearOp<FArrayBox> poissonOp;
+    // options ?
+    poissonOp.m_num_mg_iterations = 1;
+    poissonOp.m_num_mg_smooth = 4;
+    poissonOp.m_preCondSolverDepth = -1;
+    poissonOp.define(m_amrGrids, m_refinement_ratios, m_amrDomains, m_amrDx, opFactoryPtr, 0);
+    // bottom solver ?
+    BiCGStabSolver<Vector<LevelData<FArrayBox>* > > solver;
+    bool homogeneousBC = false;  
+    solver.define(&poissonOp, homogeneousBC); 
+    solver.m_normType = 0;
+    solver.m_verbosity = 2;
+    solver.m_eps = 1.0e-7;
+    solver.m_imax = 10;
+    //
+    solver.solve(a_head, a_RHS);
 }
 
 AmrHydro::AmrHydro() : m_IBCPtr(NULL)
@@ -842,6 +886,119 @@ AmrHydro::run(Real a_max_time, int a_max_step)
     }
 }
 
+/* Needed routines for timeStep */
+void
+AmrHydro::aCoeff_bCoeff_CC(LevelData<FArrayBox>&  levelacoef, 
+                           LevelData<FArrayBox>&  levelbcoef_cc, 
+                           LevelData<FArrayBox>&  levelRe, 
+                           LevelData<FArrayBox>&  levelB)
+{
+    DataIterator dit = levelacoef.dataIterator();
+    for (dit.begin(); dit.ok(); ++dit) {
+
+        FArrayBox& B    = levelB[dit];
+
+        FArrayBox& aC      = levelacoef[dit];
+        FArrayBox& bC_cc   = levelbcoef_cc[dit];
+
+        FArrayBox& Re      = levelRe[dit];
+
+        // initialize 
+        aC.setVal(0.0);
+        bC_cc.setVal(0.0);
+
+        ForAllXBNN(Real, aC, aC.box(), 0, aC.nComp());
+        { 
+            aCR = 1.0; 
+        }EndFor;
+
+        BoxIterator bit(bC_cc.box()); 
+        for (bit.begin(); bit.ok(); ++bit) {
+            IntVect iv = bit();
+            // Update b coeff
+            Real num_q = - B(iv, 0) * B(iv, 0) * B(iv, 0) * m_suhmoParm->m_gravity;
+            Real denom_q = 12.0 * m_suhmoParm->m_nu * (1 + m_suhmoParm->m_omega * Re(iv, 0));
+            bC_cc(iv, 0) = num_q/denom_q;
+        }
+    }
+}
+
+void
+AmrHydro::CalcRHS_head(LevelData<FArrayBox>& levelRHS_h, 
+                       LevelData<FArrayBox>& levelPi, 
+                       LevelData<FArrayBox>& levelPw, 
+                       LevelData<FArrayBox>& levelmR, 
+                       LevelData<FArrayBox>& levelB)
+{
+   DataIterator dit = levelRHS_h.dataIterator();
+   for (dit.begin(); dit.ok(); ++dit) {
+
+       FArrayBox& B       = levelB[dit];
+       FArrayBox& RHS     = levelRHS_h[dit];
+
+       FArrayBox& Pressi  = levelPi[dit];
+       FArrayBox& Pw      = levelPw[dit];
+       FArrayBox& meltR   = levelmR[dit];
+       
+       // initialize RHS for h
+       RHS.setVal(0.0);
+       // first term
+       RHS.copy(meltR, 0, 0, 1);
+       RHS *= 1.0 / ( m_suhmoParm->m_rho_w - m_suhmoParm->m_rho_i);
+       // third term ...
+       Real ub_norm = std::sqrt(  m_suhmoParm->m_ub[0]*m_suhmoParm->m_ub[0] 
+                                + m_suhmoParm->m_ub[1]*m_suhmoParm->m_ub[1]) / m_suhmoParm->m_lr;
+       BoxIterator bit(RHS.box()); // can use gridBox? 
+       for (bit.begin(); bit.ok(); ++bit) {
+           IntVect iv = bit();
+           if ( B(iv,0) < m_suhmoParm->m_br) {
+               RHS(iv,0) -= ub_norm * (m_suhmoParm->m_br - B(iv,0));
+           }
+           // second term ... assume  n = 3 !!
+           Real PimPw = (Pressi(iv,0) - Pw(iv,0));
+           RHS(iv,0) += m_suhmoParm->m_A * (PimPw) * (PimPw) * (PimPw) * B(iv,0);
+       }
+   }
+}
+
+void
+AmrHydro::CalcRHS_gapHeight(LevelData<FArrayBox>& levelRHS_b, 
+                       LevelData<FArrayBox>& levelPi, 
+                       LevelData<FArrayBox>& levelPw, 
+                       LevelData<FArrayBox>& levelmR, 
+                       LevelData<FArrayBox>& levelB)
+{
+   DataIterator dit = levelRHS_b.dataIterator();
+   for (dit.begin(); dit.ok(); ++dit) {
+
+       FArrayBox& B       = levelB[dit];
+       FArrayBox& RHS     = levelRHS_b[dit];
+
+       FArrayBox& Pressi  = levelPi[dit];
+       FArrayBox& Pw      = levelPw[dit];
+       FArrayBox& meltR   = levelmR[dit];
+       
+       // initialize RHS for h
+       RHS.setVal(0.0);
+       // first term
+       RHS.copy(meltR, 0, 0, 1);
+       RHS *= 1.0 / m_suhmoParm->m_rho_i;
+       // third term ...
+       Real ub_norm = std::sqrt(  m_suhmoParm->m_ub[0]*m_suhmoParm->m_ub[0] 
+                                + m_suhmoParm->m_ub[1]*m_suhmoParm->m_ub[1]) / m_suhmoParm->m_lr;
+       BoxIterator bit(RHS.box()); // can use gridBox? 
+       for (bit.begin(); bit.ok(); ++bit) {
+           IntVect iv = bit();
+           if ( B(iv,0) < m_suhmoParm->m_br) {
+               RHS(iv,0) += ub_norm * (m_suhmoParm->m_br - B(iv,0));
+           }
+           // second term ... assume  n = 3 !!
+           Real PimPw = (Pressi(iv,0) - Pw(iv,0));
+           RHS(iv,0) -= m_suhmoParm->m_A * (PimPw) * (PimPw) * (PimPw) * B(iv,0);
+       }
+   }
+}
+
 /* core of advance routine */
 void
 AmrHydro::timeStep(Real a_dt)
@@ -857,49 +1014,60 @@ AmrHydro::timeStep(Real a_dt)
     }
     
     /* Sketch of loops: Fig 1 of Sommers */
+    //
     // NOTE: all computation done at CC. When edge qties needed, use CC->Edge
     // I Copy new h and new b into old h and old b
     // II BIG OUTER LOOP: h and b ...
     //     III SMALL OUTER LOOP: h calc
-    //         Solve for h using all old qtities -- dunno if necessary yet
+    //         If first pass: 
+    //             Compute aCoeff and bCoeff_cc using old qtites
+    //             Form RHS for h using old qtites
+    //             bCoeff_cc -> bCoeff via CC->Edge
+    //             Solve for h using all old qtities
+    //             Put h into h_lag
+    //         Else:
+    //             Put h into h_lag
     //         Update water pressure Pw=f(h)
     //         Compute grad(h) and grad(Pw)
     //         IV INNER LOOP: Re/Qw !!
     //             Update VECTOR Qw = f(Re, grad(h))
     //             Update Re = f(Qw)
     //         Update melting rate = f(Qw, grad(h), grad(Pw))
-    //         Form RHS for h
-    //         Compute bCoeff_cc
-    //         bCoeff_cc -> bCoeff via CC->Edge
-    //         Solve for h again
+    //         Compute aCoeff and bCoeff_cc, RHS and solve for h again
+    //         Check convergence using h and h_lag
+    //          
     //     Form RHS for b
     //     Solve for b using Forward Euler simple scheme
     //  
     /* End comments */
 
     IntVect HeadGhostVect = m_num_head_ghost * IntVect::Unit;
+    Real coarsestDx = m_amrDx[0][0];  
 
-    /* Stuff for OpLin */
-    // RHS for head solve - local qti
+
+    /* I Copy new h and new b into old h and old b */
+
+    // Also create and initialize tmp vectors
+    Vector<LevelData<FArrayBox>*> a_head_lagged;
     Vector<LevelData<FArrayBox>*> RHS_h;
+    Vector<LevelData<FArrayBox>*> RHS_b;
     RHS_h.resize(m_max_level + 1, NULL);
+    RHS_b.resize(m_max_level + 1, NULL);
+    a_head_lagged.resize(m_max_level + 1, NULL);
     // alpha*aCoef(x)*I - beta*Div(bCoef(x)*Grad) -- note for us: alpha = 0 beta = 1 
     Vector<RefCountedPtr<LevelData<FArrayBox> > > aCoef(m_max_level + 1);
     Vector<RefCountedPtr<LevelData<FluxBox> > > bCoef(m_max_level + 1);
-
-    // first copy head and gap into old and create tmp vectors
     pout() <<"   ...Copy current into old "<< endl;
     for (int lev = 0; lev <= m_finest_level; lev++)
     {
-        LevelData<FArrayBox>& oldH     = *m_old_head[lev];
-        LevelData<FArrayBox>& currentH = *m_head[lev];
+        LevelData<FArrayBox>& oldH       = *m_old_head[lev];
+        LevelData<FArrayBox>& currentH   = *m_head[lev];
 
-        LevelData<FArrayBox>& oldB     = *m_old_gapheight[lev];
-        LevelData<FArrayBox>& currentB = *m_gapheight[lev];
+        LevelData<FArrayBox>& oldB       = *m_old_gapheight[lev];
+        LevelData<FArrayBox>& currentB   = *m_gapheight[lev];
 
-        LevelData<FArrayBox>& levelgradH    = *m_gradhead[lev];
+        LevelData<FArrayBox>& levelgradH = *m_gradhead[lev];
 
-        // this way we avoid communication and maintain ghost cells...
         DataIterator dit = oldH.dataIterator();
         for (dit.begin(); dit.ok(); ++dit)
         {
@@ -911,255 +1079,337 @@ AmrHydro::timeStep(Real a_dt)
         }
 
         // Head RHS
-        RHS_h[lev] = new LevelData<FArrayBox>(m_amrGrids[lev], 1, IntVect::Zero);
+        RHS_h[lev]         = new LevelData<FArrayBox>(m_amrGrids[lev], 1, IntVect::Zero);
+        RHS_b[lev]         = new LevelData<FArrayBox>(m_amrGrids[lev], 1, IntVect::Zero);
+        // Head lagged for iterations
+        a_head_lagged[lev] = new LevelData<FArrayBox>(m_amrGrids[lev], 1, HeadGhostVect);
         // Stuff for OpLin
         aCoef[lev] = RefCountedPtr<LevelData<FArrayBox> >(new LevelData<FArrayBox>(m_amrGrids[lev], 1, IntVect::Zero));
         bCoef[lev] = RefCountedPtr<LevelData<FluxBox> >(new LevelData<FluxBox>(m_amrGrids[lev], 1, IntVect::Zero));
     }
 
-    // SUHMO time-step
-    // 1 - Solving for the hydraulic head
-    pout() <<"   ...Solve for h ! "<< endl;
-    // EX GaussianTest: a_phi == m_head  -- a_rhs == RHS_h 
-    // a_grids == m_amrGrids --
-    for (int lev = 0; lev <= m_finest_level; lev++)
-    {
-        LevelData<FArrayBox>& leveloldH  = *m_old_head[lev];
-        LevelData<FArrayBox>& levelnewH  = *m_head[lev];
+    /* II BIG OUTER LOOP: h and b ... */
 
-        LevelData<FArrayBox>& leveloldB  = *m_old_gapheight[lev];    
+    /*     III SMALL OUTER LOOP: h calc */
+    bool converged_h = false;
+    bool first_pass = true;
+    int ite_idx = 0;
+    while (!converged_h)
+    { 
+        pout() <<"\n\n------------------------------------- "<< endl;
+        pout() <<"Iteration "<< ite_idx << endl;
+        pout() <<"------------------------------------- \n\n"<< endl;
+        
+        pout() <<"   ...Solve for h ! "<< endl;
+        // Solve for h using lagged (iteration lagged) qtities
+        //         If first pass: 
+        //             Compute aCoeff and bCoeff_cc using old qtites
+        //             bCoeff_cc -> bCoeff via CC->Edge
+        //             Form RHS for h using old qtites
+        //             Solve for h using all old qtities
+        //             Put h into h_lag
+        //         Else:
+        //             Put h into h_lag
+        if (first_pass) {
+            for (int lev = 0; lev <= m_finest_level; lev++)
+            {
+                pout() <<"        FIRST PASS: solve for h "<< endl;
+                LevelData<FArrayBox>& leveloldB  = *m_old_gapheight[lev];    
 
-        LevelData<FArrayBox>& levelacoef = *aCoef[lev];
-        LevelData<FluxBox>&   levelbcoef = *bCoef[lev];
-        LevelData<FArrayBox>& levelRHS_h = *RHS_h[lev];
+                LevelData<FArrayBox>& levelacoef = *aCoef[lev];
+                LevelData<FluxBox>&   levelbcoef = *bCoef[lev];
+                LevelData<FArrayBox>& levelRHS_h = *RHS_h[lev];
 
-        LevelData<FArrayBox>& levelPw    = *m_Pw[lev];
-        LevelData<FArrayBox>& levelPi    = *m_overburdenpress[lev];
-        LevelData<FArrayBox>& levelRe    = *m_Re[lev]; 
+                LevelData<FArrayBox>& levelmR    = *m_meltRate[lev];
+                LevelData<FArrayBox>& levelPw    = *m_Pw[lev];
+                LevelData<FArrayBox>& levelPi    = *m_overburdenpress[lev];
+                LevelData<FArrayBox>& levelRe    = *m_Re[lev]; 
 
-        LevelData<FArrayBox> levelbcoef_cc(m_amrGrids[lev], 1, IntVect::Unit);
+                LevelData<FArrayBox> levelbcoef_cc(m_amrGrids[lev], 1, IntVect::Unit);
 
-        DataIterator dit = levelacoef.dataIterator();
-        for (dit.begin(); dit.ok(); ++dit) {
+                // Compute aCoeff and bCoeff_cc using old qtites
+                aCoeff_bCoeff_CC(levelacoef, levelbcoef_cc, levelRe, leveloldB);
+                // bCoeff_cc -> bCoeff via CC->Edge
+                CellToEdge(levelbcoef_cc, levelbcoef);
+                // Form RHS for h using old qtites
+                CalcRHS_head(levelRHS_h, levelPi, 
+                             levelPw, levelmR, 
+                             leveloldB);
+            } // loop on levs
 
-            FArrayBox& oldB    = leveloldB[dit];
+            // Solve for h using all old qtities
+            SolveForHead(m_amrGrids, aCoef, bCoef,
+                         m_amrDomains[0], m_refinement_ratios, coarsestDx,
+                         m_head, RHS_h);
+            //RefCountedPtr< AMRLevelOpFactory<LevelData<FArrayBox> > > opFactoryPtr
+            //      = RefCountedPtr<AMRLevelOpFactory<LevelData<FArrayBox> > >
+            //          (defineOperatorFactory(m_amrGrids, aCoef, bCoef,
+            //                         m_amrDomains[0], m_refinement_ratios, coarsestDx));
+            //MultilevelLinearOp<FArrayBox> poissonOp;
+            //// options ?
+            //poissonOp.m_num_mg_iterations = 1;
+            //poissonOp.m_num_mg_smooth = 4;
+            //poissonOp.m_preCondSolverDepth = -1;
+            //poissonOp.define(m_amrGrids, m_refinement_ratios, m_amrDomains, m_amrDx, opFactoryPtr, 0);
+            //// bottom solver ?
+            //BiCGStabSolver<Vector<LevelData<FArrayBox>* > > solver;
+            //bool homogeneousBC = false;  
+            //solver.define(&poissonOp, homogeneousBC); 
+            //solver.m_normType = 0;
+            //solver.m_verbosity = 5;
+            //solver.m_eps = 1.0e-7;
+            //solver.m_imax = 10;
+            ////
+            //solver.solve(m_head, RHS_h);
 
-            FArrayBox& aC      = levelacoef[dit];
-            FArrayBox& bC_cc   = levelbcoef_cc[dit];
-
-            FArrayBox& Re      = levelRe[dit];
-
-            ForAllXBNN(Real, aC, aC.box(), 0, aC.nComp());
-            { 
-                aCR = 1.0; 
-            }EndFor;
-
-            BoxIterator bit(bC_cc.box()); // can use gridBox? 
-            for (bit.begin(); bit.ok(); ++bit) {
-                IntVect iv = bit();
-                // Update bcoeff
-                Real num_q = - oldB(iv, 0) * oldB(iv, 0) * oldB(iv, 0) * m_suhmoParm->m_gravity;
-                Real denom_q = 12.0 * m_suhmoParm->m_nu * (1 + m_suhmoParm->m_omega * Re(iv, 0));
-                bC_cc(iv, 0) = num_q/denom_q;
-            }
-        }
-
-        CellToEdge(levelbcoef_cc, levelbcoef); 
-
-        for (dit.begin(); dit.ok(); ++dit) {
-
-            FArrayBox& oldB    = leveloldB[dit];
-            FArrayBox& RHS     = levelRHS_h[dit];
-
-            FArrayBox& Pressi  = levelPi[dit];
-            FArrayBox& Pw      = levelPw[dit];
-
-            RHS.setVal(0.0);
-            // second term ...
-            Real ub_norm = std::sqrt(  m_suhmoParm->m_ub[0]*m_suhmoParm->m_ub[0] 
-                                     + m_suhmoParm->m_ub[1]*m_suhmoParm->m_ub[1]) / m_suhmoParm->m_lr;
-            BoxIterator bit(RHS.box()); // can use gridBox? 
-            for (bit.begin(); bit.ok(); ++bit) {
-                IntVect iv = bit();
-                if ( oldB(iv,0) < m_suhmoParm->m_br) {
-                    RHS(iv,0) -= ub_norm * (m_suhmoParm->m_br - oldB(iv,0));
+            for (int lev = 0; lev <= m_finest_level; lev++)
+            {
+                LevelData<FArrayBox>& levelcurH      = *m_head[lev];
+                LevelData<FArrayBox>& levelnewH_lag  = *a_head_lagged[lev];
+                // Put h into h_lag
+                DataIterator dit = levelnewH_lag.dataIterator();
+                for (dit.begin(); dit.ok(); ++dit) {
+                    levelnewH_lag[dit].copy(levelcurH[dit], 0, 0, 1);
                 }
-                // third term ... assume  n = 3 !!
-                Real PimPw = (Pressi(iv,0) - Pw(iv,0));
-                RHS(iv,0) += m_suhmoParm->m_A * (PimPw) * (PimPw) * (PimPw) * oldB(iv,0);
+            } // loop on levs
+
+        } else {
+            for (int lev = 0; lev <= m_finest_level; lev++)
+            {
+                LevelData<FArrayBox>& levelcurH      = *m_head[lev];
+                LevelData<FArrayBox>& levelnewH_lag  = *a_head_lagged[lev];
+                // Put h into h_lag
+                DataIterator dit = levelnewH_lag.dataIterator();
+                for (dit.begin(); dit.ok(); ++dit) {
+                    levelnewH_lag[dit].copy(levelcurH[dit], 0, 0, 1);
+                }
+            }  // loop on levs
+        } // end first pass --> now you have a usable m_head. also m_head == a_head_lagged
+
+        //         Update water pressure Pw=f(h)
+        //         Compute grad(h) and grad(Pw)
+        //         IV INNER LOOP: Re/Qw !!
+        //             Update VECTOR Qw = f(Re, grad(h))
+        //             Update Re = f(Qw)
+        //         Update melting rate = f(Qw, grad(h), grad(Pw))
+        for (int lev = 0; lev <= m_finest_level; lev++)
+        {
+            LevelData<FArrayBox>& leveloldB  = *m_old_gapheight[lev];    
+
+            LevelData<FArrayBox>& levelcurrentH = *m_head[lev];
+            LevelData<FArrayBox>& levelgradH    = *m_gradhead[lev];
+
+            LevelData<FArrayBox>& levelmR       = *m_meltRate[lev];
+            LevelData<FArrayBox>& levelPw       = *m_Pw[lev];
+            LevelData<FArrayBox>& levelQw       = *m_qw[lev]; 
+            LevelData<FArrayBox>& levelRe       = *m_Re[lev]; 
+            LevelData<FArrayBox>& levelzBed     = *m_bedelevation[lev];
+
+            DisjointBoxLayout& levelGrids    = m_amrGrids[lev];
+            DataIterator dit = levelGrids.dataIterator();
+
+            // Update water pressure Pw=f(h)
+            pout() <<"        Update water pressure "<< endl;
+            for (dit.begin(); dit.ok(); ++dit) {
+                FArrayBox& Pw       = levelPw[dit];
+                FArrayBox& currH    = levelcurrentH[dit];
+                FArrayBox& zbed     = levelzBed[dit];
+
+                Pw.copy(currH, 0, 0, 1);
+                Pw.minus(zbed, 0, 0, 1);
+                Pw *= m_suhmoParm->m_rho_w * m_suhmoParm->m_gravity;;
+            }
+        
+            // Compute grad(h) and grad(Pw)
+            pout() <<"        Compute grad(h) and grad(Pw) "<< endl;
+            LevelData<FArrayBox> levelgradPw(levelGrids, 1*SpaceDim, HeadGhostVect);
+            LevelData<FArrayBox>* crsePsiPtr = NULL;
+            LevelData<FArrayBox>* finePsiPtr = NULL;
+            int nRefCrse=-1;
+            int nRefFine=-1;
+            // one level only for now ...
+            //if (lev > 0) {
+            //    ...
+            //}
+            //if (lev < m_level) {
+            //    ...
+            //}
+            Real dx = m_amrDx[lev][0];  
+            Gradient::compGradientCC(levelgradH, levelcurrentH,
+                                     crsePsiPtr, finePsiPtr,
+                                     dx, nRefCrse, nRefFine,
+                                     m_amrDomains[lev]);
+            Gradient::compGradientCC(levelgradPw, levelPw,
+                                     crsePsiPtr, finePsiPtr,
+                                     dx, nRefCrse, nRefFine,
+                                     m_amrDomains[lev]);
+
+            //         IV INNER LOOP: Re/Qw !! --> only reev Re now
+            //             Update VECTOR Qw = f(Re, grad(h))
+            //             Update Re = f(Qw)
+            pout() <<"        Re/Qw dependency "<< endl;
+            for (dit.begin(); dit.ok(); ++dit) {
+                FArrayBox& oldB    = leveloldB[dit];
+
+                FArrayBox& gradH   = levelgradH[dit];
+
+                FArrayBox& Qwater  = levelQw[dit];
+                FArrayBox& Re      = levelRe[dit];
+
+                BoxIterator bit(Qwater.box()); // can use gridBox? 
+                for (bit.begin(); bit.ok(); ++bit) {
+                    IntVect iv = bit();
+                    // Update water flux, using old-time Re
+                    Real num_q = - oldB(iv, 0) * oldB(iv, 0) * oldB(iv, 0) * m_suhmoParm->m_gravity * gradH(iv, 0);
+                    Real denom_q = 12.0 * m_suhmoParm->m_nu * (1 + m_suhmoParm->m_omega * Re(iv, 0));
+                    Qwater(iv, 0) = num_q/denom_q;
+                    num_q = - oldB(iv, 0) * oldB(iv, 0) * oldB(iv, 0) * m_suhmoParm->m_gravity * gradH(iv, 1);
+                    // 2nd comp (2D pb)
+                    Qwater(iv, 1) = num_q/denom_q;
+                    // Update Re using this new Qw ... short loop for now !!
+                    Re(iv, 0) = std::sqrt( Qwater(iv, 0) * Qwater(iv, 0) + Qwater(iv, 1) * Qwater(iv, 1)) / m_suhmoParm->m_nu;
+                }
+            }
+
+            //         Update melting rate = f(Qw, grad(h), grad(Pw))
+            pout() <<"        Update melting rate "<< endl;
+            for (dit.begin(); dit.ok(); ++dit) {
+                FArrayBox& gradH   = levelgradH[dit];
+
+                FArrayBox& meltR   = levelmR[dit];
+                FArrayBox& Qwater  = levelQw[dit];
+
+                FArrayBox& gradPw  = levelgradPw[dit];
+
+                BoxIterator bit(meltR.box());
+                for (bit.begin(); bit.ok(); ++bit) {
+                    IntVect iv = bit();
+                    meltR(iv, 0)  = m_suhmoParm->m_G / m_suhmoParm->m_L;
+                    //meltR(iv, 0) += term in ub and stress  <-- TODO
+                    meltR(iv, 0) -= m_suhmoParm->m_rho_w * m_suhmoParm->m_gravity * (
+                                    Qwater(iv, 0) * gradH(iv, 0) + 
+                                    Qwater(iv, 1) * gradH(iv, 1) ); 
+                    meltR(iv, 0) -=  m_suhmoParm->m_ct * m_suhmoParm->m_cw * m_suhmoParm->m_rho_w * (
+                                    Qwater(iv, 0) * gradPw(iv, 0) + 
+                                    Qwater(iv, 1) * gradPw(iv, 1) );
+                }
+            }
+
+        }// loop on levs
+
+
+        //         Compute aCoeff and bCoeff_cc, RHS and solve for h again
+        for (int lev = 0; lev <= m_finest_level; lev++)
+        {
+            LevelData<FArrayBox>& leveloldB  = *m_old_gapheight[lev];    
+
+            LevelData<FArrayBox>& levelacoef = *aCoef[lev];
+            LevelData<FluxBox>&   levelbcoef = *bCoef[lev];
+            LevelData<FArrayBox>& levelRHS_h = *RHS_h[lev];
+
+            LevelData<FArrayBox>& levelmR    = *m_meltRate[lev];
+            LevelData<FArrayBox>& levelPw    = *m_Pw[lev];
+            LevelData<FArrayBox>& levelPi    = *m_overburdenpress[lev];
+            LevelData<FArrayBox>& levelRe    = *m_Re[lev]; 
+
+            LevelData<FArrayBox> levelbcoef_cc(m_amrGrids[lev], 1, IntVect::Unit);
+
+            // Compute aCoeff and bCoeff_cc using updated qtites
+            aCoeff_bCoeff_CC(levelacoef, levelbcoef_cc, levelRe, leveloldB);
+            // bCoeff_cc -> bCoeff via CC->Edge
+            CellToEdge(levelbcoef_cc, levelbcoef);
+            // Form RHS for h using updated qtites
+            CalcRHS_head(levelRHS_h, levelPi, 
+                         levelPw, levelmR, 
+                         leveloldB);
+        } // loop on levs
+
+        // Solve for h using updated qtites
+        pout() <<"        Solve for h "<< endl;
+        SolveForHead(m_amrGrids, aCoef, bCoef,
+                     m_amrDomains[0], m_refinement_ratios, coarsestDx,
+                     m_head, RHS_h);
+
+
+        //         Check convergence using h and h_lag
+        pout() <<"        Check for convergence of h "<< endl;
+        for (int lev = 0; lev <= m_finest_level; lev++)
+        {
+            LevelData<FArrayBox>& levelnewH_lag  = *a_head_lagged[lev];
+            LevelData<FArrayBox>& levelcurrentH  = *m_head[lev];
+            // put "res" in a_head_lagged
+            DataIterator dit = levelnewH_lag.dataIterator();
+            for (dit.begin(); dit.ok(); ++dit) {
+                levelnewH_lag[dit].minus(levelcurrentH[dit], 0, 0, 1);
             }
         }
-    }
-   
-    Real coarsestDx = m_amrDx[0][0];  
-    //BCHolder bc(ConstDiriNeumBC(IntVect::Zero, RealVect::Zero,  IntVect::Zero, RealVect::Zero));
-    //poissonOpFactory->define(m_amrDomains[0],
-    //                      m_amrGrids,
-    //                      m_refinement_ratios,
-    //                      coarsestDx, 
-    //                      &bc,
-    //                      0.0,
-    //                      aCoef,
-    //                      -1.0, 
-    //                      bCoef); 
-    //RefCountedPtr< AMRLevelOpFactory<LevelData<FArrayBox> > > opFactoryPtr(poissonOpFactory);
+        Real max_res = computeNorm(a_head_lagged, m_refinement_ratios , coarsestDx, Interval(0,0), 0, 0);
+        pout() <<"         x "<<max_res<< endl;
 
-    RefCountedPtr< AMRLevelOpFactory<LevelData<FArrayBox> > > opFactoryPtr
-          = RefCountedPtr<AMRLevelOpFactory<LevelData<FArrayBox> > >
-              (defineOperatorFactory(m_amrGrids, aCoef, bCoef,
-                                     m_amrDomains[0], m_refinement_ratios, coarsestDx));
+        // Do not exit if this is first pass
+        if (first_pass) {
+            first_pass = false;
+        } else {
+            if ((max_res < 1.0e-7) || (ite_idx > 20)) {
+                if (ite_idx > 20) {
+                    pout() <<"        does not converge."<< endl;
+                    MayDay::Error("Abort");
+                } else {
+                    pout() <<"        converged."<< endl;
+                    converged_h = true;
+                }
+            }
+        }
 
-    MultilevelLinearOp<FArrayBox> poissonOp;
-    // options ?
-    poissonOp.m_num_mg_iterations = 1;
-    poissonOp.m_num_mg_smooth = 4;
-    poissonOp.m_preCondSolverDepth = -1;
-    poissonOp.define(m_amrGrids, m_refinement_ratios, m_amrDomains, m_amrDx, opFactoryPtr, 0);
+        ite_idx++;
 
-    BiCGStabSolver<Vector<LevelData<FArrayBox>* > > solver;
-    bool homogeneousBC = false;  
-    solver.define(&poissonOp, homogeneousBC); 
-    solver.m_normType = 0;
-    solver.m_verbosity = 5;
-    solver.m_eps = 1.0e-7;
-    solver.m_imax = 10;
+    } // end while h solve
 
-    solver.solve(m_head, RHS_h);
 
-    // 2 - Time-advance gap height
+    //     Form RHS for b
     pout() <<"   ...Solve for b ! "<< endl;
     int gh_method = 0; // 0: backward Euler, 1:...
     for (int lev = m_finest_level; lev >= 0; lev--)
     {
         LevelData<FArrayBox>& leveloldB  = *m_old_gapheight[lev];    
-        LevelData<FArrayBox>& levelnewB  = *m_gapheight[lev];    
 
-        LevelData<FArrayBox>& levelcurrentH = *m_head[lev];
-        LevelData<FArrayBox>& levelgradH    = *m_gradhead[lev];
+        LevelData<FArrayBox>& levelmR    = *m_meltRate[lev];
+        LevelData<FArrayBox>& levelPw    = *m_Pw[lev];
+        LevelData<FArrayBox>& levelPi    = *m_overburdenpress[lev];
 
-        LevelData<FArrayBox>& levelmR       = *m_meltRate[lev];
-        LevelData<FArrayBox>& levelPw       = *m_Pw[lev];
-        LevelData<FArrayBox>& levelPi       = *m_overburdenpress[lev];
-        LevelData<FArrayBox>& levelQw       = *m_qw[lev]; 
-        LevelData<FArrayBox>& levelRe       = *m_Re[lev]; 
-        LevelData<FArrayBox>& levelzBed     = *m_bedelevation[lev];
-
-        DisjointBoxLayout& levelGrids    = m_amrGrids[lev];
-        DataIterator dit = levelGrids.dataIterator();
-        //IntVect nGhost   = m_num_head_ghost * IntVect::Unit;
-  
-        // Update water pressure
-        pout() <<"        Update water pressure "<< endl;
-        for (dit.begin(); dit.ok(); ++dit) {
-            FArrayBox& Pw      = levelPw[dit];
-            FArrayBox& newH    = levelcurrentH[dit];
-            FArrayBox& zbed    = levelzBed[dit];
-
-            Pw.copy(newH, 0, 0, 1);
-            Pw.minus(zbed, 0, 0, 1);
-            Pw *= m_suhmoParm->m_rho_w * m_suhmoParm->m_gravity;;
-        }
-        
-        // Compute gradients at CC
-        pout() <<"        Compute grad(h) and grad(Pw) "<< endl;
-        // should those grad be def on a box WITHOUT ghost cells ?
-        LevelData<FArrayBox> levelgradPw(levelGrids, 1*SpaceDim, HeadGhostVect);
-        LevelData<FArrayBox>* crsePsiPtr = NULL;
-        LevelData<FArrayBox>* finePsiPtr = NULL;
-        int nRefCrse=-1;
-        int nRefFine=-1;
-        // one level only for now ...
-        //if (lev > 0) {
-        //    ...
-        //}
-        //if (lev < m_level) {
-        //    ...
-        //}
-        Real dx = m_amrDx[lev][0];  
-        Gradient::compGradientCC(levelgradH, levelcurrentH,
-                                 crsePsiPtr, finePsiPtr,
-                                 dx, nRefCrse, nRefFine,
-                                 m_amrDomains[lev]);
-        Gradient::compGradientCC(levelgradPw, levelPw,
-                                 crsePsiPtr, finePsiPtr,
-                                 dx, nRefCrse, nRefFine,
-                                 m_amrDomains[lev]);
+        LevelData<FArrayBox>& levelRHS_b = *RHS_b[lev];
 
         // 2. a : Get the RHS of gh eqs:
-        pout() <<"        Compute water flux (with old time Re), recompute Re and the meting rate"<< endl;
-        pout() <<"        Finally update RHS (using old time b info, expl Euler scheme)"<< endl;
-        LevelData<FArrayBox> gh_RHS(levelGrids, 1, HeadGhostVect);
-        for (dit.begin(); dit.ok(); ++dit) {
-            FArrayBox& oldB    = leveloldB[dit];
+        CalcRHS_gapHeight(levelRHS_b, levelPi, 
+                          levelPw, levelmR, 
+                          leveloldB);
+    }  // loop on levs
 
-            FArrayBox& gradH   = levelgradH[dit];
 
-            //const Box& gridBox = levelGrids[dit];
+    //     Solve for b using Forward Euler simple scheme
+    pout() <<"        Update gap height with expl Euler scheme"<< endl;
+    for (int lev = m_finest_level; lev >= 0; lev--)
+    {
+        LevelData<FArrayBox>& leveloldB  = *m_old_gapheight[lev];    
+        LevelData<FArrayBox>& levelnewB  = *m_gapheight[lev];    
 
-            FArrayBox& meltR   = levelmR[dit];
-            FArrayBox& Pw      = levelPw[dit];
-            FArrayBox& Pressi  = levelPi[dit];
-            FArrayBox& Qwater  = levelQw[dit];
-            FArrayBox& Re      = levelRe[dit];
+        LevelData<FArrayBox>& levelRHS_b = *RHS_b[lev];
 
-            FArrayBox& gradPw  = levelgradPw[dit];
-            FArrayBox& RHS     = gh_RHS[dit];
-
-            BoxIterator bit(meltR.box()); // can use gridBox? 
-            for (bit.begin(); bit.ok(); ++bit) {
-                IntVect iv = bit();
-                // Update water flux, using old-time Re
-                Real num_q = - oldB(iv, 0) * oldB(iv, 0) * oldB(iv, 0) * m_suhmoParm->m_gravity * gradH(iv, 0);
-                Real denom_q = 12.0 * m_suhmoParm->m_nu * (1 + m_suhmoParm->m_omega * Re(iv, 0));
-                Qwater(iv, 0) = num_q/denom_q;
-                num_q = - oldB(iv, 0) * oldB(iv, 0) * oldB(iv, 0) * m_suhmoParm->m_gravity * gradH(iv, 1);
-                Qwater(iv, 1) = num_q/denom_q;
-                // Update Re
-                Re(iv, 0) = std::sqrt( Qwater(iv, 0) * Qwater(iv, 0) + Qwater(iv, 1) * Qwater(iv, 1)) / m_suhmoParm->m_nu;
-                // Update melting rate
-                meltR(iv, 0)  = m_suhmoParm->m_G / m_suhmoParm->m_L;
-                //meltR(iv, 0) += term in ub and stress  <-- TODO
-                meltR(iv, 0) -= m_suhmoParm->m_rho_w * m_suhmoParm->m_gravity * (
-                                    Qwater(iv, 0) * gradH(iv, 0) + 
-                                    Qwater(iv, 1) * gradH(iv, 1) ); 
-                meltR(iv, 0) -=  m_suhmoParm->m_ct * m_suhmoParm->m_cw * m_suhmoParm->m_rho_w * (
-                                    Qwater(iv, 0) * gradPw(iv, 0) + 
-                                    Qwater(iv, 1) * gradPw(iv, 1) );
-            }
-            
-            // gap height b RHS
-            // first term
-            RHS.copy(meltR, 0, 0, 1);
-            RHS *= 1.0 / m_suhmoParm->m_rho_i;
-            // second term ...
-            Real ub_norm = std::sqrt(  m_suhmoParm->m_ub[0]*m_suhmoParm->m_ub[0] 
-                                     + m_suhmoParm->m_ub[1]*m_suhmoParm->m_ub[1]) / m_suhmoParm->m_lr;
-            for (bit.begin(); bit.ok(); ++bit) {
-                IntVect iv = bit();
-                if ( oldB(iv,0) < m_suhmoParm->m_br) {
-                    RHS(iv,0) += ub_norm * (m_suhmoParm->m_br - oldB(iv,0));
-                }
-                // third term ... assume  n = 3 !!
-                Real PimPw = (Pressi(iv,0) - Pw(iv,0));
-                RHS(iv,0) -= m_suhmoParm->m_A * (PimPw) * (PimPw) * (PimPw) * oldB(iv,0);
-            }
-
-        }
-
-        pout() <<"        Update gap height with expl Euler scheme"<< endl;
         // 2. b : update gap height
+        DisjointBoxLayout& levelGrids    = m_amrGrids[lev];
+        DataIterator dit = levelGrids.dataIterator();
         for (dit.begin(); dit.ok(); ++dit) {
 
             FArrayBox& oldB    = leveloldB[dit];
             FArrayBox& newB    = levelnewB[dit];
-            FArrayBox& RHS     = gh_RHS[dit];
+            FArrayBox& RHS     = levelRHS_b[dit];
 
             newB.copy(RHS, 0, 0, 1);
             newB *= a_dt;
             newB.plus(oldB, 0, 0, 1);
         }
         
-    }
+    }  // loop on levs
 
     // allocate face-centered storage
     //Vector<LevelData<FluxBox>*> vectFluxes(m_head.size(), NULL);
