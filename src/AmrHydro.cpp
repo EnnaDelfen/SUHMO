@@ -178,31 +178,6 @@ mixBCValues(FArrayBox& a_state,
   }
 }
 
-//AMRLevelOpFactory<LevelData<FArrayBox> >* 
-//defineOperatorFactory(
-//                      const Vector<DisjointBoxLayout>&               a_grids,
-//                      Vector<RefCountedPtr<LevelData<FArrayBox> > >& a_aCoef,
-//                      Vector<RefCountedPtr<LevelData<FluxBox> > >&   a_bCoef,
-//                      ProblemDomain& coarsestDomain,
-//                      Vector<int>& refRatio,
-//                      Real& coarsestDx)
-//{
-//    VCAMRPoissonOp2Factory* poissonOpF_head = new VCAMRPoissonOp2Factory;
-//
-//    BCHolder bc(ConstDiriNeumBC(IntVect::Unit, RealVect::Zero,  IntVect::Unit, RealVect::Zero));
-//    poissonOpF_head->define(coarsestDomain,
-//                      a_grids,
-//                      refRatio,
-//                      coarsestDx,
-//                      bc,//&mixBCValues,
-//                      0.0,
-//                      a_aCoef,
-//                      -1.0,
-//                      a_bCoef);
-//
-//    return (AMRLevelOpFactory<LevelData<FArrayBox> >*) poissonOpF_head;
-//}
-
 void
 AmrHydro::SolveForHead(
                       const Vector<DisjointBoxLayout>&               a_grids,
@@ -267,6 +242,7 @@ AmrHydro::setDefaults()
     pout() << "AmrHydro::setDefaults()" << endl;
 
     // set some bogus values as defaults
+    m_PrintCustom = false;
     m_is_defined = false;
     m_verbosity = 4;
     m_max_level = -1;
@@ -426,6 +402,9 @@ AmrHydro::initialize()
         m_refinement_ratios.resize(1);
         m_refinement_ratios[0] = -1;
     }
+
+
+    ppAmr.query("PrintCustom", m_PrintCustom);
 
     ppAmr.query("verbosity", m_verbosity);
 
@@ -1138,25 +1117,25 @@ AmrHydro::timeStep(Real a_dt)
             } // loop on levs
             
             // debug print
-            Vector<std::string> vectName;
-            vectName.resize(1);
-            vectName[0] = "rhS"; 
-            Vector<Vector<LevelData<FArrayBox>*>> stuffToPlot;
-            stuffToPlot.resize(1);
-            stuffToPlot[0].resize(m_max_level + 1, NULL);
-            stuffToPlot[0][0]  = new LevelData<FArrayBox>(m_amrGrids[0], 1, IntVect::Zero);
-            for (int lev = 0; lev <= m_finest_level; lev++)
-            {
-                LevelData<FArrayBox>& levelRHS_h = *RHS_h[lev];
-                LevelData<FArrayBox>& levelSTP   = *stuffToPlot[0][lev];
-                // Put h into h_lag
-                DataIterator dit = levelRHS_h.dataIterator();
-                for (dit.begin(); dit.ok(); ++dit) {
-                    levelSTP[dit].copy(levelRHS_h[dit], 0, 0, 1);
-                }
-            } // loop on levs
-            writePltCustom(1, vectName, stuffToPlot);
-            MayDay::Error("Abort");
+            //Vector<std::string> vectName;
+            //vectName.resize(1);
+            //vectName[0] = "rhS"; 
+            //Vector<Vector<LevelData<FArrayBox>*>> stuffToPlot;
+            //stuffToPlot.resize(1);
+            //stuffToPlot[0].resize(m_max_level + 1, NULL);
+            //stuffToPlot[0][0]  = new LevelData<FArrayBox>(m_amrGrids[0], 1, IntVect::Zero);
+            //for (int lev = 0; lev <= m_finest_level; lev++)
+            //{
+            //    LevelData<FArrayBox>& levelRHS_h = *RHS_h[lev];
+            //    LevelData<FArrayBox>& levelSTP   = *stuffToPlot[0][lev];
+            //    // Put h into h_lag
+            //    DataIterator dit = levelRHS_h.dataIterator();
+            //    for (dit.begin(); dit.ok(); ++dit) {
+            //        levelSTP[dit].copy(levelRHS_h[dit], 0, 0, 1);
+            //    }
+            //} // loop on levs
+            //writePltCustom(1, vectName, stuffToPlot);
+            //MayDay::Error("Abort");
 
             // Solve for h using all old qtities
             SolveForHead(m_amrGrids, aCoef, bCoef,
@@ -1493,6 +1472,41 @@ AmrHydro::timeStep(Real a_dt)
             pout() << "Time = " << m_time << "  level " << lev << " cells advanced = " << m_num_cells[lev] << endl;
         }
     }
+
+    // debug print
+    if (m_PrintCustom) {
+        Vector<std::string> vectName;
+        vectName.resize(3);
+        vectName[0]="head";
+        vectName[1]="gapHeight";
+        vectName[2]="bedelevation";
+        Vector<Vector<LevelData<FArrayBox>*>> stuffToPlot;
+        stuffToPlot.resize(3);
+        stuffToPlot[0].resize(m_max_level + 1, NULL);
+        stuffToPlot[1].resize(m_max_level + 1, NULL);
+        stuffToPlot[2].resize(m_max_level + 1, NULL);
+        stuffToPlot[0][0]  = new LevelData<FArrayBox>(m_amrGrids[0], 1, m_num_head_ghost * IntVect::Unit);
+        stuffToPlot[1][0]  = new LevelData<FArrayBox>(m_amrGrids[0], 1, m_num_head_ghost * IntVect::Unit);
+        stuffToPlot[2][0]  = new LevelData<FArrayBox>(m_amrGrids[0], 1, m_num_head_ghost * IntVect::Unit);
+        for (int lev = 0; lev <= m_finest_level; lev++)
+        {
+            LevelData<FArrayBox>& levelHead      = *m_head[lev];
+            LevelData<FArrayBox>& levelHeadSTP   = *stuffToPlot[0][lev];
+            LevelData<FArrayBox>& levelGap       = *m_gapheight[lev];    
+            LevelData<FArrayBox>& levelGapSTP    = *stuffToPlot[1][lev];
+            LevelData<FArrayBox>& levelzBed      = *m_bedelevation[lev];
+            LevelData<FArrayBox>& levelZbSTP     = *stuffToPlot[2][lev];
+            // Put h into h_lag
+            DataIterator dit = levelHead.dataIterator();
+            for (dit.begin(); dit.ok(); ++dit) {
+                levelHeadSTP[dit].copy(levelHead[dit], 0, 0, 1);
+                levelGapSTP[dit].copy(levelGap[dit], 0, 0, 1);
+                levelZbSTP[dit].copy(levelzBed[dit], 0, 0, 1);
+            }
+        } // loop on levs
+        writePltCustom(3, vectName, stuffToPlot);
+    }
+
 }
 
 // compute half-time face-centered thickness using unsplit PPM
@@ -2541,7 +2555,8 @@ AmrHydro::writePlotFile()
     }
 
     // plot comps: head + gapHeight + bedelevation + overburdenPress
-    int numPlotComps = 9;
+    //int numPlotComps = 9;
+    int numPlotComps = 3;
 
     // add in grad(head) if desired
     //if (m_write_gradPhi)
@@ -2554,14 +2569,14 @@ AmrHydro::writePlotFile()
     string headName("head");
     string gapHeightName("gapHeight");
     string zbedName("bedelevation");
-    string piName("overburdenPress");
-    string pwName("Pw"); 
-    string qwName("Qw_x"); 
-    string ReName("Re"); 
-    string meltRateName("meltRate"); 
-    string xGradName("GradHead_x");
-    string yGradName("yGradPhi");
-    string zGradName("zGradPhi");
+    //string piName("overburdenPress");
+    //string pwName("Pw"); 
+    //string qwName("Qw_x"); 
+    //string ReName("Re"); 
+    //string meltRateName("meltRate"); 
+    //string xGradName("GradHead_x");
+    //string yGradName("yGradPhi");
+    //string zGradName("zGradPhi");
 
     Vector<string> vectName(numPlotComps);
     // int dThicknessComp;
@@ -2569,12 +2584,12 @@ AmrHydro::writePlotFile()
     vectName[0] = headName;
     vectName[1] = gapHeightName;
     vectName[2] = zbedName;
-    vectName[3] = piName;
-    vectName[4] = pwName;
-    vectName[5] = qwName;
-    vectName[6] = ReName;
-    vectName[7] = meltRateName;
-    vectName[8] = xGradName;
+    //vectName[3] = piName;
+    //vectName[4] = pwName;
+    //vectName[5] = qwName;
+    //vectName[6] = ReName;
+    //vectName[7] = meltRateName;
+    //vectName[8] = xGradName;
     //if (m_write_gradPhi)
     //{
     //    vectName[numPlotComps] = xGradName;
@@ -2604,14 +2619,14 @@ AmrHydro::writePlotFile()
         LevelData<FArrayBox>& plotDataLev = *plotData[lev];
 
         const LevelData<FArrayBox>& levelHead      = *m_head[lev];
-        const LevelData<FArrayBox>& levelGradHead  = *m_gradhead[lev];
+        //const LevelData<FArrayBox>& levelGradHead  = *m_gradhead[lev];
         const LevelData<FArrayBox>& levelgapHeight = *m_gapheight[lev];
         const LevelData<FArrayBox>& levelzbed      = *m_bedelevation[lev];
-        const LevelData<FArrayBox>& levelpi        = *m_overburdenpress[lev];
-        const LevelData<FArrayBox>& levelpw        = *m_Pw[lev];
-        const LevelData<FArrayBox>& levelqw        = *m_qw[lev];
-        const LevelData<FArrayBox>& levelRe        = *m_Re[lev];
-        const LevelData<FArrayBox>& levelmR        = *m_meltRate[lev];
+        //const LevelData<FArrayBox>& levelpi        = *m_overburdenpress[lev];
+        //const LevelData<FArrayBox>& levelpw        = *m_Pw[lev];
+        //const LevelData<FArrayBox>& levelqw        = *m_qw[lev];
+        //const LevelData<FArrayBox>& levelRe        = *m_Re[lev];
+        //const LevelData<FArrayBox>& levelmR        = *m_meltRate[lev];
         //LevelData<FArrayBox> levelGradPhi;
         //if (m_write_gradPhi)
         //{
@@ -2644,14 +2659,14 @@ AmrHydro::writePlotFile()
             FArrayBox& thisPlotData   = plotDataLev[dit];
             int comp = 0;
             const FArrayBox& thisHead       = levelHead[dit];
-            const FArrayBox& thisGradHead   = levelGradHead[dit];
+            //const FArrayBox& thisGradHead   = levelGradHead[dit];
             const FArrayBox& thisGapHeight  = levelgapHeight[dit];
             const FArrayBox& thiszbed       = levelzbed[dit];
-            const FArrayBox& thisPi         = levelpi[dit];
-            const FArrayBox& thisPw         = levelpw[dit];
-            const FArrayBox& thisqw         = levelqw[dit];
-            const FArrayBox& thisRe         = levelRe[dit];
-            const FArrayBox& thismR         = levelmR[dit];
+            //const FArrayBox& thisPi         = levelpi[dit];
+            //const FArrayBox& thisPw         = levelpw[dit];
+            //const FArrayBox& thisqw         = levelqw[dit];
+            //const FArrayBox& thisRe         = levelRe[dit];
+            //const FArrayBox& thismR         = levelmR[dit];
 
             thisPlotData.copy(thisHead, 0, comp, 1);
             comp++;
@@ -2659,18 +2674,18 @@ AmrHydro::writePlotFile()
             comp++;
             thisPlotData.copy(thiszbed, 0, comp, 1);
             comp++;
-            thisPlotData.copy(thisPi, 0, comp, 1);
-            comp++;
-            thisPlotData.copy(thisPw, 0, comp, 1);
-            comp++;
-            thisPlotData.copy(thisqw, 0, comp, 1);
-            comp++;
-            thisPlotData.copy(thisRe, 0, comp, 1);
-            comp++;
-            thisPlotData.copy(thismR, 0, comp, 1);
-            comp++;
-            thisPlotData.copy(thisGradHead, 0, comp, 1);
-            comp++;
+            //thisPlotData.copy(thisPi, 0, comp, 1);
+            //comp++;
+            //thisPlotData.copy(thisPw, 0, comp, 1);
+            //comp++;
+            //thisPlotData.copy(thisqw, 0, comp, 1);
+            //comp++;
+            //thisPlotData.copy(thisRe, 0, comp, 1);
+            //comp++;
+            //thisPlotData.copy(thismR, 0, comp, 1);
+            //comp++;
+            //thisPlotData.copy(thisGradHead, 0, comp, 1);
+            //comp++;
             // now copy for grad(head)
             //if (m_write_gradPhi)
             //{

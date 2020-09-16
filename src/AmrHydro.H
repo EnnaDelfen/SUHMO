@@ -357,6 +357,9 @@ protected:
     /// maximum amount cfl number may grow in one timestep
     Real m_max_dt_grow;
 
+    // debug 
+    bool m_PrintCustom;
+
     /* current step */
     int m_cur_step;
 
