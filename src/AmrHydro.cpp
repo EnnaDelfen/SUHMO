@@ -240,7 +240,7 @@ AmrHydro::SolveForHead(
     bool homogeneousBC = false;  
     solver.define(&poissonOp, homogeneousBC); 
     solver.m_normType = 0;
-    solver.m_verbosity = 2;
+    solver.m_verbosity = 4;
     solver.m_eps = 1.0e-7;
     solver.m_imax = 10;
     //
@@ -1136,31 +1136,32 @@ AmrHydro::timeStep(Real a_dt)
                              levelPw, levelmR, 
                              leveloldB);
             } // loop on levs
+            
+            // debug print
+            Vector<std::string> vectName;
+            vectName.resize(1);
+            vectName[0] = "rhS"; 
+            Vector<Vector<LevelData<FArrayBox>*>> stuffToPlot;
+            stuffToPlot.resize(1);
+            stuffToPlot[0].resize(m_max_level + 1, NULL);
+            stuffToPlot[0][0]  = new LevelData<FArrayBox>(m_amrGrids[0], 1, IntVect::Zero);
+            for (int lev = 0; lev <= m_finest_level; lev++)
+            {
+                LevelData<FArrayBox>& levelRHS_h = *RHS_h[lev];
+                LevelData<FArrayBox>& levelSTP   = *stuffToPlot[0][lev];
+                // Put h into h_lag
+                DataIterator dit = levelRHS_h.dataIterator();
+                for (dit.begin(); dit.ok(); ++dit) {
+                    levelSTP[dit].copy(levelRHS_h[dit], 0, 0, 1);
+                }
+            } // loop on levs
+            writePltCustom(1, vectName, stuffToPlot);
+            MayDay::Error("Abort");
 
             // Solve for h using all old qtities
             SolveForHead(m_amrGrids, aCoef, bCoef,
                          m_amrDomains[0], m_refinement_ratios, coarsestDx,
                          m_head, RHS_h);
-            //RefCountedPtr< AMRLevelOpFactory<LevelData<FArrayBox> > > opFactoryPtr
-            //      = RefCountedPtr<AMRLevelOpFactory<LevelData<FArrayBox> > >
-            //          (defineOperatorFactory(m_amrGrids, aCoef, bCoef,
-            //                         m_amrDomains[0], m_refinement_ratios, coarsestDx));
-            //MultilevelLinearOp<FArrayBox> poissonOp;
-            //// options ?
-            //poissonOp.m_num_mg_iterations = 1;
-            //poissonOp.m_num_mg_smooth = 4;
-            //poissonOp.m_preCondSolverDepth = -1;
-            //poissonOp.define(m_amrGrids, m_refinement_ratios, m_amrDomains, m_amrDx, opFactoryPtr, 0);
-            //// bottom solver ?
-            //BiCGStabSolver<Vector<LevelData<FArrayBox>* > > solver;
-            //bool homogeneousBC = false;  
-            //solver.define(&poissonOp, homogeneousBC); 
-            //solver.m_normType = 0;
-            //solver.m_verbosity = 5;
-            //solver.m_eps = 1.0e-7;
-            //solver.m_imax = 10;
-            ////
-            //solver.solve(m_head, RHS_h);
 
             for (int lev = 0; lev <= m_finest_level; lev++)
             {
@@ -2461,6 +2462,74 @@ AmrHydro::computeInitialDt()
 }
 
 #ifdef CH_USE_HDF5
+/// write hdf5 plotfile to the standard location
+void
+AmrHydro::writePltCustom(int numPlotComps, 
+                         Vector<std::string>& vectName,
+                         Vector<Vector<LevelData<FArrayBox>*>> stuffToPlot)
+{
+    if (m_verbosity > 3)
+    {
+        pout() << "AmrHydro::writePltCustom" << endl;
+    }
+
+    Box domain = m_amrDomains[0].domainBox();
+    Real dt = 1.;
+    int numLevels = m_finest_level + 1;
+
+    // Use plot data container for all vars
+    Vector<LevelData<FArrayBox>*> plotData(m_head.size(), NULL);
+    IntVect ghostVect(IntVect::Unit);
+    for (int lev = 0; lev < numLevels; lev++) {
+        plotData[lev] = new LevelData<FArrayBox>(m_amrGrids[lev], numPlotComps, ghostVect);
+
+        LevelData<FArrayBox>& plotDataLev      = *plotData[lev];
+
+        DataIterator dit = m_amrGrids[lev].dataIterator();
+        for (int kk = 0; kk < numPlotComps; kk++) {
+            LevelData<FArrayBox>& stuffToPlotLev  = *stuffToPlot[kk][lev];
+            for (dit.begin(); dit.ok(); ++dit) {
+                FArrayBox& thisPlotData      = plotDataLev[dit];
+                FArrayBox& thisstuffToPlot   = stuffToPlotLev[dit];
+                thisPlotData.copy(thisstuffToPlot, 0, kk, 1);
+            }  // end loop over boxes on this level
+        } // end loop over vars to add to pltData
+
+    } // end loop over levels for computing plot data
+
+    // generate plotfile name
+    char iter_str[100];
+    sprintf(iter_str, "%s%06d.", m_plot_prefix.c_str(), m_cur_step);
+
+    string filename(iter_str);
+
+    if (SpaceDim == 1)
+    {
+        filename.append("1d_custom.hdf5");
+    }
+    else if (SpaceDim == 2)
+    {
+        filename.append("2d_custom.hdf5");
+    }
+    else if (SpaceDim == 3)
+    {
+        filename.append("3d_custom.hdf5");
+    }
+
+    WriteAMRHierarchyHDF5(
+        filename, m_amrGrids, plotData, vectName, domain, m_amrDx[0][0], dt, time(), m_refinement_ratios, numLevels);
+
+    // need to delete plotData
+    for (int lev = 0; lev < numLevels; lev++)
+    {
+        if (plotData[lev] != NULL)
+        {
+            delete plotData[lev];
+            plotData[lev] = NULL;
+        }
+    }
+}
+
 
 /// write hdf5 plotfile to the standard location
 void

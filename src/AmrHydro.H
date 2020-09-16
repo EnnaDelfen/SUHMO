@@ -108,6 +108,10 @@ public:
 
 #ifdef CH_USE_HDF5
 
+    void writePltCustom(int numPlotComps,
+                        Vector<std::string>& vectName,
+                        Vector<Vector<LevelData<FArrayBox>*>> stp);
+
     /** writes plotfile to the standard location; filename is
         <plot_root>.<step>.<DIM>d.hdf5
      */
