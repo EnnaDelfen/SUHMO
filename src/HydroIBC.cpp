@@ -107,12 +107,14 @@ HydroIBC::initializeData(RealVect& a_dx,
             thiszbed(iv, 0)      = Params.m_slope*(iv[0]+0.5)*a_dx[0];
             thisHead(iv, 0)      = P_water_init * Fact + thiszbed(iv, 0) ;
             thispi(iv, 0)        = P_ice; // cst for now ...
-            thisPw(iv, 0)        = Params.m_rho_w * Params.m_gravity * (thisHead(iv, 0)  - thiszbed(iv, 0));
+            thisPw(iv, 0)        = P_water_init; //Params.m_rho_w * Params.m_gravity * (thisHead(iv, 0)  - thiszbed(iv, 0));
             // dummy stuff 
             thisRe(iv, 0)        = Params.m_ReInit;
-            thisqw(iv, 0)        = 0.0;
+            Real denom_q         = 12.0 * Params.m_nu * (1 + Params.m_omega * Params.m_ReInit);
+            Real num_q           = - Params.m_gravity * Params.m_gapInit * Params.m_gapInit * Params.m_gapInit * Params.m_slope ;
+            thisqw(iv, 0)        = num_q/denom_q; 
             thisqw(iv, 1)        = 0.0;
-            thismeltRate(iv, 0)  = Params.m_G / Params.m_L;
+            thismeltRate(iv, 0)  = (Params.m_G - Params.m_gravity * Params.m_rho_w * thisqw(iv, 0) * Params.m_slope)/ Params.m_L;
         } // end loop over cells
     }     // end loop over boxes
 

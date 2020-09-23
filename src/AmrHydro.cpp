@@ -103,7 +103,7 @@ void ParseDirichletValue(Real* pos,
        }    
     }
     a_values[0]=bcVal;
-    pout() << "Dirich BC val at " << pos[0] << "," << pos[1] << " : " << a_values[0] << endl;
+    //pout() << "Dirich BC val at " << pos[0] << "," << pos[1] << " : " << a_values[0] << endl;
 }
 
 void 
@@ -132,7 +132,7 @@ mixBCValues(FArrayBox& a_state,
               // box of ghost cells is outside of domain bounds ?
               if(!a_domain.domainBox().contains(ghostBoxLo)) {
                   if (GlobalBCRS::s_bcLo[dir] == 0) {
-                      pout() << "const diri bcs lo for direction " << dir << endl;
+                      //pout() << "const diri bcs lo for direction " << dir << endl;
 		              DiriBC(a_state,
 		                     valid,
 		                     a_dx,
@@ -154,7 +154,7 @@ mixBCValues(FArrayBox& a_state,
               // box of ghost cells is outside of domain bounds ?
               if(!a_domain.domainBox().contains(ghostBoxHi)) {
                   if (GlobalBCRS::s_bcHi[dir] == 0) {
-                      pout() << "const diri bcs hi for direction " << dir << endl;
+                      //pout() << "const diri bcs hi for direction " << dir << endl;
 		              DiriBC(a_state,
 		                     valid,
 		                     a_dx,
@@ -191,12 +191,12 @@ AmrHydro::SolveForHead(
 {
     VCAMRPoissonOp2Factory* poissonOpF_head = new VCAMRPoissonOp2Factory;
 
-    BCHolder bc(ConstDiriNeumBC(IntVect::Unit, RealVect::Zero,  IntVect::Unit, RealVect::Zero));
+    //BCHolder bc(ConstDiriNeumBC(IntVect::Unit, RealVect::Zero,  IntVect::Unit, RealVect::Zero));
     poissonOpF_head->define(coarsestDomain,
                       a_grids,
                       refRatio,
                       coarsestDx,
-                      bc,//&mixBCValues,
+                      &mixBCValues, //bc
                       0.0,
                       a_aCoef,
                       -1.0,
@@ -1264,7 +1264,7 @@ AmrHydro::timeStep(Real a_dt)
                 BoxIterator bit(meltR.box());
                 for (bit.begin(); bit.ok(); ++bit) {
                     IntVect iv = bit();
-                    meltR(iv, 0)  = m_suhmoParm->m_G / m_suhmoParm->m_L;
+                    meltR(iv, 0)  = m_suhmoParm->m_G; // / m_suhmoParm->m_L;
                     //meltR(iv, 0) += term in ub and stress  <-- TODO
                     meltR(iv, 0) -= m_suhmoParm->m_rho_w * m_suhmoParm->m_gravity * (
                                     Qwater(iv, 0) * gradH(iv, 0) + 
@@ -1272,6 +1272,7 @@ AmrHydro::timeStep(Real a_dt)
                     meltR(iv, 0) -=  m_suhmoParm->m_ct * m_suhmoParm->m_cw * m_suhmoParm->m_rho_w * (
                                     Qwater(iv, 0) * gradPw(iv, 0) + 
                                     Qwater(iv, 1) * gradPw(iv, 1) );
+                    meltR(iv, 0) = meltR(iv, 0) / m_suhmoParm->m_L;
                 }
             }
 
