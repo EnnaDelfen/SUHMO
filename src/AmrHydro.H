@@ -110,7 +110,8 @@ public:
 
     void writePltCustom(int numPlotComps,
                         Vector<std::string>& vectName,
-                        Vector<Vector<LevelData<FArrayBox>*>> stp);
+                        Vector<Vector<LevelData<FArrayBox>*>> stp,
+                        string namePlot);
 
     /** writes plotfile to the standard location; filename is
         <plot_root>.<step>.<DIM>d.hdf5

@@ -1505,8 +1505,9 @@ AmrHydro::timeStep(Real a_dt)
                 levelZbSTP[dit].copy(levelzBed[dit], 0, 0, 1);
             }
         } // loop on levs
-        writePltCustom(3, vectName, stuffToPlot);
+        writePltCustom(3, vectName, stuffToPlot, "final_");
     }
+
 
 }
 
@@ -2481,7 +2482,8 @@ AmrHydro::computeInitialDt()
 void
 AmrHydro::writePltCustom(int numPlotComps, 
                          Vector<std::string>& vectName,
-                         Vector<Vector<LevelData<FArrayBox>*>> stuffToPlot)
+                         Vector<Vector<LevelData<FArrayBox>*>> stuffToPlot,
+                         string namePlot)
 {
     if (m_verbosity > 3)
     {
@@ -2517,6 +2519,8 @@ AmrHydro::writePltCustom(int numPlotComps,
     sprintf(iter_str, "%s%06d.", m_plot_prefix.c_str(), m_cur_step);
 
     string filename(iter_str);
+    
+    filename.append(namePlot);
 
     if (SpaceDim == 1)
     {
