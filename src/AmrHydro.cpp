@@ -126,7 +126,7 @@ mixBCValues(FArrayBox& a_state,
       Box valid = a_valid;
       for(int dir=0; dir<CH_SPACEDIM; ++dir) {
           // don't do anything if periodic -- should be perio in y dir 1
-          //if (!a_domain.isPeriodic(dir)) {
+          if (!a_domain.isPeriodic(dir)) {
               Box ghostBoxLo = adjCellBox(valid, dir, Side::Lo, 1);
               Box ghostBoxHi = adjCellBox(valid, dir, Side::Hi, 1);
               // box of ghost cells is outside of domain bounds ?
@@ -173,7 +173,7 @@ mixBCValues(FArrayBox& a_state,
                              Side::Hi);
                   }
               }
-          //} // end if is not periodic in ith direction
+          } // end if is not periodic in ith direction
       } // end dir loop
   }
 }
@@ -206,7 +206,7 @@ AmrHydro::SolveForHead(
 
     MultilevelLinearOp<FArrayBox> poissonOp;
     // options ?
-    poissonOp.m_num_mg_iterations = 1;
+    poissonOp.m_num_mg_iterations = 3;
     poissonOp.m_num_mg_smooth = 4;
     poissonOp.m_preCondSolverDepth = -1;
     poissonOp.define(m_amrGrids, m_refinement_ratios, m_amrDomains, m_amrDx, opFactoryPtr, 0);
@@ -216,8 +216,8 @@ AmrHydro::SolveForHead(
     solver.define(&poissonOp, homogeneousBC); 
     solver.m_normType = 0;
     solver.m_verbosity = 4;
-    solver.m_eps = 1.0e-7;
-    solver.m_imax = 10;
+    solver.m_eps = 1.0e-10;
+    solver.m_imax = 100;
     //
     solver.solve(a_head, a_RHS);
 }
@@ -1089,71 +1089,6 @@ AmrHydro::timeStep(Real a_dt)
         //             Put h into h_lag
         //         Else:
         //             Put h into h_lag
-        if (first_pass) {
-            for (int lev = 0; lev <= m_finest_level; lev++)
-            {
-                pout() <<"        FIRST PASS: solve for h "<< endl;
-                LevelData<FArrayBox>& leveloldB  = *m_old_gapheight[lev];    
-
-                LevelData<FArrayBox>& levelacoef = *aCoef[lev];
-                LevelData<FluxBox>&   levelbcoef = *bCoef[lev];
-                LevelData<FArrayBox>& levelRHS_h = *RHS_h[lev];
-
-                LevelData<FArrayBox>& levelmR    = *m_meltRate[lev];
-                LevelData<FArrayBox>& levelPw    = *m_Pw[lev];
-                LevelData<FArrayBox>& levelPi    = *m_overburdenpress[lev];
-                LevelData<FArrayBox>& levelRe    = *m_Re[lev]; 
-
-                LevelData<FArrayBox> levelbcoef_cc(m_amrGrids[lev], 1, IntVect::Unit);
-
-                // Compute aCoeff and bCoeff_cc using old qtites
-                aCoeff_bCoeff_CC(levelacoef, levelbcoef_cc, levelRe, leveloldB);
-                // bCoeff_cc -> bCoeff via CC->Edge
-                CellToEdge(levelbcoef_cc, levelbcoef);
-                // Form RHS for h using old qtites
-                CalcRHS_head(levelRHS_h, levelPi, 
-                             levelPw, levelmR, 
-                             leveloldB);
-            } // loop on levs
-            
-            // debug print
-            //Vector<std::string> vectName;
-            //vectName.resize(1);
-            //vectName[0] = "rhS"; 
-            //Vector<Vector<LevelData<FArrayBox>*>> stuffToPlot;
-            //stuffToPlot.resize(1);
-            //stuffToPlot[0].resize(m_max_level + 1, NULL);
-            //stuffToPlot[0][0]  = new LevelData<FArrayBox>(m_amrGrids[0], 1, IntVect::Zero);
-            //for (int lev = 0; lev <= m_finest_level; lev++)
-            //{
-            //    LevelData<FArrayBox>& levelRHS_h = *RHS_h[lev];
-            //    LevelData<FArrayBox>& levelSTP   = *stuffToPlot[0][lev];
-            //    // Put h into h_lag
-            //    DataIterator dit = levelRHS_h.dataIterator();
-            //    for (dit.begin(); dit.ok(); ++dit) {
-            //        levelSTP[dit].copy(levelRHS_h[dit], 0, 0, 1);
-            //    }
-            //} // loop on levs
-            //writePltCustom(1, vectName, stuffToPlot);
-            //MayDay::Error("Abort");
-
-            // Solve for h using all old qtities
-            SolveForHead(m_amrGrids, aCoef, bCoef,
-                         m_amrDomains[0], m_refinement_ratios, coarsestDx,
-                         m_head, RHS_h);
-
-            for (int lev = 0; lev <= m_finest_level; lev++)
-            {
-                LevelData<FArrayBox>& levelcurH      = *m_head[lev];
-                LevelData<FArrayBox>& levelnewH_lag  = *a_head_lagged[lev];
-                // Put h into h_lag
-                DataIterator dit = levelnewH_lag.dataIterator();
-                for (dit.begin(); dit.ok(); ++dit) {
-                    levelnewH_lag[dit].copy(levelcurH[dit], 0, 0, 1);
-                }
-            } // loop on levs
-
-        } else {
             for (int lev = 0; lev <= m_finest_level; lev++)
             {
                 LevelData<FArrayBox>& levelcurH      = *m_head[lev];
@@ -1164,7 +1099,6 @@ AmrHydro::timeStep(Real a_dt)
                     levelnewH_lag[dit].copy(levelcurH[dit], 0, 0, 1);
                 }
             }  // loop on levs
-        } // end first pass --> now you have a usable m_head. also m_head == a_head_lagged
 
         //         Update water pressure Pw=f(h)
         //         Compute grad(h) and grad(Pw)
