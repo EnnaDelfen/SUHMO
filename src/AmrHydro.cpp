@@ -1245,7 +1245,8 @@ AmrHydro::timeStep(Real a_dt)
 
 
         //         Check convergence using h and h_lag
-        pout() <<"        Check for convergence of h "<< endl;
+        Real maxHead = computeMax(m_head, m_refinement_ratios, Interval(0,0), 0);
+        pout() <<"        Check for convergence of h (max head is "<< maxHead<<")"<<endl;
         for (int lev = 0; lev <= m_finest_level; lev++)
         {
             LevelData<FArrayBox>& levelnewH_lag  = *a_head_lagged[lev];
@@ -1254,24 +1255,69 @@ AmrHydro::timeStep(Real a_dt)
             DataIterator dit = levelnewH_lag.dataIterator();
             for (dit.begin(); dit.ok(); ++dit) {
                 levelnewH_lag[dit].minus(levelcurrentH[dit], 0, 0, 1);
+                levelnewH_lag[dit].divide(maxHead);
+                levelnewH_lag[dit].abs();
             }
         }
-        Real max_res = computeNorm(a_head_lagged, m_refinement_ratios , coarsestDx, Interval(0,0), 0, 0);
-        pout() <<"         x "<<max_res<< endl;
+        //Real max_res = computeNorm(a_head_lagged, m_refinement_ratios , coarsestDx, Interval(0,0), 0, 0);
+        Real max_res = computeMax(a_head_lagged, m_refinement_ratios, Interval(0,0), 0);
+        pout() <<ite_idx<< "         x "<<max_res<< endl;
 
         // Do not exit if this is first pass
-        if (first_pass) {
-            first_pass = false;
-        } else {
-            if ((max_res < 1.0e-7) || (ite_idx > 20)) {
-                if (ite_idx > 20) {
-                    pout() <<"        does not converge."<< endl;
-                    MayDay::Error("Abort");
-                } else {
-                    pout() <<"        converged."<< endl;
-                    converged_h = true;
-                }
+        if ((max_res < 1.0e-7) || (ite_idx > 20)) {
+            if (ite_idx > 20) {
+                pout() <<"        does not converge."<< endl;
+                MayDay::Error("Abort");
+            } else {
+                pout() <<"        converged."<< endl;
+                converged_h = true;
             }
+        }
+     
+        // custom plt here
+        // debug print
+        if (m_PrintCustom) {
+            Vector<std::string> vectName;
+            vectName.resize(5);
+            vectName[0]="head";
+            vectName[1]="gapHeight";
+            vectName[2]="bedelevation";
+            vectName[3]="head_residual";
+            vectName[4]="RHS_head";
+            Vector<Vector<LevelData<FArrayBox>*>> stuffToPlot;
+            stuffToPlot.resize(5);
+            stuffToPlot[0].resize(m_max_level + 1, NULL);
+            stuffToPlot[1].resize(m_max_level + 1, NULL);
+            stuffToPlot[2].resize(m_max_level + 1, NULL);
+            stuffToPlot[3].resize(m_max_level + 1, NULL);
+            stuffToPlot[4].resize(m_max_level + 1, NULL);
+            stuffToPlot[0][0]  = new LevelData<FArrayBox>(m_amrGrids[0], 1, m_num_head_ghost * IntVect::Unit);
+            stuffToPlot[1][0]  = new LevelData<FArrayBox>(m_amrGrids[0], 1, m_num_head_ghost * IntVect::Unit);
+            stuffToPlot[2][0]  = new LevelData<FArrayBox>(m_amrGrids[0], 1, m_num_head_ghost * IntVect::Unit);
+            stuffToPlot[3][0]  = new LevelData<FArrayBox>(m_amrGrids[0], 1, m_num_head_ghost * IntVect::Unit);
+            stuffToPlot[4][0]  = new LevelData<FArrayBox>(m_amrGrids[0], 1, IntVect::Zero);
+            for (int lev = 0; lev <= m_finest_level; lev++)
+            {
+                LevelData<FArrayBox>& levelHead      = *m_head[lev];
+                LevelData<FArrayBox>& levelHeadSTP   = *stuffToPlot[0][lev];
+                LevelData<FArrayBox>& levelGap       = *m_gapheight[lev];    
+                LevelData<FArrayBox>& levelGapSTP    = *stuffToPlot[1][lev];
+                LevelData<FArrayBox>& levelzBed      = *m_bedelevation[lev];
+                LevelData<FArrayBox>& levelZbSTP     = *stuffToPlot[2][lev];
+                LevelData<FArrayBox>& levelRes       = *a_head_lagged[lev];
+                LevelData<FArrayBox>& levelResSTP    = *stuffToPlot[3][lev];
+                LevelData<FArrayBox>& levelRHS       = *RHS_h[lev];
+                LevelData<FArrayBox>& levelRHSSTP    = *stuffToPlot[4][lev];
+                DataIterator dit = levelHead.dataIterator();
+                for (dit.begin(); dit.ok(); ++dit) {
+                    levelHeadSTP[dit].copy(levelHead[dit], 0, 0, 1);
+                    levelGapSTP[dit].copy(levelGap[dit], 0, 0, 1);
+                    levelZbSTP[dit].copy(levelzBed[dit], 0, 0, 1);
+                    levelResSTP[dit].copy(levelRes[dit], 0, 0, 1);
+                    levelRHSSTP[dit].copy(levelRHS[dit], 0, 0, 1);
+                }
+            } // loop on levs
+            writePltCustom(5, vectName, stuffToPlot, std::to_string(ite_idx));
         }
 
         ite_idx++;
