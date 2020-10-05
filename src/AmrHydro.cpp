@@ -191,7 +191,7 @@ AmrHydro::SolveForHead(
 {
     VCAMRPoissonOp2Factory* poissonOpF_head = new VCAMRPoissonOp2Factory;
 
-    //BCHolder bc(ConstDiriNeumBC(IntVect::Unit, RealVect::Zero,  IntVect::Unit, RealVect::Zero));
+    //BCHolder bc(ConstDiriNeumBC(IntVect::Unit, RealVect::Unit,  IntVect::Zero, RealVect::Zero));
     poissonOpF_head->define(coarsestDomain,
                       a_grids,
                       refRatio,
@@ -875,27 +875,25 @@ AmrHydro::aCoeff_bCoeff_CC(LevelData<FArrayBox>&  levelacoef,
     DataIterator dit = levelacoef.dataIterator();
     for (dit.begin(); dit.ok(); ++dit) {
 
-        FArrayBox& B    = levelB[dit];
-
-        FArrayBox& aC      = levelacoef[dit];
-        FArrayBox& bC_cc   = levelbcoef_cc[dit];
-
-        FArrayBox& Re      = levelRe[dit];
+        FArrayBox& B      = levelB[dit];
+        FArrayBox& aC     = levelacoef[dit];
+        FArrayBox& bC_cc  = levelbcoef_cc[dit];
+        FArrayBox& Re     = levelRe[dit];
 
         // initialize 
         aC.setVal(0.0);
         bC_cc.setVal(0.0);
 
-        ForAllXBNN(Real, aC, aC.box(), 0, aC.nComp());
-        { 
-            aCR = 1.0; 
-        }EndFor;
+        //ForAllXBNN(Real, aC, aC.box(), 0, aC.nComp());
+        //{ 
+        //    aCR = 1.0; 
+        //}EndFor;
 
         BoxIterator bit(bC_cc.box()); 
         for (bit.begin(); bit.ok(); ++bit) {
             IntVect iv = bit();
             // Update b coeff
-            Real num_q = - B(iv, 0) * B(iv, 0) * B(iv, 0) * m_suhmoParm->m_gravity;
+            Real num_q = B(iv, 0) * B(iv, 0) * B(iv, 0) * m_suhmoParm->m_gravity;
             Real denom_q = 12.0 * m_suhmoParm->m_nu * (1 + m_suhmoParm->m_omega * Re(iv, 0));
             bC_cc(iv, 0) = num_q/denom_q;
         }
@@ -1379,8 +1377,7 @@ AmrHydro::timeStep(Real a_dt)
     m_cur_step += 1;
 
 // write diagnostic info, like sum of ice
-    if (m_verbosity > 0)
-    {
+    if (m_verbosity > 0) {
         pout() << "VERBOSE: AmrHydro::timestep " << m_cur_step << " --     end time = "
                //<< setiosflags(ios::fixed) << setprecision(6) << setw(12)
                << m_time << " ( " << time() << " )"
@@ -1393,17 +1390,14 @@ AmrHydro::timeStep(Real a_dt)
     }
 
     int totalCellsAdvanced = 0;
-    for (int lev = 0; lev < m_num_cells.size(); lev++)
-    {
+    for (int lev = 0; lev < m_num_cells.size(); lev++) {
         totalCellsAdvanced += m_num_cells[lev];
     }
 
-    if (m_verbosity > 0)
-    {
+    if (m_verbosity > 0) {
         pout() << "Time = " << m_time << " cells advanced = " << totalCellsAdvanced << endl;
 
-        for (int lev = 0; lev < m_num_cells.size(); lev++)
-        {
+        for (int lev = 0; lev < m_num_cells.size(); lev++) {
             pout() << "Time = " << m_time << "  level " << lev << " cells advanced = " << m_num_cells[lev] << endl;
         }
     }
