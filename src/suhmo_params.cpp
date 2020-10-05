@@ -5,7 +5,7 @@
 
 void suhmo_params::setDefaults()
 {
-    m_rho_i = 980.0;
+    m_rho_i = 910.0;
     m_rho_w = 1000.0;
     m_gravity = 9.8;
     // constants of problem
@@ -32,7 +32,7 @@ void suhmo_params::readInputs()
     pout() << "suhmo_params::readInputs()" << endl;
 
     // Cst of problem
-    m_rho_i = 980.0;
+    m_rho_i = 910.0;
     m_rho_w = 1000.0;
     m_gravity = 9.8;
     // Problem dependent variables
