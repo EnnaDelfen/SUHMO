@@ -97,24 +97,31 @@ HydroIBC::initializeData(RealVect& a_dx,
         for (bit.begin(); bit.ok(); ++bit)
         {
             IntVect iv = bit();
-            // gapHeight - initially constant 
+            Real x_loc = (iv[0]+0.5)*a_dx[0];
+
+            // bed topography
+            thiszbed(iv, 0)      = Params.m_slope*x_loc;
+            // initial gap height
             thisGapHeight(iv, 0) = Params.m_gapInit;
-            // Initial Head is such that the water pressure is equal to 50% of the ice overburden pressure
+            // Ice height (should be ice only, so surface - (bed + gap))
+            //thisiceHeight(iv, 0) = 6.0 * (std::sqrt(x_loc + Params.m_H) - std::sqrt(Params.m_H)) + 1.0;
             thisiceHeight(iv, 0) = Params.m_H;
-            Real P_ice        = Params.m_rho_i * Params.m_gravity * Params.m_H;
-            Real P_water_init = P_ice * 0.5;
-            Real Fact         = 1./(Params.m_rho_w * Params.m_gravity);
-            thiszbed(iv, 0)      = Params.m_slope*(iv[0]+0.5)*a_dx[0];
-            thisHead(iv, 0)      = P_water_init * Fact + thiszbed(iv, 0) ;
-            thispi(iv, 0)        = P_ice; // cst for now ...
-            thisPw(iv, 0)        = P_water_init; //Params.m_rho_w * Params.m_gravity * (thisHead(iv, 0)  - thiszbed(iv, 0));
+            // Ice overburden pressure : rho_i * g * H
+            thispi(iv, 0)        = Params.m_rho_i * Params.m_gravity * thisiceHeight(iv, 0);
+            // Water press ?? No idea --> Pi/2.0
+            thisPw(iv, 0)        = thispi(iv, 0) * 0.5;
+            Real Fact            = 1./(Params.m_rho_w * Params.m_gravity);
+            thisHead(iv, 0)      = thisPw(iv, 0) * Fact + thiszbed(iv, 0) ;
             // dummy stuff 
             thisRe(iv, 0)        = Params.m_ReInit;
             Real denom_q         = 12.0 * Params.m_nu * (1 + Params.m_omega * Params.m_ReInit);
-            Real num_q           = - Params.m_gravity * Params.m_gapInit * Params.m_gapInit * Params.m_gapInit * Params.m_slope ;
+            // grad head = slope for now
+            Real num_q           = - Params.m_gravity * std::pow(thisGapHeight(iv, 0),3) * Params.m_slope ;
             thisqw(iv, 0)        = num_q/denom_q; 
+// DEBUG 
+            thisqw(iv, 0)        = 0.0;
             thisqw(iv, 1)        = 0.0;
-            thismeltRate(iv, 0)  = (Params.m_G - Params.m_gravity * Params.m_rho_w * thisqw(iv, 0) * Params.m_slope)/ Params.m_L;
+            thismeltRate(iv, 0)  = 0.0;//(Params.m_G - Params.m_gravity * Params.m_rho_w * thisqw(iv, 0) * Params.m_slope)/ Params.m_L;
         } // end loop over cells
     }     // end loop over boxes
 
