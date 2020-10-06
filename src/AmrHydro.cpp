@@ -47,6 +47,7 @@ using std::string;
 #include "MayDay.H"
 #include "CONSTANTS.H"
 #include "Gradient.H"
+#include "ExtrapGhostCells.H"
 
 #include "NamespaceHeader.H"
 
@@ -897,9 +898,7 @@ AmrHydro::aCoeff_bCoeff_CC(LevelData<FArrayBox>&  levelacoef,
             // Update b coeff
             Real num_q = B(iv, 0) * B(iv, 0) * B(iv, 0) * m_suhmoParm->m_gravity;
             Real denom_q = 12.0 * m_suhmoParm->m_nu * (1 + m_suhmoParm->m_omega * Re(iv, 0));
-//DEBUG
             bC_cc(iv, 0) = num_q/denom_q;
-            //bC_cc(iv, 0) = 1.0;    
         }
     }
 }
@@ -1167,6 +1166,10 @@ AmrHydro::timeStep(Real a_dt)
                                      m_amrDomains[lev]);
 
             // Need to fill the ghost cells of gradH    
+            levelgradH.exchange();
+            ExtrapGhostCells( levelgradH, m_amrDomains[0]);
+            levelgradPw.exchange();
+            ExtrapGhostCells( levelgradPw, m_amrDomains[0]);
 
             //         IV INNER LOOP: Re/Qw !! --> only reev Re now
             //             Update VECTOR Qw = f(Re, grad(h))
@@ -1183,23 +1186,25 @@ AmrHydro::timeStep(Real a_dt)
                 BoxIterator bit(Qwater.box()); // can use gridBox? 
                 for (bit.begin(); bit.ok(); ++bit) {
                     IntVect iv = bit();
-                    if ( m_amrDomains[0].domainBox().contains(iv) ) {
+                    //if ( m_amrDomains[0].domainBox().contains(iv) ) {
                        // Update water flux, using old-time Re
-                       Real num_q = - oldB(iv, 0) * oldB(iv, 0) * oldB(iv, 0) * m_suhmoParm->m_gravity * gradH(iv, 0);
+                       Real num_q = - std::pow(oldB(iv, 0),3) * m_suhmoParm->m_gravity * gradH(iv, 0);
                        Real denom_q = 12.0 * m_suhmoParm->m_nu * (1 + m_suhmoParm->m_omega * Re(iv, 0));
                        Qwater(iv, 0) = num_q/denom_q;
-                       num_q = - oldB(iv, 0) * oldB(iv, 0) * oldB(iv, 0) * m_suhmoParm->m_gravity * gradH(iv, 1);
+                       num_q = - std::pow(oldB(iv, 0),3) * m_suhmoParm->m_gravity * gradH(iv, 1);
                        // 2nd comp (2D pb)
                        Qwater(iv, 1) = num_q/denom_q;
                        // Update Re using this new Qw ... short loop for now !!
                        Re(iv, 0) = std::sqrt( Qwater(iv, 0) * Qwater(iv, 0) + Qwater(iv, 1) * Qwater(iv, 1)) / m_suhmoParm->m_nu;
-                    } else {
-                       Qwater(iv, 0) = 0.0;
-                       Qwater(iv, 1) = 0.0;
-                       Re(iv, 0) = 0.0;
-                    }
+                    //} else {
+                    //   Qwater(iv, 0) = 0.0;
+                    //   Qwater(iv, 1) = 0.0;
+                    //   Re(iv, 0) = 0.0;
+                    //}
+                    //pout() <<iv<<" "<<gradH(iv, 0)<<" "<< Qwater(iv, 0) << endl;
                 }
             }
+            //MayDay::Error("Abort");
 
             //         Update melting rate = f(Qw, grad(h), grad(Pw))
             pout() <<"        Update melting rate "<< endl;
