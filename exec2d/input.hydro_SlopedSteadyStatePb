@@ -2,7 +2,7 @@
 main.domain_size=100.00 100.00 # physical dimensions of domain
 main.problem_type=basic
 main.maxTime=2000.0
-main.maxStep=100
+main.maxStep=2
 
 # bc - 0 = diri / 1 = neum
 bc.lo_bc = 0 0
@@ -30,7 +30,7 @@ suhmo.br = 0.1
 suhmo.lr = 2.0
 suhmo.A = 0.0 
 
-suhmo.slope=0.0
+suhmo.slope=10.0
 suhmo.GapInit=0.01
 suhmo.ReInit=0.0
 
