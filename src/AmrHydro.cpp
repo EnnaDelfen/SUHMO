@@ -216,7 +216,9 @@ AmrHydro::SolveForHead(
     solver.define(&poissonOp, homogeneousBC); 
     solver.m_normType = 0;
     solver.m_verbosity = 4;
-    solver.m_eps = 1.0e-10;
+    //solver.m_eps = 1.0e-6;
+    solver.m_reps = 1.0e-10;
+    solver.setConvergenceMetrics(1.0, 1.0e-10);
     solver.m_imax = 100;
     //
     solver.solve(a_head, a_RHS);
