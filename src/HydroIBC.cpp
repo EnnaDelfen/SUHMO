@@ -118,9 +118,8 @@ HydroIBC::initializeData(RealVect& a_dx,
             // grad head = slope for now
             Real num_q           = - Params.m_gravity * std::pow(thisGapHeight(iv, 0),3) * Params.m_slope ;
             thisqw(iv, 0)        = num_q/denom_q; 
-// DEBUG 
-            thisqw(iv, 0)        = 0.0;
             thisqw(iv, 1)        = 0.0;
+// DEBUG 
             thismeltRate(iv, 0)  = 0.0;//(Params.m_G - Params.m_gravity * Params.m_rho_w * thisqw(iv, 0) * Params.m_slope)/ Params.m_L;
         } // end loop over cells
     }     // end loop over boxes
