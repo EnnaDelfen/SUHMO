@@ -27,6 +27,14 @@ class GlobalBCRS
 public: 
     static std::vector<int> s_bcLo, s_bcHi; 
     static bool             s_areBCsParsed;
+    static Real             s_xlo_diri;
+    static Real             s_xhi_diri;
+    static Real             s_ylo_diri;
+    static Real             s_yhi_diri;
+    static Real             s_xlo_neum;
+    static Real             s_xhi_neum;
+    static Real             s_ylo_neum;
+    static Real             s_yhi_neum;
 };
 
 /// framework class to manage non-subcycled AMR model

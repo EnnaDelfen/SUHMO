@@ -59,52 +59,167 @@ using std::string;
 std::vector<int>  GlobalBCRS::s_bcLo = std::vector<int>();
 std::vector<int>  GlobalBCRS::s_bcHi = std::vector<int>();
 bool              GlobalBCRS::s_areBCsParsed= false;
+Real              GlobalBCRS::s_xlo_diri= -1000;
+Real              GlobalBCRS::s_xhi_diri= -1000;
+Real              GlobalBCRS::s_ylo_diri= -1000;
+Real              GlobalBCRS::s_yhi_diri= -1000;
+Real              GlobalBCRS::s_xlo_neum= -1000;
+Real              GlobalBCRS::s_xhi_neum= -1000;
+Real              GlobalBCRS::s_ylo_neum= -1000;
+Real              GlobalBCRS::s_yhi_neum= -1000;
 
-void ParseNeumannValue(Real* pos,
+void
+ParseBC() 
+{
+    ParmParse ppBC("bc");
+    ppBC.getarr("lo_bc", GlobalBCRS::s_bcLo, 0, CH_SPACEDIM);
+    ppBC.getarr("hi_bc", GlobalBCRS::s_bcHi, 0, CH_SPACEDIM);
+
+    ParmParse ppAmr("AmrHydro");
+    std::vector<int> isPerio(CH_SPACEDIM, 0);
+    ppAmr.getarr("is_periodic", isPerio, 0, CH_SPACEDIM);
+
+    ParmParse pp;
+    if (isPerio[0] == 0) {
+        // x lo
+        if (GlobalBCRS::s_bcLo[0] == 0) {
+            pp.get("x.lo_dirich_val",GlobalBCRS::s_xlo_diri);
+        } else if (GlobalBCRS::s_bcLo[0] == 1) {
+            pp.get("x.lo_neumann_val",GlobalBCRS::s_xlo_neum);
+        }
+        // x hi
+        if (GlobalBCRS::s_bcHi[0] == 0) {
+            pp.get("x.hi_dirich_val",GlobalBCRS::s_xhi_diri);
+        } else if (GlobalBCRS::s_bcHi[0] == 1) {
+            pp.get("x.hi_neumann_val",GlobalBCRS::s_xhi_neum);
+        }
+    }
+    if (isPerio[1] == 0) {
+        // y lo
+        if (GlobalBCRS::s_bcLo[1] == 0) {
+            pp.get("y.lo_dirich_val",GlobalBCRS::s_ylo_diri);
+        } else if (GlobalBCRS::s_bcLo[1] == 1) {
+            pp.get("y.lo_neumann_val",GlobalBCRS::s_ylo_neum);
+        }
+        // y hi
+        if (GlobalBCRS::s_bcHi[1] == 0) {
+            pp.get("y.hi_dirich_val",GlobalBCRS::s_yhi_diri);
+        } else if (GlobalBCRS::s_bcHi[1] == 1) {
+            pp.get("y.hi_neumann_val",GlobalBCRS::s_yhi_neum);
+        }
+    }
+    GlobalBCRS::s_areBCsParsed = true;
+}
+
+
+void NeumannValue(Real* pos,
                        int* dir, 
                        Side::LoHiSide* side, 
                        Real* a_values)
 {
     ParmParse pp;
     Real bcVal = 0.0;
-    if ( dir == 0 ) {
-       if (*side == Side::Lo) {
-          pp.get("x.lo_neumann_val",bcVal);
-       } else { 
-          pp.get("x.hi_neumann_val",bcVal);
-       }    
-    } else if ( *dir == 1 ) {
-       if (*side == Side::Lo) {
-          pp.get("y.lo_neumann_val",bcVal);
-       } else { 
-          pp.get("y.hi_neumann_val",bcVal);
-       }    
-    }
-    a_values[0]=bcVal;
-}
-
-void ParseDirichletValue(Real* pos,
-                         int* dir, 
-                         Side::LoHiSide* side, 
-                         Real* a_values)
-{
-    ParmParse pp;
-    Real bcVal = 0.0;
     if ( *dir == 0 ) {
        if (*side == Side::Lo) {
-          pp.get("x.lo_dirich_val",bcVal);
+          bcVal = GlobalBCRS::s_xlo_neum;
        } else { 
-          pp.get("x.hi_dirich_val",bcVal);
+          bcVal = GlobalBCRS::s_xhi_neum;
        }    
     } else if ( *dir == 1 ) {
        if (*side == Side::Lo) {
-          pp.get("y.lo_dirich_val",bcVal);
+          bcVal = GlobalBCRS::s_ylo_neum;
        } else { 
-          pp.get("y.hi_dirich_val",bcVal);
+          bcVal = GlobalBCRS::s_yhi_neum;
        }    
     }
-    a_values[0]=bcVal;
-    //pout() << "Dirich BC val at " << pos[0] << "," << pos[1] << " : " << a_values[0] << endl;
+    a_values[0] = bcVal;
+}
+
+
+Real DirichletValue(int dir, 
+                    Side::LoHiSide side)
+{
+    Real bcVal = 0.0;
+    if ( dir == 0 ) {
+       if (side == Side::Lo) {
+          bcVal = GlobalBCRS::s_xlo_diri;
+       } else { 
+          bcVal = GlobalBCRS::s_xhi_diri;
+       }    
+    } else if ( dir == 1 ) {
+       if (side == Side::Lo) {
+          bcVal = GlobalBCRS::s_ylo_diri;
+       } else { 
+          bcVal = GlobalBCRS::s_yhi_diri;
+       }    
+    }
+    return bcVal;
+}
+
+void DirichletValue(Real* pos,
+                    int* dir, 
+                    Side::LoHiSide* side, 
+                    Real* a_values)
+{
+    a_values[0] = DirichletValue(*dir, *side);
+}
+
+
+void BCFill(FArrayBox& a_state,
+            const Box& a_valid,
+            const ProblemDomain& a_domain,
+            Real a_dx)
+{
+  // If box is outside of domain bounds ?
+  if(!a_domain.domainBox().contains(a_state.box())) {
+
+      if (!GlobalBCRS::s_areBCsParsed) {
+          ParseBC();
+      }
+
+      for(int dir=0; dir<CH_SPACEDIM; ++dir) {
+          // don't do anything if periodic -- should be perio in y dir 1
+          if (!a_domain.isPeriodic(dir)) {
+              Box ghostBoxLo = adjCellBox(a_valid, dir, Side::Lo, 1);
+              Box ghostBoxHi = adjCellBox(a_valid, dir, Side::Hi, 1);
+
+              if ((!a_domain.domainBox().contains(ghostBoxLo)) && (a_state.box().contains(ghostBoxLo)) ) {
+                  if (GlobalBCRS::s_bcLo[dir] == 0) {
+                      // Diri
+                      BoxIterator bit(ghostBoxLo);
+                      for (bit.begin(); bit.ok(); ++bit) {
+                          IntVect iv = bit();
+                          a_state(iv, 0) = DirichletValue(dir, Side::Lo);
+                      }
+                  } else if (GlobalBCRS::s_bcLo[dir] == 1) {
+                      // Neum
+                      Box fromRegion = ghostBoxLo;
+                      int isign = sign(Side::Lo);
+                      fromRegion.shift(dir, -isign);
+                      a_state.copy(a_state, fromRegion, 0, ghostBoxLo, 0, a_state.nComp());
+                  } // End BC options
+              } // End ghostBoxLo in dir
+
+              if ((!a_domain.domainBox().contains(ghostBoxHi)) && (a_state.box().contains(ghostBoxHi)) ) {
+                  if (GlobalBCRS::s_bcHi[dir] == 0) {
+                      // Diri
+                      BoxIterator bit(ghostBoxHi);
+                      for (bit.begin(); bit.ok(); ++bit) {
+                          IntVect iv = bit();
+                          a_state(iv, 0) = DirichletValue(dir, Side::Hi);
+                      }
+                  } else if (GlobalBCRS::s_bcHi[dir] == 1) {
+                      // Neum
+                      Box fromRegion = ghostBoxHi;
+                      int isign = sign(Side::Hi);
+                      fromRegion.shift(dir, -isign);
+                      a_state.copy(a_state, fromRegion, 0, ghostBoxHi, 0, a_state.nComp());
+                  } // End BC options
+              } // End ghostBoxHi in dir
+
+          } // end if is not periodic in ith direction
+      } // end dir loop
+  }
 }
 
 void 
@@ -118,10 +233,7 @@ mixBCValues(FArrayBox& a_state,
   if(!a_domain.domainBox().contains(a_state.box())) {
 
       if (!GlobalBCRS::s_areBCsParsed) {
-          ParmParse ppBC("bc");
-          ppBC.getarr("lo_bc", GlobalBCRS::s_bcLo, 0, SpaceDim);
-          ppBC.getarr("hi_bc", GlobalBCRS::s_bcHi, 0, SpaceDim);
-          GlobalBCRS::s_areBCsParsed = true;
+          ParseBC();
       }
 
       Box valid = a_valid;
@@ -133,21 +245,19 @@ mixBCValues(FArrayBox& a_state,
               // box of ghost cells is outside of domain bounds ?
               if(!a_domain.domainBox().contains(ghostBoxLo)) {
                   if (GlobalBCRS::s_bcLo[dir] == 0) {
-                      //pout() << "const diri bcs lo for direction " << dir << endl;
 		              DiriBC(a_state,
 		                     valid,
 		                     a_dx,
 		                     a_homogeneous,
-		                     ParseDirichletValue,
+		                     DirichletValue,
 		                     dir,
 		                     Side::Lo);
                   } else if (GlobalBCRS::s_bcLo[dir] == 1) {
-                      //pout() << "const neum bcs lo for direction " << dir << endl;
 		              NeumBC(a_state,
 		                     valid,
 		                     a_dx,
 		                     a_homogeneous,
-		                     ParseNeumannValue,
+		                     NeumannValue,
 		                     dir,
 		                     Side::Lo);
                   }
@@ -155,21 +265,19 @@ mixBCValues(FArrayBox& a_state,
               // box of ghost cells is outside of domain bounds ?
               if(!a_domain.domainBox().contains(ghostBoxHi)) {
                   if (GlobalBCRS::s_bcHi[dir] == 0) {
-                      //pout() << "const diri bcs hi for direction " << dir << endl;
 		              DiriBC(a_state,
 		                     valid,
 		                     a_dx,
 		                     a_homogeneous,
-		                     ParseDirichletValue,
+		                     DirichletValue,
 		                     dir,
 		                     Side::Hi);
                   } else if (GlobalBCRS::s_bcHi[dir] == 1) {
-                      //pout() << "const neum bcs lo for direction " << dir << endl;
 		              NeumBC(a_state,
 		                     valid,
 		                     a_dx,
 		                     a_homogeneous,
-		                     ParseNeumannValue,
+		                     NeumannValue,
 		                     dir,
                              Side::Hi);
                   }
@@ -987,7 +1095,7 @@ AmrHydro::timeStep(Real a_dt)
 
     if (m_verbosity >= 2)
     {
-        pout() << "-- Timestep " << m_cur_step << " Advancing solution from time " << m_time << " ( " << time()
+        pout() << "\n\n\n-- Timestep " << m_cur_step << " Advancing solution from time " << m_time << " ( " << time()
                << ")"
                   " with dt = "
                << a_dt << endl;
@@ -1037,7 +1145,7 @@ AmrHydro::timeStep(Real a_dt)
     // alpha*aCoef(x)*I - beta*Div(bCoef(x)*Grad) -- note for us: alpha = 0 beta = 1 
     Vector<RefCountedPtr<LevelData<FArrayBox> > > aCoef(m_max_level + 1);
     Vector<RefCountedPtr<LevelData<FluxBox> > > bCoef(m_max_level + 1);
-    pout() <<"   ...Copy current into old "<< endl;
+    pout() <<"   ...Copy current into old & take care of ghost cells and BCs "<< endl;
     for (int lev = 0; lev <= m_finest_level; lev++)
     {
         LevelData<FArrayBox>& oldH       = *m_old_head[lev];
@@ -1048,20 +1156,27 @@ AmrHydro::timeStep(Real a_dt)
 
         LevelData<FArrayBox>& levelgradH = *m_gradhead[lev];
 
+        // fill internal ghost cells -- do nothing for b
+        currentH.exchange();
+
+        // Get the valid boxes
+        const DisjointBoxLayout& levelGrids = m_amrGrids[lev];
+
         DataIterator dit = oldH.dataIterator();
         for (dit.begin(); dit.ok(); ++dit)
         {
+            // get the validBox
+            const Box& validBox = levelGrids.get(dit);
+
+            // Fill BC ghost cells of h  -- do nothing for b right now
+            BCFill(currentH[dit], validBox, m_amrDomains[lev], m_amrDx[lev][0]);
+
+            // Copy curr into old -- copy ghost cells too 
             oldH[dit].copy(currentH[dit], 0, 0, 1);
             oldB[dit].copy(currentB[dit], 0, 0, 1);
 
-            // debug
-            FArrayBox& gradH  = levelgradH[dit];
-            BoxIterator bit(gradH.box());
-            for (bit.begin(); bit.ok(); ++bit) {
-                IntVect iv = bit();
-                gradH(iv, 0) = 0.0;
-                gradH(iv, 1) = 0.0;
-            }
+            // Extra precaution
+            levelgradH[dit].setVal(0.0);
         }
 
         // Head RHS
@@ -1073,12 +1188,12 @@ AmrHydro::timeStep(Real a_dt)
         aCoef[lev] = RefCountedPtr<LevelData<FArrayBox> >(new LevelData<FArrayBox>(m_amrGrids[lev], 1, IntVect::Zero));
         bCoef[lev] = RefCountedPtr<LevelData<FluxBox> >(new LevelData<FluxBox>(m_amrGrids[lev], 1, IntVect::Zero));
     }
+    // GhostCells of b are garbage at this point if it's not first dt
 
     /* II BIG OUTER LOOP: h and b ... */
 
     /*     III SMALL OUTER LOOP: h calc */
     bool converged_h = false;
-    bool first_pass = true;
     int ite_idx = 0;
     while (!converged_h)
     { 
@@ -1096,16 +1211,26 @@ AmrHydro::timeStep(Real a_dt)
         //             Put h into h_lag
         //         Else:
         //             Put h into h_lag
-            for (int lev = 0; lev <= m_finest_level; lev++)
-            {
-                LevelData<FArrayBox>& levelcurH      = *m_head[lev];
-                LevelData<FArrayBox>& levelnewH_lag  = *a_head_lagged[lev];
-                // Put h into h_lag
-                DataIterator dit = levelnewH_lag.dataIterator();
-                for (dit.begin(); dit.ok(); ++dit) {
-                    levelnewH_lag[dit].copy(levelcurH[dit], 0, 0, 1);
-                }
-            }  // loop on levs
+        for (int lev = 0; lev <= m_finest_level; lev++)
+        {
+            LevelData<FArrayBox>& levelcurH      = *m_head[lev];
+            LevelData<FArrayBox>& levelnewH_lag  = *a_head_lagged[lev];
+            // Get the valid boxes
+            const DisjointBoxLayout& levelGrids = m_amrGrids[lev];
+
+            // fill internal ghost cells
+            levelcurH.exchange();
+
+            // Put h into h_lag
+            DataIterator dit = levelnewH_lag.dataIterator();
+            for (dit.begin(); dit.ok(); ++dit) {
+                // get the validBox & fill BC ghost cells
+                const Box& validBox = levelGrids.get(dit);
+                BCFill(levelcurH[dit], validBox, m_amrDomains[lev], m_amrDx[lev][0]);
+
+                levelnewH_lag[dit].copy(levelcurH[dit], 0, 0, 1); // should copy ghost cells too !
+            }
+        }  // loop on levs
 
         //         Update water pressure Pw=f(h)
         //         Compute grad(h) and grad(Pw)
@@ -1165,7 +1290,7 @@ AmrHydro::timeStep(Real a_dt)
                                      dx, nRefCrse, nRefFine,
                                      m_amrDomains[lev]);
 
-            // Need to fill the ghost cells of gradH    
+            // Need to fill the ghost cells of gradH -- extrapolate on the no perio boundaries   
             levelgradH.exchange();
             ExtrapGhostCells( levelgradH, m_amrDomains[0]);
             levelgradPw.exchange();
@@ -1177,6 +1302,7 @@ AmrHydro::timeStep(Real a_dt)
             pout() <<"        Re/Qw dependency "<< endl;
             for (dit.begin(); dit.ok(); ++dit) {
                 FArrayBox& oldB    = leveloldB[dit];
+                //FArrayBox& currH   = levelcurrentH[dit];
 
                 FArrayBox& gradH   = levelgradH[dit];
 
@@ -1186,22 +1312,16 @@ AmrHydro::timeStep(Real a_dt)
                 BoxIterator bit(Qwater.box()); // can use gridBox? 
                 for (bit.begin(); bit.ok(); ++bit) {
                     IntVect iv = bit();
-                    //if ( m_amrDomains[0].domainBox().contains(iv) ) {
-                       // Update water flux, using old-time Re
-                       Real num_q = - std::pow(oldB(iv, 0),3) * m_suhmoParm->m_gravity * gradH(iv, 0);
-                       Real denom_q = 12.0 * m_suhmoParm->m_nu * (1 + m_suhmoParm->m_omega * Re(iv, 0));
-                       Qwater(iv, 0) = num_q/denom_q;
-                       num_q = - std::pow(oldB(iv, 0),3) * m_suhmoParm->m_gravity * gradH(iv, 1);
-                       // 2nd comp (2D pb)
-                       Qwater(iv, 1) = num_q/denom_q;
-                       // Update Re using this new Qw ... short loop for now !!
-                       Re(iv, 0) = std::sqrt( Qwater(iv, 0) * Qwater(iv, 0) + Qwater(iv, 1) * Qwater(iv, 1)) / m_suhmoParm->m_nu;
-                    //} else {
-                    //   Qwater(iv, 0) = 0.0;
-                    //   Qwater(iv, 1) = 0.0;
-                    //   Re(iv, 0) = 0.0;
-                    //}
-                    //pout() <<iv<<" "<<gradH(iv, 0)<<" "<< Qwater(iv, 0) << endl;
+                    // Update water flux, using old-time Re
+                    Real num_q = - std::pow(oldB(iv, 0),3) * m_suhmoParm->m_gravity * gradH(iv, 0);
+                    Real denom_q = 12.0 * m_suhmoParm->m_nu * (1 + m_suhmoParm->m_omega * Re(iv, 0));
+                    Qwater(iv, 0) = num_q/denom_q;
+                    num_q = - std::pow(oldB(iv, 0),3) * m_suhmoParm->m_gravity * gradH(iv, 1);
+                    // 2nd comp (2D pb)
+                    Qwater(iv, 1) = num_q/denom_q;
+                    // Update Re using this new Qw ... short loop for now !!
+                    Re(iv, 0) = std::sqrt( Qwater(iv, 0) * Qwater(iv, 0) + Qwater(iv, 1) * Qwater(iv, 1)) / m_suhmoParm->m_nu;
+                    //pout() <<iv<<" "<< currH(iv,0)<< "  " << gradH(iv, 0) << endl;
                 }
             }
             //MayDay::Error("Abort");
@@ -1474,38 +1594,38 @@ AmrHydro::timeStep(Real a_dt)
     }
 
     // debug print
-    if (m_PrintCustom) {
-        Vector<std::string> vectName;
-        vectName.resize(3);
-        vectName[0]="head";
-        vectName[1]="gapHeight";
-        vectName[2]="bedelevation";
-        Vector<Vector<LevelData<FArrayBox>*>> stuffToPlot;
-        stuffToPlot.resize(3);
-        stuffToPlot[0].resize(m_max_level + 1, NULL);
-        stuffToPlot[1].resize(m_max_level + 1, NULL);
-        stuffToPlot[2].resize(m_max_level + 1, NULL);
-        stuffToPlot[0][0]  = new LevelData<FArrayBox>(m_amrGrids[0], 1, m_num_head_ghost * IntVect::Unit);
-        stuffToPlot[1][0]  = new LevelData<FArrayBox>(m_amrGrids[0], 1, m_num_head_ghost * IntVect::Unit);
-        stuffToPlot[2][0]  = new LevelData<FArrayBox>(m_amrGrids[0], 1, m_num_head_ghost * IntVect::Unit);
-        for (int lev = 0; lev <= m_finest_level; lev++)
-        {
-            LevelData<FArrayBox>& levelHead      = *m_head[lev];
-            LevelData<FArrayBox>& levelHeadSTP   = *stuffToPlot[0][lev];
-            LevelData<FArrayBox>& levelGap       = *m_gapheight[lev];    
-            LevelData<FArrayBox>& levelGapSTP    = *stuffToPlot[1][lev];
-            LevelData<FArrayBox>& levelzBed      = *m_bedelevation[lev];
-            LevelData<FArrayBox>& levelZbSTP     = *stuffToPlot[2][lev];
-            // Put h into h_lag
-            DataIterator dit = levelHead.dataIterator();
-            for (dit.begin(); dit.ok(); ++dit) {
-                levelHeadSTP[dit].copy(levelHead[dit], 0, 0, 1);
-                levelGapSTP[dit].copy(levelGap[dit], 0, 0, 1);
-                levelZbSTP[dit].copy(levelzBed[dit], 0, 0, 1);
-            }
-        } // loop on levs
-        writePltCustom(3, vectName, stuffToPlot, "final_");
-    }
+    //if (m_PrintCustom) {
+    //    Vector<std::string> vectName;
+    //    vectName.resize(3);
+    //    vectName[0]="head";
+    //    vectName[1]="gapHeight";
+    //    vectName[2]="bedelevation";
+    //    Vector<Vector<LevelData<FArrayBox>*>> stuffToPlot;
+    //    stuffToPlot.resize(3);
+    //    stuffToPlot[0].resize(m_max_level + 1, NULL);
+    //    stuffToPlot[1].resize(m_max_level + 1, NULL);
+    //    stuffToPlot[2].resize(m_max_level + 1, NULL);
+    //    stuffToPlot[0][0]  = new LevelData<FArrayBox>(m_amrGrids[0], 1, m_num_head_ghost * IntVect::Unit);
+    //    stuffToPlot[1][0]  = new LevelData<FArrayBox>(m_amrGrids[0], 1, m_num_head_ghost * IntVect::Unit);
+    //    stuffToPlot[2][0]  = new LevelData<FArrayBox>(m_amrGrids[0], 1, m_num_head_ghost * IntVect::Unit);
+    //    for (int lev = 0; lev <= m_finest_level; lev++)
+    //    {
+    //        LevelData<FArrayBox>& levelHead      = *m_head[lev];
+    //        LevelData<FArrayBox>& levelHeadSTP   = *stuffToPlot[0][lev];
+    //        LevelData<FArrayBox>& levelGap       = *m_gapheight[lev];    
+    //        LevelData<FArrayBox>& levelGapSTP    = *stuffToPlot[1][lev];
+    //        LevelData<FArrayBox>& levelzBed      = *m_bedelevation[lev];
+    //        LevelData<FArrayBox>& levelZbSTP     = *stuffToPlot[2][lev];
+    //        // Put h into h_lag
+    //        DataIterator dit = levelHead.dataIterator();
+    //        for (dit.begin(); dit.ok(); ++dit) {
+    //            levelHeadSTP[dit].copy(levelHead[dit], 0, 0, 1);
+    //            levelGapSTP[dit].copy(levelGap[dit], 0, 0, 1);
+    //            levelZbSTP[dit].copy(levelzBed[dit], 0, 0, 1);
+    //        }
+    //    } // loop on levs
+    //    writePltCustom(3, vectName, stuffToPlot, "final_");
+    //}
 
 
 }
@@ -2559,8 +2679,8 @@ AmrHydro::writePlotFile()
     }
 
     // plot comps: head + gapHeight + bedelevation + overburdenPress
-    //int numPlotComps = 9;
-    int numPlotComps = 3;
+    int numPlotComps = 9;
+    //int numPlotComps = 3;
 
     // add in grad(head) if desired
     //if (m_write_gradPhi)
@@ -2573,14 +2693,12 @@ AmrHydro::writePlotFile()
     string headName("head");
     string gapHeightName("gapHeight");
     string zbedName("bedelevation");
-    //string piName("overburdenPress");
-    //string pwName("Pw"); 
-    //string qwName("Qw_x"); 
-    //string ReName("Re"); 
-    //string meltRateName("meltRate"); 
-    //string xGradName("GradHead_x");
-    //string yGradName("yGradPhi");
-    //string zGradName("zGradPhi");
+    string piName("overburdenPress");
+    string pwName("Pw"); 
+    string qwName("Qw_x"); 
+    string ReName("Re"); 
+    string meltRateName("meltRate"); 
+    string xGradName("GradHead_x");
 
     Vector<string> vectName(numPlotComps);
     // int dThicknessComp;
@@ -2588,12 +2706,12 @@ AmrHydro::writePlotFile()
     vectName[0] = headName;
     vectName[1] = gapHeightName;
     vectName[2] = zbedName;
-    //vectName[3] = piName;
-    //vectName[4] = pwName;
-    //vectName[5] = qwName;
-    //vectName[6] = ReName;
-    //vectName[7] = meltRateName;
-    //vectName[8] = xGradName;
+    vectName[3] = piName;
+    vectName[4] = pwName;
+    vectName[5] = qwName;
+    vectName[6] = ReName;
+    vectName[7] = meltRateName;
+    vectName[8] = xGradName;
     //if (m_write_gradPhi)
     //{
     //    vectName[numPlotComps] = xGradName;
@@ -2623,14 +2741,14 @@ AmrHydro::writePlotFile()
         LevelData<FArrayBox>& plotDataLev = *plotData[lev];
 
         const LevelData<FArrayBox>& levelHead      = *m_head[lev];
-        //const LevelData<FArrayBox>& levelGradHead  = *m_gradhead[lev];
+        const LevelData<FArrayBox>& levelGradHead  = *m_gradhead[lev];
         const LevelData<FArrayBox>& levelgapHeight = *m_gapheight[lev];
         const LevelData<FArrayBox>& levelzbed      = *m_bedelevation[lev];
-        //const LevelData<FArrayBox>& levelpi        = *m_overburdenpress[lev];
-        //const LevelData<FArrayBox>& levelpw        = *m_Pw[lev];
-        //const LevelData<FArrayBox>& levelqw        = *m_qw[lev];
-        //const LevelData<FArrayBox>& levelRe        = *m_Re[lev];
-        //const LevelData<FArrayBox>& levelmR        = *m_meltRate[lev];
+        const LevelData<FArrayBox>& levelpi        = *m_overburdenpress[lev];
+        const LevelData<FArrayBox>& levelpw        = *m_Pw[lev];
+        const LevelData<FArrayBox>& levelqw        = *m_qw[lev];
+        const LevelData<FArrayBox>& levelRe        = *m_Re[lev];
+        const LevelData<FArrayBox>& levelmR        = *m_meltRate[lev];
         //LevelData<FArrayBox> levelGradPhi;
         //if (m_write_gradPhi)
         //{
@@ -2663,14 +2781,14 @@ AmrHydro::writePlotFile()
             FArrayBox& thisPlotData   = plotDataLev[dit];
             int comp = 0;
             const FArrayBox& thisHead       = levelHead[dit];
-            //const FArrayBox& thisGradHead   = levelGradHead[dit];
+            const FArrayBox& thisGradHead   = levelGradHead[dit];
             const FArrayBox& thisGapHeight  = levelgapHeight[dit];
             const FArrayBox& thiszbed       = levelzbed[dit];
-            //const FArrayBox& thisPi         = levelpi[dit];
-            //const FArrayBox& thisPw         = levelpw[dit];
-            //const FArrayBox& thisqw         = levelqw[dit];
-            //const FArrayBox& thisRe         = levelRe[dit];
-            //const FArrayBox& thismR         = levelmR[dit];
+            const FArrayBox& thisPi         = levelpi[dit];
+            const FArrayBox& thisPw         = levelpw[dit];
+            const FArrayBox& thisqw         = levelqw[dit];
+            const FArrayBox& thisRe         = levelRe[dit];
+            const FArrayBox& thismR         = levelmR[dit];
 
             thisPlotData.copy(thisHead, 0, comp, 1);
             comp++;
@@ -2678,18 +2796,18 @@ AmrHydro::writePlotFile()
             comp++;
             thisPlotData.copy(thiszbed, 0, comp, 1);
             comp++;
-            //thisPlotData.copy(thisPi, 0, comp, 1);
-            //comp++;
-            //thisPlotData.copy(thisPw, 0, comp, 1);
-            //comp++;
-            //thisPlotData.copy(thisqw, 0, comp, 1);
-            //comp++;
-            //thisPlotData.copy(thisRe, 0, comp, 1);
-            //comp++;
-            //thisPlotData.copy(thismR, 0, comp, 1);
-            //comp++;
-            //thisPlotData.copy(thisGradHead, 0, comp, 1);
-            //comp++;
+            thisPlotData.copy(thisPi, 0, comp, 1);
+            comp++;
+            thisPlotData.copy(thisPw, 0, comp, 1);
+            comp++;
+            thisPlotData.copy(thisqw, 0, comp, 1);
+            comp++;
+            thisPlotData.copy(thisRe, 0, comp, 1);
+            comp++;
+            thisPlotData.copy(thismR, 0, comp, 1);
+            comp++;
+            thisPlotData.copy(thisGradHead, 0, comp, 1);
+            comp++;
             // now copy for grad(head)
             //if (m_write_gradPhi)
             //{
@@ -2703,20 +2821,20 @@ AmrHydro::writePlotFile()
 
         // this is just so that visit surface plots look right
         // fill coarse-fine ghost-cell values with interpolated data
-        if (lev > 0)
-        {
-            PiecewiseLinearFillPatch interpolator(m_amrGrids[lev],
-                                                  m_amrGrids[lev - 1],
-                                                  numPlotComps,
-                                                  m_amrDomains[lev - 1],
-                                                  m_refinement_ratios[lev - 1],
-                                                  ghostVect[0]);
+        //if (lev > 0)
+        //{
+        //    PiecewiseLinearFillPatch interpolator(m_amrGrids[lev],
+        //                                          m_amrGrids[lev - 1],
+        //                                          numPlotComps,
+        //                                          m_amrDomains[lev - 1],
+        //                                          m_refinement_ratios[lev - 1],
+        //                                          ghostVect[0]);
 
-            // no interpolation in time
-            Real time_interp_coeff = 0.0;
-            interpolator.fillInterp(
-                *plotData[lev], *plotData[lev - 1], *plotData[lev - 1], time_interp_coeff, 0, 0, numPlotComps);
-        }
+        //    // no interpolation in time
+        //    Real time_interp_coeff = 0.0;
+        //    interpolator.fillInterp(
+        //        *plotData[lev], *plotData[lev - 1], *plotData[lev - 1], time_interp_coeff, 0, 0, numPlotComps);
+        //}
         // just in case...
         // plotData[lev]->exchange();
     } // end loop over levels for computing plot data
