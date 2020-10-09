@@ -1083,6 +1083,8 @@ AmrHydro::CalcRHS_gapHeight(LevelData<FArrayBox>& levelRHS_b,
            // second term ... assume  n = 3 !!
            Real PimPw = (Pressi(iv,0) - Pw(iv,0));
            RHS(iv,0) -= m_suhmoParm->m_A * (PimPw) * (PimPw) * (PimPw) * B(iv,0);
+//DEBUG
+           RHS(iv,0) = 0.0;
        }
    }
 }
@@ -1321,10 +1323,8 @@ AmrHydro::timeStep(Real a_dt)
                     Qwater(iv, 1) = num_q/denom_q;
                     // Update Re using this new Qw ... short loop for now !!
                     Re(iv, 0) = std::sqrt( Qwater(iv, 0) * Qwater(iv, 0) + Qwater(iv, 1) * Qwater(iv, 1)) / m_suhmoParm->m_nu;
-                    //pout() <<iv<<" "<< currH(iv,0)<< "  " << gradH(iv, 0) << endl;
                 }
             }
-            //MayDay::Error("Abort");
 
             //         Update melting rate = f(Qw, grad(h), grad(Pw))
             pout() <<"        Update melting rate "<< endl;
@@ -1341,15 +1341,13 @@ AmrHydro::timeStep(Real a_dt)
                     IntVect iv = bit();
                     meltR(iv, 0)  = m_suhmoParm->m_G; // / m_suhmoParm->m_L;
                     //meltR(iv, 0) += term in ub and stress  <-- TODO
-                    meltR(iv, 0) -= m_suhmoParm->m_rho_w * m_suhmoParm->m_gravity * (
-                                    Qwater(iv, 0) * gradH(iv, 0) + 
-                                    Qwater(iv, 1) * gradH(iv, 1) ); 
-                    meltR(iv, 0) -=  m_suhmoParm->m_ct * m_suhmoParm->m_cw * m_suhmoParm->m_rho_w * (
-                                    Qwater(iv, 0) * gradPw(iv, 0) + 
-                                    Qwater(iv, 1) * gradPw(iv, 1) );
+                    //meltR(iv, 0) -= m_suhmoParm->m_rho_w * m_suhmoParm->m_gravity * (
+                    //                Qwater(iv, 0) * gradH(iv, 0) + 
+                    //                Qwater(iv, 1) * gradH(iv, 1) ); 
+                    //meltR(iv, 0) -=  m_suhmoParm->m_ct * m_suhmoParm->m_cw * m_suhmoParm->m_rho_w * (
+                    //                Qwater(iv, 0) * gradPw(iv, 0) + 
+                    //                Qwater(iv, 1) * gradPw(iv, 1) );
                     meltR(iv, 0) = meltR(iv, 0) / m_suhmoParm->m_L;
-// DEBUG: meltR to zero
-                    meltR(iv, 0) = 0.0;
                 }
             }
 
