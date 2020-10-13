@@ -1190,7 +1190,7 @@ AmrHydro::timeStep(Real a_dt)
         aCoef[lev] = RefCountedPtr<LevelData<FArrayBox> >(new LevelData<FArrayBox>(m_amrGrids[lev], 1, IntVect::Zero));
         bCoef[lev] = RefCountedPtr<LevelData<FluxBox> >(new LevelData<FluxBox>(m_amrGrids[lev], 1, IntVect::Zero));
     }
-    // GhostCells of b are garbage at this point if it's not first dt
+    // GhostCells of b are garbage at this point if it's not first dt or it doesn't change
 
     /* II BIG OUTER LOOP: h and b ... */
 
@@ -1263,9 +1263,15 @@ AmrHydro::timeStep(Real a_dt)
                 FArrayBox& currH    = levelcurrentH[dit];
                 FArrayBox& zbed     = levelzBed[dit];
 
-                Pw.copy(currH, 0, 0, 1);
-                Pw.minus(zbed, 0, 0, 1);
-                Pw *= m_suhmoParm->m_rho_w * m_suhmoParm->m_gravity;;
+                BoxIterator bit(Pw.box());
+                for (bit.begin(); bit.ok(); ++bit) {
+                    IntVect iv = bit();
+                    Pw(iv,0) = (currH(iv,0) - zbed(iv,0)) * m_suhmoParm->m_rho_w * m_suhmoParm->m_gravity;
+                }
+                // Other solution
+                //Pw.copy(currH, 0, 0, 1);
+                //Pw.minus(zbed, 0, 0, 1);
+                //Pw *= m_suhmoParm->m_rho_w * m_suhmoParm->m_gravity;;
             }
         
             // Compute grad(h) and grad(Pw)
@@ -1323,6 +1329,7 @@ AmrHydro::timeStep(Real a_dt)
                     Qwater(iv, 1) = num_q/denom_q;
                     // Update Re using this new Qw ... short loop for now !!
                     Re(iv, 0) = std::sqrt( Qwater(iv, 0) * Qwater(iv, 0) + Qwater(iv, 1) * Qwater(iv, 1)) / m_suhmoParm->m_nu;
+                    //pout() << "Cell "<< iv << currH(iv,0) << " " << gradH(iv,0) << " " << gradH(iv,1) << endl;
                 }
             }
 
@@ -1506,9 +1513,19 @@ AmrHydro::timeStep(Real a_dt)
             FArrayBox& newB    = levelnewB[dit];
             FArrayBox& RHS     = levelRHS_b[dit];
 
-            newB.copy(RHS, 0, 0, 1);
-            newB *= a_dt;
-            newB.plus(oldB, 0, 0, 1);
+            // DO NOT TOUCH GHOST CELLS
+            BoxIterator bit(RHS.box()); 
+            for (bit.begin(); bit.ok(); ++bit) {
+                IntVect iv = bit(); 
+                newB(iv,0) = RHS(iv,0) * a_dt + oldB(iv,0);
+            }
+
+            // DEBUG
+            //BoxIterator bit2(newB.box()); // can use gridBox? 
+            //for (bit2.begin(); bit2.ok(); ++bit2) {
+            //    IntVect iv = bit2();
+            //    pout() << "Cell "<< iv << " " << newB(iv,0) << endl;
+            //}
         }
         
     }  // loop on levs
