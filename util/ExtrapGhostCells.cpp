@@ -17,10 +17,11 @@ void
 ExtrapGhostCells(LevelData<FArrayBox>& a_phi,
                  const ProblemDomain& a_domain)
 {
-  DataIterator dit = a_phi.dataIterator();
-  for (dit.begin(); dit.ok(); ++dit)
-    {
-      ExtrapGhostCells(a_phi[dit], a_domain, a_phi.ghostVect());
+    DataIterator dit = a_phi.dataIterator();
+    pout()<< "IN ExtrapGhostCells " <<endl;
+    for (dit.begin(); dit.ok(); ++dit) {
+          ExtrapGhostCells(a_phi[dit], a_domain, 
+                           a_phi.ghostVect());
     }
 }
 
@@ -32,34 +33,37 @@ ExtrapGhostCells(FArrayBox& a_phi,
 
   const Box& domainBox = a_domain.domainBox();
 
-  for (int dir=0; dir<SpaceDim; dir++)
-    {
-      if (!a_domain.isPeriodic(dir))
-        {
+  for (int dir=0; dir<SpaceDim; dir++) {
+
+      if (!a_domain.isPeriodic(dir)) {
+
           int rad = a_ghostVect[dir];
-          
-           // lo-side 
-           int hiLo = 0;
-	       // slc :: we need to do the low side one strip at 
-	       // at time so that strip n is filled before we
-           // extrapolate from it into strip n -1. 
-           Box  stripLo = adjCellLo(domainBox,  dir, 1);
-           // do this to try to catch corner cells
-	       stripLo.grow(rad);
-           stripLo.grow(dir,-rad);
-	  for (int i =0; i < rad; ++i)
-	    {
-	      Box ghostBoxLo = stripLo;
-	      ghostBoxLo &= a_phi.box();
-	      if (!ghostBoxLo.isEmpty())
-		{
-		  FORT_SIMPLEEXTRAPBC(CHF_FRA(a_phi),
-				      CHF_BOX(ghostBoxLo),
-				      CHF_INT(dir), 
-				      CHF_INT(hiLo));
-		}
-	      stripLo.shift(dir,-1);
-	    }
+
+          // lo-side 
+          int hiLo = 0;
+          // slc :: we need to do the low side one strip at 
+          // at time so that strip n is filled before we
+          // extrapolate from it into strip n -1. 
+          Box  stripLo = adjCellLo(domainBox,  
+                                   dir, 1);
+
+          // do this to try to catch corner cells
+          stripLo.grow(rad);
+          stripLo.grow(dir,-rad);
+
+          for (int i =0; i < rad; ++i) {
+              Box ghostBoxLo = stripLo;
+              ghostBoxLo &= a_phi.box();
+
+              if (!ghostBoxLo.isEmpty())
+              {
+                  FORT_SIMPLEEXTRAPBC(CHF_FRA(a_phi),
+                                      CHF_BOX(ghostBoxLo),
+                                      CHF_INT(dir), 
+                                      CHF_INT(hiLo));
+              }
+              stripLo.shift(dir,-1);
+          }
           
           // hi-side
           hiLo = 1;
@@ -70,15 +74,15 @@ ExtrapGhostCells(FArrayBox& a_phi,
           ghostBoxHi.grow(dir,-1);
           ghostBoxHi &= a_phi.box();
           if(!ghostBoxHi.isEmpty())
-            {
+          {
               FORT_SIMPLEEXTRAPBC(CHF_FRA(a_phi),
                                   CHF_BOX(ghostBoxHi),
                                   CHF_INT(dir), 
                                   CHF_INT(hiLo));
-            }
+          }
           
-        } // end if not periodic in this direction
-    } // end loop over directions
+      } // end if not periodic in this direction
+  } // end loop over directions
 }
 
 #include "NamespaceFooter.H"
