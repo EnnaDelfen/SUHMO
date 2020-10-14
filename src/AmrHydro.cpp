@@ -1397,12 +1397,12 @@ AmrHydro::timeStep(Real a_dt)
                     IntVect iv = bit();
                     meltR(iv, 0)  = m_suhmoParm->m_G; // / m_suhmoParm->m_L;
                     //meltR(iv, 0) += term in ub and stress  <-- TODO
-                    //meltR(iv, 0) -= m_suhmoParm->m_rho_w * m_suhmoParm->m_gravity * (
-                    //                Qwater(iv, 0) * gradH(iv, 0) + 
-                    //                Qwater(iv, 1) * gradH(iv, 1) ); 
-                    //meltR(iv, 0) -=  m_suhmoParm->m_ct * m_suhmoParm->m_cw * m_suhmoParm->m_rho_w * (
-                    //                Qwater(iv, 0) * gradPw(iv, 0) + 
-                    //                Qwater(iv, 1) * gradPw(iv, 1) );
+                    meltR(iv, 0) -= m_suhmoParm->m_rho_w * m_suhmoParm->m_gravity * (
+                                    Qwater(iv, 0) * gradH(iv, 0) + 
+                                    Qwater(iv, 1) * gradH(iv, 1) ); 
+                    meltR(iv, 0) -=  m_suhmoParm->m_ct * m_suhmoParm->m_cw * m_suhmoParm->m_rho_w * (
+                                    Qwater(iv, 0) * gradPw(iv, 0) + 
+                                    Qwater(iv, 1) * gradPw(iv, 1) );
                     meltR(iv, 0) = meltR(iv, 0) / m_suhmoParm->m_L;
                 }
             }
