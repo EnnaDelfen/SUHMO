@@ -18,7 +18,6 @@ ExtrapGhostCells(LevelData<FArrayBox>& a_phi,
                  const ProblemDomain& a_domain)
 {
     DataIterator dit = a_phi.dataIterator();
-    pout()<< "IN ExtrapGhostCells " <<endl;
     for (dit.begin(); dit.ok(); ++dit) {
           ExtrapGhostCells(a_phi[dit], a_domain, 
                            a_phi.ghostVect());
