@@ -165,6 +165,42 @@ void DirichletValue(Real* pos,
 }
 
 
+void FixedNeumBCFill(FArrayBox& a_state,
+            const Box& a_valid,
+            const ProblemDomain& a_domain,
+            Real a_dx)
+{
+  // If box is outside of domain bounds ?
+  if(!a_domain.domainBox().contains(a_state.box())) {
+
+      for(int dir=0; dir<CH_SPACEDIM; ++dir) {
+          // don't do anything if periodic -- should be perio in y dir 1
+          if (!a_domain.isPeriodic(dir)) {
+              Box ghostBoxLo = adjCellBox(a_valid, dir, Side::Lo, 1);
+              Box ghostBoxHi = adjCellBox(a_valid, dir, Side::Hi, 1);
+
+              if ((!a_domain.domainBox().contains(ghostBoxLo)) && (a_state.box().contains(ghostBoxLo)) ) {
+                  // Neum
+                  Box fromRegion = ghostBoxLo;
+                  int isign = sign(Side::Lo);
+                  fromRegion.shift(dir, -isign);
+                  a_state.copy(a_state, fromRegion, 0, ghostBoxLo, 0, a_state.nComp());
+              } // End ghostBoxLo in dir
+
+              if ((!a_domain.domainBox().contains(ghostBoxHi)) && (a_state.box().contains(ghostBoxHi)) ) {
+                  // Neum
+                  Box fromRegion = ghostBoxHi;
+                  int isign = sign(Side::Hi);
+                  fromRegion.shift(dir, -isign);
+                  a_state.copy(a_state, fromRegion, 0, ghostBoxHi, 0, a_state.nComp());
+              } // End ghostBoxHi in dir
+
+          } // end if is not periodic in ith direction
+      } // end dir loop
+  }
+}
+
+
 void BCFill(FArrayBox& a_state,
             const Box& a_valid,
             const ProblemDomain& a_domain,
@@ -1032,11 +1068,6 @@ AmrHydro::aCoeff_bCoeff_CC(LevelData<FArrayBox>&  levelacoef,
         aC.setVal(0.0);
         bC_cc.setVal(0.0);
 
-        //ForAllXBNN(Real, aC, aC.box(), 0, aC.nComp());
-        //{ 
-        //    aCR = 1.0; 
-        //}EndFor;
-
         BoxIterator bit(bC_cc.box()); 
         for (bit.begin(); bit.ok(); ++bit) {
             IntVect iv = bit();
@@ -1069,7 +1100,7 @@ AmrHydro::CalcRHS_head(LevelData<FArrayBox>& levelRHS_h,
        RHS.setVal(0.0);
        // first term
        RHS.copy(meltR, 0, 0, 1);
-       RHS *= 1.0 / ( m_suhmoParm->m_rho_w - m_suhmoParm->m_rho_i);
+       RHS *= (1.0 /  m_suhmoParm->m_rho_w - 1.0 / m_suhmoParm->m_rho_i);
        // third term ...
        Real ub_norm = std::sqrt(  m_suhmoParm->m_ub[0]*m_suhmoParm->m_ub[0] 
                                 + m_suhmoParm->m_ub[1]*m_suhmoParm->m_ub[1]) / m_suhmoParm->m_lr;
@@ -1119,9 +1150,7 @@ AmrHydro::CalcRHS_gapHeight(LevelData<FArrayBox>& levelRHS_b,
            }
            // second term ... assume  n = 3 !!
            Real PimPw = (Pressi(iv,0) - Pw(iv,0));
-           RHS(iv,0) -= m_suhmoParm->m_A * (PimPw) * (PimPw) * (PimPw) * B(iv,0);
-//DEBUG
-           RHS(iv,0) = 0.0;
+           RHS(iv,0) -= m_suhmoParm->m_A * std::pow(PimPw, 3) * B(iv,0);
        }
    }
 }
@@ -1146,17 +1175,11 @@ AmrHydro::timeStep(Real a_dt)
     // I Copy new h and new b into old h and old b
     // II BIG OUTER LOOP: h and b ...
     //     III SMALL OUTER LOOP: h calc
-    //         If first pass: 
-    //             Compute aCoeff and bCoeff_cc using old qtites
-    //             Form RHS for h using old qtites
-    //             bCoeff_cc -> bCoeff via CC->Edge
-    //             Solve for h using all old qtities
-    //             Put h into h_lag
-    //         Else:
-    //             Put h into h_lag
+    //         Fill GC of h
+    //         Put h into h_lag (GC too)
     //         Update water pressure Pw=f(h)
     //         Compute grad(h) and grad(Pw)
-    //         IV INNER LOOP: Re/Qw !!
+    //         IV INNER LOOP: Re/Qw !! (fixed nb of iter for now)
     //             Update VECTOR Qw = f(Re, grad(h))
     //             Update Re = f(Qw)
     //         Update melting rate = f(Qw, grad(h), grad(Pw))
@@ -1178,9 +1201,11 @@ AmrHydro::timeStep(Real a_dt)
     Vector<LevelData<FArrayBox>*> a_head_lagged;
     Vector<LevelData<FArrayBox>*> RHS_h;
     Vector<LevelData<FArrayBox>*> RHS_b;
+    Vector<LevelData<FArrayBox>*> a_ReQwIter;
+    a_head_lagged.resize(m_max_level + 1, NULL);
     RHS_h.resize(m_max_level + 1, NULL);
     RHS_b.resize(m_max_level + 1, NULL);
-    a_head_lagged.resize(m_max_level + 1, NULL);
+    a_ReQwIter.resize(m_max_level + 1, NULL);
     // alpha*aCoef(x)*I - beta*Div(bCoef(x)*Grad) -- note for us: alpha = 0 beta = 1 
     Vector<RefCountedPtr<LevelData<FArrayBox> > > aCoef(m_max_level + 1);
     Vector<RefCountedPtr<LevelData<FluxBox> > > bCoef(m_max_level + 1);
@@ -1195,8 +1220,9 @@ AmrHydro::timeStep(Real a_dt)
 
         LevelData<FArrayBox>& levelgradH = *m_gradhead[lev];
 
-        // fill internal ghost cells -- do nothing for b
+        // fill internal ghost cells
         currentH.exchange();
+        currentB.exchange();
 
         // Get the valid boxes
         const DisjointBoxLayout& levelGrids = m_amrGrids[lev];
@@ -1209,6 +1235,7 @@ AmrHydro::timeStep(Real a_dt)
 
             // Fill BC ghost cells of h  -- do nothing for b right now
             BCFill(currentH[dit], validBox, m_amrDomains[lev], m_amrDx[lev][0]);
+            FixedNeumBCFill(currentB[dit], validBox, m_amrDomains[lev], m_amrDx[lev][0]);
 
             // Copy curr into old -- copy ghost cells too 
             oldH[dit].copy(currentH[dit], 0, 0, 1);
@@ -1223,33 +1250,27 @@ AmrHydro::timeStep(Real a_dt)
         RHS_b[lev]         = new LevelData<FArrayBox>(m_amrGrids[lev], 1, IntVect::Zero);
         // Head lagged for iterations
         a_head_lagged[lev] = new LevelData<FArrayBox>(m_amrGrids[lev], 1, HeadGhostVect);
+        // Re/Qw iterations -- testing
+        a_ReQwIter[lev]    = new LevelData<FArrayBox>(m_amrGrids[lev], 1, HeadGhostVect);
         // Stuff for OpLin
         aCoef[lev] = RefCountedPtr<LevelData<FArrayBox> >(new LevelData<FArrayBox>(m_amrGrids[lev], 1, IntVect::Zero));
         bCoef[lev] = RefCountedPtr<LevelData<FluxBox> >(new LevelData<FluxBox>(m_amrGrids[lev], 1, IntVect::Zero));
     }
-    // GhostCells of b are garbage at this point if it's not first dt or it doesn't change
 
     /* II BIG OUTER LOOP: h and b ... */
 
     /*     III SMALL OUTER LOOP: h calc */
+    pout() <<"   ...Solve for h ! "<< endl;
     bool converged_h = false;
     int ite_idx = 0;
     while (!converged_h)
     { 
-        pout() <<"\n\n------------------------------------- "<< endl;
-        pout() <<"Iteration "<< ite_idx << endl;
-        pout() <<"------------------------------------- \n\n"<< endl;
-        
-        pout() <<"   ...Solve for h ! "<< endl;
+        pout() <<"   ------------------------------------- "<< endl;
+        pout() <<"     Iteration "<< ite_idx << endl;
+        pout() <<"   ------------------------------------- "<< endl;
         // Solve for h using lagged (iteration lagged) qtities
-        //         If first pass: 
-        //             Compute aCoeff and bCoeff_cc using old qtites
-        //             bCoeff_cc -> bCoeff via CC->Edge
-        //             Form RHS for h using old qtites
-        //             Solve for h using all old qtities
-        //             Put h into h_lag
-        //         Else:
-        //             Put h into h_lag
+        //         Fill GC of h
+        //         Put h into h_lag (GC too)
         for (int lev = 0; lev <= m_finest_level; lev++)
         {
             LevelData<FArrayBox>& levelcurH      = *m_head[lev];
@@ -1279,7 +1300,7 @@ AmrHydro::timeStep(Real a_dt)
         //         Update melting rate = f(Qw, grad(h), grad(Pw))
         for (int lev = 0; lev <= m_finest_level; lev++)
         {
-            LevelData<FArrayBox>& leveloldB  = *m_old_gapheight[lev];    
+            LevelData<FArrayBox>& leveloldB     = *m_old_gapheight[lev];    
 
             LevelData<FArrayBox>& levelcurrentH = *m_head[lev];
             LevelData<FArrayBox>& levelgradH    = *m_gradhead[lev];
@@ -1291,7 +1312,9 @@ AmrHydro::timeStep(Real a_dt)
             LevelData<FArrayBox>& levelzBed     = *m_bedelevation[lev];
             LevelData<FArrayBox>& levelgradZb   = *m_gradZb[lev];
 
-            DisjointBoxLayout& levelGrids    = m_amrGrids[lev];
+            LevelData<FArrayBox>& levelReQwIter = *a_ReQwIter[lev];
+
+            DisjointBoxLayout& levelGrids       = m_amrGrids[lev];
             DataIterator dit = levelGrids.dataIterator();
 
             // Update water pressure Pw=f(h)
@@ -1367,19 +1390,35 @@ AmrHydro::timeStep(Real a_dt)
                 FArrayBox& Re      = levelRe[dit];
 
                 BoxIterator bit(Qwater.box()); // can use gridBox? 
-                for (bit.begin(); bit.ok(); ++bit) {
-                    IntVect iv = bit();
-                    // Update water flux, using old-time Re
-                    Real num_q = - std::pow(oldB(iv, 0),3) * m_suhmoParm->m_gravity * gradH(iv, 0);
-                    Real denom_q = 12.0 * m_suhmoParm->m_nu * (1 + m_suhmoParm->m_omega * Re(iv, 0));
-                    Qwater(iv, 0) = num_q/denom_q;
-                    num_q = - std::pow(oldB(iv, 0),3) * m_suhmoParm->m_gravity * gradH(iv, 1);
-                    // 2nd comp (2D pb)
-                    Qwater(iv, 1) = num_q/denom_q;
-                    // Update Re using this new Qw ... short loop for now !!
-                    Re(iv, 0) = std::sqrt( Qwater(iv, 0) * Qwater(iv, 0) + Qwater(iv, 1) * Qwater(iv, 1)) / m_suhmoParm->m_nu;
-                    //pout() << "Cell "<< iv << currH(iv,0) << " " << gradH(iv,0) << " " << gradPw(iv,0) << endl;
+                int max_ite_Re = 5; 
+                Real max_Re_diff = 0.0;
+                for (int it = 0; it <= max_ite_Re; it++) {
+                    pout() << "           ------------------------" << endl;
+                    pout() << "           ite " << it;
+                    levelReQwIter[dit].copy(Re, 0, 0, 1);
+                    for (bit.begin(); bit.ok(); ++bit) {
+                        IntVect iv = bit();
+                        //pout() << "Re before " << Re(iv, 0);
+                        // Update water flux, using old-time Re
+                        Real num_q = - std::pow(oldB(iv, 0),3) * m_suhmoParm->m_gravity * gradH(iv, 0);
+                        Real denom_q = 12.0 * m_suhmoParm->m_nu * (1 + m_suhmoParm->m_omega * Re(iv, 0));
+                        Qwater(iv, 0) = num_q/denom_q;
+                        num_q = - std::pow(oldB(iv, 0),3) * m_suhmoParm->m_gravity * gradH(iv, 1);
+                        // 2nd comp (2D pb)
+                        Qwater(iv, 1) = num_q/denom_q;
+                        // Update Re using this new Qw ... short loop for now !!
+                        Re(iv, 0) = std::sqrt( Qwater(iv, 0) * Qwater(iv, 0) 
+                                             + Qwater(iv, 1) * Qwater(iv, 1)) / m_suhmoParm->m_nu;
+                        //pout() << " Re after " << Re(iv, 0) << endl;
+                        //pout() << "Cell "<< iv << currH(iv,0) << " " << gradH(iv,0) << " " << gradPw(iv,0) << endl;
+                        
+                    }
+                    levelReQwIter[dit].minus(Re, 0, 0, 1);
+                    levelReQwIter[dit].abs();
+                    max_Re_diff = levelReQwIter[dit].max();
+                    pout() << ", max : " << max_Re_diff << endl;
                 }
+                pout() << "           ------------------------" << endl;
             }
 
             //         Update melting rate = f(Qw, grad(h), grad(Pw))
@@ -1437,7 +1476,7 @@ AmrHydro::timeStep(Real a_dt)
         } // loop on levs
 
         // Solve for h using updated qtites
-        pout() <<"        Solve for h "<< endl;
+        pout() <<"        Poisson solve for h "<< endl;
         SolveForHead(m_amrGrids, aCoef, bCoef,
                      m_amrDomains[0], m_refinement_ratios, coarsestDx,
                      m_head, RHS_h);
@@ -1462,7 +1501,6 @@ AmrHydro::timeStep(Real a_dt)
         Real max_res = computeMax(a_head_lagged, m_refinement_ratios, Interval(0,0), 0);
         pout() <<ite_idx<< "         x "<<max_res<< endl;
 
-        // Do not exit if this is first pass
         if ((max_res < 1.0e-7) || (ite_idx > 20)) {
             if (ite_idx > 20) {
                 pout() <<"        does not converge."<< endl;
@@ -1521,6 +1559,7 @@ AmrHydro::timeStep(Real a_dt)
 
         ite_idx++;
 
+    pout() << endl;
     } // end while h solve
 
 
@@ -1567,14 +1606,8 @@ AmrHydro::timeStep(Real a_dt)
             for (bit.begin(); bit.ok(); ++bit) {
                 IntVect iv = bit(); 
                 newB(iv,0) = RHS(iv,0) * a_dt + oldB(iv,0);
+                //pout() << "old B " << oldB(iv,0) <<  "new B " << newB(iv,0) << endl;
             }
-
-            // DEBUG
-            //BoxIterator bit2(newB.box()); // can use gridBox? 
-            //for (bit2.begin(); bit2.ok(); ++bit2) {
-            //    IntVect iv = bit2();
-            //    pout() << "Cell "<< iv << " " << newB(iv,0) << endl;
-            //}
         }
         
     }  // loop on levs
