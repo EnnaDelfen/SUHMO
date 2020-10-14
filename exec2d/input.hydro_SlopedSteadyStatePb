@@ -1,8 +1,8 @@
 # main - driver.cpp
 main.domain_size=1000.00 1000.00 # physical dimensions of domain
 main.problem_type=basic
-main.maxTime=200000.0
-main.maxStep=50
+main.maxTime=2800000.0
+main.maxStep=720
 
 # bc - 0 = diri / 1 = neum
 bc.lo_bc = 0 0
@@ -30,16 +30,16 @@ suhmo.br = 0.1
 suhmo.lr = 2.0
 suhmo.A = 2.5e-25 #3.375e-24
 
-suhmo.slope = 0.1
+suhmo.slope = 0.02
 suhmo.GapInit = 0.01
-suhmo.ReInit = 10.0
+suhmo.ReInit = 100.0
 
 # class AmrHydro.cpp
 # misc
 AmrHydro.PrintCustom=false
 AmrHydro.verbosity=5
 # mesh and refinement
-AmrHydro.num_cells=128 128   # number of cells on coarsest domain
+AmrHydro.num_cells=64 64   # number of cells on coarsest domain
 AmrHydro.maxLevel=0
 AmrHydro.ref_ratios=2 2 2
 AmrHydro.block_factor=8
@@ -59,11 +59,11 @@ AmrHydro.tagging_val=1.0
 AmrHydro.cfl=0.5
 AmrHydro.initial_cfl=0.5
 AmrHydro.max_dt_grow_factor=1.1
-AmrHydro.fixed_dt=500.0 # over-ride dynamic dt computation 
+AmrHydro.fixed_dt=3600.0 # over-ride dynamic dt computation 
 AmrHydro.offsetTime=0.0
 # Typically -1 for never, 0 for last step only, or integer interval (number of steps)
 # Plot and output
-AmrHydro.plot_interval=2
+AmrHydro.plot_interval=100
 AmrHydro.plot_time_interval=0.0 # This is if we want to plot at a given time interval (rather than number of steps)
 AmrHydro.plot_prefix = plot
 AmrHydro.write_gradPhi=false
