@@ -1310,7 +1310,7 @@ AmrHydro::timeStep(Real a_dt)
             LevelData<FArrayBox>& levelQw       = *m_qw[lev]; 
             LevelData<FArrayBox>& levelRe       = *m_Re[lev]; 
             LevelData<FArrayBox>& levelzBed     = *m_bedelevation[lev];
-            LevelData<FArrayBox>& levelgradZb   = *m_gradZb[lev];
+            //LevelData<FArrayBox>& levelgradZb   = *m_gradZb[lev];
 
             LevelData<FArrayBox>& levelReQwIter = *a_ReQwIter[lev];
 
@@ -1393,8 +1393,8 @@ AmrHydro::timeStep(Real a_dt)
                 int max_ite_Re = 5; 
                 Real max_Re_diff = 0.0;
                 for (int it = 0; it <= max_ite_Re; it++) {
-                    pout() << "           ------------------------" << endl;
-                    pout() << "           ite " << it;
+                    //pout() << "           ------------------------" << endl;
+                    //pout() << "           ite " << it;
                     levelReQwIter[dit].copy(Re, 0, 0, 1);
                     for (bit.begin(); bit.ok(); ++bit) {
                         IntVect iv = bit();
@@ -1416,9 +1416,9 @@ AmrHydro::timeStep(Real a_dt)
                     levelReQwIter[dit].minus(Re, 0, 0, 1);
                     levelReQwIter[dit].abs();
                     max_Re_diff = levelReQwIter[dit].max();
-                    pout() << ", max : " << max_Re_diff << endl;
+                    //pout() << ", max : " << max_Re_diff << endl;
                 }
-                pout() << "           ------------------------" << endl;
+                //pout() << "           ------------------------" << endl;
             }
 
             //         Update melting rate = f(Qw, grad(h), grad(Pw))
@@ -1607,6 +1607,19 @@ AmrHydro::timeStep(Real a_dt)
                 IntVect iv = bit(); 
                 newB(iv,0) = RHS(iv,0) * a_dt + oldB(iv,0);
                 //pout() << "old B " << oldB(iv,0) <<  "new B " << newB(iv,0) << endl;
+            }
+        }
+        
+        // Temporal probe ...
+        LevelData<FArrayBox>& levelQw       = *m_qw[lev]; 
+        for (dit.begin(); dit.ok(); ++dit) {
+            BoxIterator bit(levelQw[dit].box()); 
+            for (bit.begin(); bit.ok(); ++bit) {
+                IntVect iv = bit(); 
+                if (iv == IntVect::Zero) {
+                    pout() << iv << " ** TimeStep " << m_cur_step << " Time " << m_time 
+                           <<" Temporal Qw " << levelQw[dit](iv,0) << " **"<< endl;
+                }
             }
         }
         
