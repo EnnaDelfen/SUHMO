@@ -72,7 +72,8 @@ HydroIBC::initializeData(RealVect& a_dx,
                            LevelData<FArrayBox>& a_meltRate,
                            LevelData<FArrayBox>& a_zbed,
                            LevelData<FArrayBox>& a_Pi,
-                           LevelData<FArrayBox>& a_iceHeight)
+                           LevelData<FArrayBox>& a_iceHeight,
+                           LevelData<FArrayBox>& a_Gradzbed)
 {
     
     pout() << "HydroIBC::initializeData" << endl;
@@ -92,6 +93,7 @@ HydroIBC::initializeData(RealVect& a_dx,
         FArrayBox& thiszbed      = a_zbed[dit];
         FArrayBox& thispi        = a_Pi[dit];
         FArrayBox& thisiceHeight = a_iceHeight[dit];
+        FArrayBox& thisGradzbed  = a_Gradzbed[dit];
 
         BoxIterator bit(thisHead.box()); // Default .box() have ghostcells ?
         for (bit.begin(); bit.ok(); ++bit)
@@ -100,7 +102,9 @@ HydroIBC::initializeData(RealVect& a_dx,
             Real x_loc = (iv[0]+0.5)*a_dx[0];
 
             // bed topography
-            thiszbed(iv, 0)      = std::max(Params.m_slope*x_loc, 0.0);
+            //thiszbed(iv, 0)      = std::max(Params.m_slope*x_loc, 0.0);
+            thiszbed(iv, 0)      = Params.m_slope*x_loc;
+            thisGradzbed(iv, 0)  = Params.m_slope;
             // initial gap height
             thisGapHeight(iv, 0) = Params.m_gapInit;
             // Ice height (should be ice only, so surface - (bed + gap))

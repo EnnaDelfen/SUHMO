@@ -186,10 +186,24 @@ void BCFill(FArrayBox& a_state,
               if ((!a_domain.domainBox().contains(ghostBoxLo)) && (a_state.box().contains(ghostBoxLo)) ) {
                   if (GlobalBCRS::s_bcLo[dir] == 0) {
                       // Diri
-                      BoxIterator bit(ghostBoxLo);
-                      for (bit.begin(); bit.ok(); ++bit) {
-                          IntVect iv = bit();
-                          a_state(iv, 0) = DirichletValue(dir, Side::Lo);
+                      //BoxIterator bit(ghostBoxLo);
+                      //for (bit.begin(); bit.ok(); ++bit) {
+                      //    IntVect iv = bit();
+                      //    a_state(iv, 0) = DirichletValue(dir, Side::Lo);
+                      //}
+                      ghostBoxLo &= a_state.box();
+                      int isign = sign(Side::Lo);
+                      for (BoxIterator bit(ghostBoxLo); bit.ok(); ++bit) {
+                          IntVect ivTo = bit();
+                          IntVect ivClose = ivTo -   isign*BASISV(dir);
+                          //IntVect ivFar   = ivTo - 2*isign*BASISV(dir);
+                          Real nearVal = a_state(ivClose, 0);
+                          //Real farVal  = a_state(ivFar,   0);
+                          Real inhomogVal = DirichletValue(dir, Side::Lo);
+                          // linear or quad
+                          Real ghostVal =  2.0 * inhomogVal - nearVal;
+                          //Real ghostVal =  (8.0 / 3.0) * inhomogVal + (1.0 / 3.0) * farVal - 2.0 * nearVal;
+                          a_state(ivTo, 0) = ghostVal;
                       }
                   } else if (GlobalBCRS::s_bcLo[dir] == 1) {
                       // Neum
@@ -203,10 +217,24 @@ void BCFill(FArrayBox& a_state,
               if ((!a_domain.domainBox().contains(ghostBoxHi)) && (a_state.box().contains(ghostBoxHi)) ) {
                   if (GlobalBCRS::s_bcHi[dir] == 0) {
                       // Diri
-                      BoxIterator bit(ghostBoxHi);
-                      for (bit.begin(); bit.ok(); ++bit) {
-                          IntVect iv = bit();
-                          a_state(iv, 0) = DirichletValue(dir, Side::Hi);
+                      //BoxIterator bit(ghostBoxHi);
+                      //for (bit.begin(); bit.ok(); ++bit) {
+                      //    IntVect iv = bit();
+                      //    a_state(iv, 0) = DirichletValue(dir, Side::Hi);
+                      //}
+                      ghostBoxHi &= a_state.box();
+                      int isign = sign(Side::Hi);
+                      for (BoxIterator bit(ghostBoxHi); bit.ok(); ++bit) {
+                          IntVect ivTo = bit();
+                          IntVect ivClose = ivTo -   isign*BASISV(dir);
+                          //IntVect ivFar   = ivTo - 2*isign*BASISV(dir);
+                          Real nearVal = a_state(ivClose, 0);
+                          //Real farVal  = a_state(ivFar,   0);
+                          Real inhomogVal = DirichletValue(dir, Side::Hi);
+                          // linear or quad
+                          Real ghostVal =  2.0 * inhomogVal - nearVal;
+                          //Real ghostVal =  (8.0 / 3.0) * inhomogVal + (1.0 / 3.0) * farVal - 2.0 * nearVal;
+                          a_state(ivTo, 0) = ghostVal;
                       }
                   } else if (GlobalBCRS::s_bcHi[dir] == 1) {
                       // Neum
@@ -459,6 +487,11 @@ AmrHydro::~AmrHydro()
         {
             delete m_bedelevation[lev];
             m_bedelevation[lev] = NULL;
+        }
+        if (m_gradZb[lev] != NULL)
+        {
+            delete m_gradZb[lev];
+            m_gradZb[lev] = NULL;
         }
         if (m_overburdenpress[lev] != NULL)
         {
@@ -781,6 +814,8 @@ AmrHydro::initialize()
         m_bedelevation.resize(m_max_level + 1, NULL);
         m_overburdenpress.resize(m_max_level + 1, NULL);
 
+        m_gradZb.resize(m_max_level + 1, NULL);
+
         //-------------------------------------------------
         // For each level, define a collection of FArrayBox
         //-------------------------------------------------
@@ -801,6 +836,8 @@ AmrHydro::initialize()
 
             m_bedelevation[lev] = new LevelData<FArrayBox>;
             m_overburdenpress[lev] = new LevelData<FArrayBox>;
+
+            m_gradZb[lev] = new LevelData<FArrayBox>;
         }
 
         int finest_level = -1;
@@ -1252,6 +1289,7 @@ AmrHydro::timeStep(Real a_dt)
             LevelData<FArrayBox>& levelQw       = *m_qw[lev]; 
             LevelData<FArrayBox>& levelRe       = *m_Re[lev]; 
             LevelData<FArrayBox>& levelzBed     = *m_bedelevation[lev];
+            LevelData<FArrayBox>& levelgradZb   = *m_gradZb[lev];
 
             DisjointBoxLayout& levelGrids    = m_amrGrids[lev];
             DataIterator dit = levelGrids.dataIterator();
@@ -1293,14 +1331,24 @@ AmrHydro::timeStep(Real a_dt)
                                      crsePsiPtr, finePsiPtr,
                                      dx, nRefCrse, nRefFine,
                                      m_amrDomains[lev]);
+            // Need to fill the ghost cells of gradH -- extrapolate on the no perio boundaries   
+            levelgradH.exchange();
+            ExtrapGhostCells( levelgradH, m_amrDomains[0]);
+
             Gradient::compGradientCC(levelgradPw, levelPw,
                                      crsePsiPtr, finePsiPtr,
                                      dx, nRefCrse, nRefFine,
                                      m_amrDomains[lev]);
-
-            // Need to fill the ghost cells of gradH -- extrapolate on the no perio boundaries   
-            levelgradH.exchange();
-            ExtrapGhostCells( levelgradH, m_amrDomains[0]);
+            //for (dit.begin(); dit.ok(); ++dit) {
+            //    FArrayBox& gradPw   = levelgradPw[dit];
+            //    FArrayBox& gradH    = levelgradH[dit];
+            //    FArrayBox& gradZb   = levelgradZb[dit];
+            //    BoxIterator bit(gradPw.box()); // can use gridBox? 
+            //    for (bit.begin(); bit.ok(); ++bit) {
+            //        IntVect iv = bit();
+            //        gradPw(iv,0) = m_suhmoParm->m_rho_w * m_suhmoParm->m_gravity * ( gradH(iv,0) - gradZb(iv,0) );
+            //    }
+            //}
             levelgradPw.exchange();
             ExtrapGhostCells( levelgradPw, m_amrDomains[0]);
 
@@ -1313,6 +1361,7 @@ AmrHydro::timeStep(Real a_dt)
                 //FArrayBox& currH   = levelcurrentH[dit];
 
                 FArrayBox& gradH   = levelgradH[dit];
+                //FArrayBox& gradPw  = levelgradPw[dit];
 
                 FArrayBox& Qwater  = levelQw[dit];
                 FArrayBox& Re      = levelRe[dit];
@@ -1329,7 +1378,7 @@ AmrHydro::timeStep(Real a_dt)
                     Qwater(iv, 1) = num_q/denom_q;
                     // Update Re using this new Qw ... short loop for now !!
                     Re(iv, 0) = std::sqrt( Qwater(iv, 0) * Qwater(iv, 0) + Qwater(iv, 1) * Qwater(iv, 1)) / m_suhmoParm->m_nu;
-                    //pout() << "Cell "<< iv << currH(iv,0) << " " << gradH(iv,0) << " " << gradH(iv,1) << endl;
+                    //pout() << "Cell "<< iv << currH(iv,0) << " " << gradH(iv,0) << " " << gradPw(iv,0) << endl;
                 }
             }
 
@@ -2405,6 +2454,7 @@ AmrHydro::levelSetup(int a_level, const DisjointBoxLayout& a_grids)
         m_iceheight[a_level] = new LevelData<FArrayBox>(a_grids, nPhiComp, HeadGhostVect);
         m_bedelevation[a_level] = new LevelData<FArrayBox>(a_grids, nPhiComp, HeadGhostVect);
         m_overburdenpress[a_level] = new LevelData<FArrayBox>(a_grids, nPhiComp, HeadGhostVect);
+        m_gradZb[a_level] = new LevelData<FArrayBox>(a_grids, nPhiComp, HeadGhostVect);
     }
     else
     {
@@ -2466,6 +2516,7 @@ AmrHydro::initData(Vector<LevelData<FArrayBox>*>& a_head)
         LevelData<FArrayBox>& levelIceHeight = *m_iceheight[lev];
         LevelData<FArrayBox>& levelzBed      = *m_bedelevation[lev];
         LevelData<FArrayBox>& levelPi        = *m_overburdenpress[lev];
+        LevelData<FArrayBox>& levelgradzBed  = *m_gradZb[lev];
         if (lev > 0)
         {
             // AF: !!! deal with multiple levels later !!!
@@ -2503,7 +2554,7 @@ AmrHydro::initData(Vector<LevelData<FArrayBox>*>& a_head)
                                  levelPw, levelqw,
                                  levelRe, levelmR,
                                  levelzBed, levelPi,
-                                 levelIceHeight);
+                                 levelIceHeight, levelgradzBed);
 
         // initialize oldPhi to be the current value
         levelHead.copyTo(*m_old_head[lev]);

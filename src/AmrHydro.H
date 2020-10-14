@@ -403,6 +403,8 @@ protected:
     Vector<LevelData<FArrayBox>*> m_bedelevation;           //
     Vector<LevelData<FArrayBox>*> m_overburdenpress;        // rhoi*g*H
 
+    Vector<LevelData<FArrayBox>*> m_gradZb;        // rhoi*g*H
+
 
     /* Solver */
     //VCAMRPoissonOp2Factory* m_poisson_h;
