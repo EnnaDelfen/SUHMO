@@ -372,7 +372,7 @@ AmrHydro::SolveForHead(
                       &mixBCValues, //bc
                       0.0,
                       a_aCoef,
-                      -1.0,
+                      1.0,
                       a_bCoef);
 
     RefCountedPtr< AMRLevelOpFactory<LevelData<FArrayBox> > > opFactoryPtr(poissonOpF_head);
@@ -1072,7 +1072,7 @@ AmrHydro::aCoeff_bCoeff_CC(LevelData<FArrayBox>&  levelacoef,
         for (bit.begin(); bit.ok(); ++bit) {
             IntVect iv = bit();
             // Update b coeff
-            Real num_q = std::pow(B(iv, 0),3) * m_suhmoParm->m_gravity;
+            Real num_q = - std::pow(B(iv, 0),3) * m_suhmoParm->m_gravity;
             Real denom_q = 12.0 * m_suhmoParm->m_nu * (1 + m_suhmoParm->m_omega * Re(iv, 0));
             bC_cc(iv, 0) = num_q/denom_q;
         }
@@ -1112,7 +1112,8 @@ AmrHydro::CalcRHS_head(LevelData<FArrayBox>& levelRHS_h,
            }
            // second term ... assume  n = 3 !!
            Real PimPw = (Pressi(iv,0) - Pw(iv,0));
-           RHS(iv,0) += m_suhmoParm->m_A * std::pow(PimPw, 3) * B(iv,0);
+           Real AbsPimPw = std::abs(PimPw);
+           RHS(iv,0) += m_suhmoParm->m_A * std::pow(AbsPimPw, 2) * PimPw * B(iv,0);
        }
    }
 }
@@ -1150,7 +1151,8 @@ AmrHydro::CalcRHS_gapHeight(LevelData<FArrayBox>& levelRHS_b,
            }
            // second term ... assume  n = 3 !!
            Real PimPw = (Pressi(iv,0) - Pw(iv,0));
-           RHS(iv,0) -= m_suhmoParm->m_A * std::pow(PimPw, 3) * B(iv,0);
+           Real AbsPimPw = std::abs(PimPw);
+           RHS(iv,0) -= m_suhmoParm->m_A * std::pow(AbsPimPw, 2) * PimPw * B(iv,0);
        }
    }
 }
