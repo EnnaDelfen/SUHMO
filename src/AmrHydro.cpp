@@ -1116,9 +1116,9 @@ AmrHydro::CalcRHS_head(LevelData<FArrayBox>& levelRHS_h,
            Real PimPw = (Pressi(iv,0) - Pw(iv,0));
            Real AbsPimPw = std::abs(PimPw);
            RHS(iv,0) += m_suhmoParm->m_A * std::pow(AbsPimPw, 2) * PimPw * B(iv,0);
-           //if ( (iv[0] == 15) && (iv[1] == 15) ) {
-           //    pout() << "Moulin location "<< iv << endl;
-           //    RHS(iv,0) += 4.0 / (30. * 30. );  // m3s-1 / m2
+           //if ( (iv[0] == 32) && (iv[1] == 32) ) {
+           //    //pout() << "Moulin location "<< iv << endl;
+           //    RHS(iv,0) += 4.0 / (m_amrDx[0][0] * m_amrDx[0][1]);  // m3s-1 / m2
            //}
        }
    }
@@ -1207,14 +1207,16 @@ AmrHydro::timeStep(Real a_dt)
 
     // Also create and initialize tmp vectors
     Vector<LevelData<FArrayBox>*> a_head_lagged;
+    Vector<LevelData<FArrayBox>*> a_gapheight_lagged;
     Vector<LevelData<FArrayBox>*> RHS_h;
     Vector<LevelData<FArrayBox>*> RHS_b;
     Vector<LevelData<FArrayBox>*> a_ReQwIter;
     a_head_lagged.resize(m_max_level + 1, NULL);
+    a_gapheight_lagged.resize(m_max_level + 1, NULL);
     RHS_h.resize(m_max_level + 1, NULL);
     RHS_b.resize(m_max_level + 1, NULL);
     a_ReQwIter.resize(m_max_level + 1, NULL);
-    // alpha*aCoef(x)*I - beta*Div(bCoef(x)*Grad) -- note for us: alpha = 0 beta = 1 
+    // alpha*aCoef(x)*I - beta*Div(bCoef(x)*Grad) -- note for us: alpha = 0 beta = - 1 
     Vector<RefCountedPtr<LevelData<FArrayBox> > > aCoef(m_max_level + 1);
     Vector<RefCountedPtr<LevelData<FluxBox> > > bCoef(m_max_level + 1);
     pout() <<"   ...Copy current into old & take care of ghost cells and BCs "<< endl;
@@ -1241,7 +1243,7 @@ AmrHydro::timeStep(Real a_dt)
             // get the validBox
             const Box& validBox = levelGrids.get(dit);
 
-            // Fill BC ghost cells of h  -- do nothing for b right now
+            // Fill BC ghost cells of h and b
             BCFill(currentH[dit], validBox, m_amrDomains[lev], m_amrDx[lev][0]);
             FixedNeumBCFill(currentB[dit], validBox, m_amrDomains[lev], m_amrDx[lev][0]);
 
@@ -1253,11 +1255,12 @@ AmrHydro::timeStep(Real a_dt)
             levelgradH[dit].setVal(0.0);
         }
 
-        // Head RHS
+        // Head and b RHS
         RHS_h[lev]         = new LevelData<FArrayBox>(m_amrGrids[lev], 1, IntVect::Zero);
         RHS_b[lev]         = new LevelData<FArrayBox>(m_amrGrids[lev], 1, IntVect::Zero);
-        // Head lagged for iterations
-        a_head_lagged[lev] = new LevelData<FArrayBox>(m_amrGrids[lev], 1, HeadGhostVect);
+        // Head and B lagged for iterations
+        a_head_lagged[lev]      = new LevelData<FArrayBox>(m_amrGrids[lev], 1, HeadGhostVect);
+        a_gapheight_lagged[lev] = new LevelData<FArrayBox>(m_amrGrids[lev], 1, HeadGhostVect);
         // Re/Qw iterations -- testing
         a_ReQwIter[lev]    = new LevelData<FArrayBox>(m_amrGrids[lev], 1, HeadGhostVect);
         // Stuff for OpLin
@@ -1283,11 +1286,16 @@ AmrHydro::timeStep(Real a_dt)
         {
             LevelData<FArrayBox>& levelcurH      = *m_head[lev];
             LevelData<FArrayBox>& levelnewH_lag  = *a_head_lagged[lev];
+
+            LevelData<FArrayBox>& levelcurB      = *m_gapheight[lev];
+            LevelData<FArrayBox>& levelnewB_lag  = *a_gapheight_lagged[lev];
+
             // Get the valid boxes
             const DisjointBoxLayout& levelGrids = m_amrGrids[lev];
 
             // fill internal ghost cells
             levelcurH.exchange();
+            levelcurB.exchange();
 
             // Put h into h_lag
             DataIterator dit = levelnewH_lag.dataIterator();
@@ -1295,8 +1303,10 @@ AmrHydro::timeStep(Real a_dt)
                 // get the validBox & fill BC ghost cells
                 const Box& validBox = levelGrids.get(dit);
                 BCFill(levelcurH[dit], validBox, m_amrDomains[lev], m_amrDx[lev][0]);
+                FixedNeumBCFill(levelcurB[dit], validBox, m_amrDomains[lev], m_amrDx[lev][0]);
 
                 levelnewH_lag[dit].copy(levelcurH[dit], 0, 0, 1); // should copy ghost cells too !
+                levelnewB_lag[dit].copy(levelcurB[dit], 0, 0, 1); // should copy ghost cells too !
             }
         }  // loop on levs
 
@@ -1308,7 +1318,7 @@ AmrHydro::timeStep(Real a_dt)
         //         Update melting rate = f(Qw, grad(h), grad(Pw))
         for (int lev = 0; lev <= m_finest_level; lev++)
         {
-            LevelData<FArrayBox>& leveloldB     = *m_old_gapheight[lev];    
+            LevelData<FArrayBox>& levelB        = *m_gapheight[lev];    
 
             LevelData<FArrayBox>& levelcurrentH = *m_head[lev];
             LevelData<FArrayBox>& levelgradH    = *m_gradhead[lev];
@@ -1388,7 +1398,7 @@ AmrHydro::timeStep(Real a_dt)
             //             Update Re = f(Qw)
             pout() <<"        Re/Qw dependency "<< endl;
             for (dit.begin(); dit.ok(); ++dit) {
-                FArrayBox& oldB    = leveloldB[dit];
+                FArrayBox& oldB    = levelB[dit];
                 //FArrayBox& currH   = levelcurrentH[dit];
 
                 FArrayBox& gradH   = levelgradH[dit];
@@ -1460,7 +1470,7 @@ AmrHydro::timeStep(Real a_dt)
         //         Compute aCoeff and bCoeff_cc, RHS and solve for h again
         for (int lev = 0; lev <= m_finest_level; lev++)
         {
-            LevelData<FArrayBox>& leveloldB  = *m_old_gapheight[lev];    
+            LevelData<FArrayBox>& levelB     = *m_gapheight[lev];    
 
             LevelData<FArrayBox>& levelacoef = *aCoef[lev];
             LevelData<FluxBox>&   levelbcoef = *bCoef[lev];
@@ -1474,13 +1484,13 @@ AmrHydro::timeStep(Real a_dt)
             LevelData<FArrayBox> levelbcoef_cc(m_amrGrids[lev], 1, IntVect::Unit);
 
             // Compute aCoeff and bCoeff_cc using updated qtites
-            aCoeff_bCoeff_CC(levelacoef, levelbcoef_cc, levelRe, leveloldB);
+            aCoeff_bCoeff_CC(levelacoef, levelbcoef_cc, levelRe, levelB);
             // bCoeff_cc -> bCoeff via CC->Edge
             CellToEdge(levelbcoef_cc, levelbcoef);
             // Form RHS for h using updated qtites
             CalcRHS_head(levelRHS_h, levelPi, 
                          levelPw, levelmR, 
-                         leveloldB);
+                         levelB);
         } // loop on levs
 
         // Solve for h using updated qtites
@@ -1490,34 +1500,93 @@ AmrHydro::timeStep(Real a_dt)
                      m_head, RHS_h);
 
 
-        //         Check convergence using h and h_lag
+        /* TRY TO SOLVE FOR B IN THE LOOP */
+        //     Form RHS for b -- using b of current Picard iteration
+        pout() <<"   ...Solve for b ! "<< endl;
+        int gh_method = 0; // 0: backward Euler, 1:...
+        for (int lev = m_finest_level; lev >= 0; lev--)
+        {
+            LevelData<FArrayBox>& levelB     = *m_gapheight[lev];    
+
+            LevelData<FArrayBox>& levelmR    = *m_meltRate[lev];
+            LevelData<FArrayBox>& levelPw    = *m_Pw[lev];
+            LevelData<FArrayBox>& levelPi    = *m_overburdenpress[lev];
+
+            LevelData<FArrayBox>& levelRHS_b = *RHS_b[lev];
+
+            // 2. a : Get the RHS of gh eqs:
+            CalcRHS_gapHeight(levelRHS_b, levelPi, 
+                              levelPw, levelmR, 
+                              levelB);
+        }  // loop on levs
+
+        //     Solve for b using Forward Euler simple scheme -- use OLD b here
+        pout() <<"        Update gap height with expl Euler scheme"<< endl;
+        for (int lev = m_finest_level; lev >= 0; lev--)
+        {
+            LevelData<FArrayBox>& leveloldB  = *m_old_gapheight[lev];    
+            LevelData<FArrayBox>& levelnewB  = *m_gapheight[lev];    
+
+            LevelData<FArrayBox>& levelRHS_b = *RHS_b[lev];
+
+            // 2. b : update gap height
+            DisjointBoxLayout& levelGrids    = m_amrGrids[lev];
+            DataIterator dit = levelGrids.dataIterator();
+            for (dit.begin(); dit.ok(); ++dit) {
+ 
+                FArrayBox& oldB    = leveloldB[dit];
+                FArrayBox& newB    = levelnewB[dit];
+                FArrayBox& RHS     = levelRHS_b[dit];
+
+                // DO NOT TOUCH GHOST CELLS
+                BoxIterator bit(RHS.box()); 
+                for (bit.begin(); bit.ok(); ++bit) {
+                    IntVect iv = bit(); 
+                    newB(iv,0) = RHS(iv,0) * a_dt + oldB(iv,0);
+                    //pout() << "old B " << oldB(iv,0) <<  "new B " << newB(iv,0) << endl;
+                }
+            }
+        }  // loop on levs
+
+
+        /* CONVERGENCE TESTS with LAGGED quantities */
         Real maxHead = computeMax(m_head, m_refinement_ratios, Interval(0,0), 0);
-        pout() <<"        Check for convergence of h (max head is "<< maxHead<<")"<<endl;
+        Real maxb    = computeMax(m_gapheight, m_refinement_ratios, Interval(0,0), 0);
+        pout() <<"        Check for convergence of h,b (max are "<< maxHead<<" "<< maxb <<")"<<endl;
         for (int lev = 0; lev <= m_finest_level; lev++)
         {
             LevelData<FArrayBox>& levelnewH_lag  = *a_head_lagged[lev];
             LevelData<FArrayBox>& levelcurrentH  = *m_head[lev];
-            // put "res" in a_head_lagged
+            LevelData<FArrayBox>& levelnewB_lag  = *a_gapheight_lagged[lev];
+            LevelData<FArrayBox>& levelcurrentB  = *m_gapheight[lev];
+
             DataIterator dit = levelnewH_lag.dataIterator();
             for (dit.begin(); dit.ok(); ++dit) {
                 levelnewH_lag[dit].minus(levelcurrentH[dit], 0, 0, 1);
                 levelnewH_lag[dit].divide(maxHead);
                 levelnewH_lag[dit].abs();
+
+                levelnewB_lag[dit].minus(levelcurrentB[dit], 0, 0, 1);
+                levelnewB_lag[dit].divide(maxb);
+                levelnewB_lag[dit].abs();
             }
         }
         //Real max_res = computeNorm(a_head_lagged, m_refinement_ratios , coarsestDx, Interval(0,0), 0, 0);
-        Real max_res = computeMax(a_head_lagged, m_refinement_ratios, Interval(0,0), 0);
-        pout() <<ite_idx<< "         x "<<max_res<< endl;
+        Real max_resH = computeMax(a_head_lagged, m_refinement_ratios, Interval(0,0), 0);
+        Real max_resB = computeMax(a_gapheight_lagged, m_refinement_ratios, Interval(0,0), 0);
+        pout() <<ite_idx<< "         x(h,b) "<<max_resH<<" "<<max_resB<<endl;
 
-        if ((max_res < 5.0e-6) || (ite_idx > 100)) {
+        //if (ite_idx > 1) {
             if (ite_idx > 100) {
                 pout() <<"        does not converge."<< endl;
                 MayDay::Error("Abort");
             } else {
-                pout() <<"        converged."<< endl;
-                converged_h = true;
+                if ((max_resH < 1.0e-6) && (max_resB < 1.0e-6)) {
+                    pout() <<"        converged."<< endl;
+                    converged_h = true;
+                }
             }
-        }
+        //}
      
         // custom plt here
         // debug print
@@ -1566,60 +1635,18 @@ AmrHydro::timeStep(Real a_dt)
         }
 
         ite_idx++;
-
-    pout() << endl;
+        pout() << endl;
     } // end while h solve
 
 
-    //     Form RHS for b
-    pout() <<"   ...Solve for b ! "<< endl;
-    int gh_method = 0; // 0: backward Euler, 1:...
+     // Temporal probe ...
     for (int lev = m_finest_level; lev >= 0; lev--)
     {
-        LevelData<FArrayBox>& leveloldB  = *m_old_gapheight[lev];    
+        LevelData<FArrayBox>& levelQw       = *m_qw[lev]; 
 
-        LevelData<FArrayBox>& levelmR    = *m_meltRate[lev];
-        LevelData<FArrayBox>& levelPw    = *m_Pw[lev];
-        LevelData<FArrayBox>& levelPi    = *m_overburdenpress[lev];
-
-        LevelData<FArrayBox>& levelRHS_b = *RHS_b[lev];
-
-        // 2. a : Get the RHS of gh eqs:
-        CalcRHS_gapHeight(levelRHS_b, levelPi, 
-                          levelPw, levelmR, 
-                          leveloldB);
-    }  // loop on levs
-
-
-    //     Solve for b using Forward Euler simple scheme
-    pout() <<"        Update gap height with expl Euler scheme"<< endl;
-    for (int lev = m_finest_level; lev >= 0; lev--)
-    {
-        LevelData<FArrayBox>& leveloldB  = *m_old_gapheight[lev];    
-        LevelData<FArrayBox>& levelnewB  = *m_gapheight[lev];    
-
-        LevelData<FArrayBox>& levelRHS_b = *RHS_b[lev];
-
-        // 2. b : update gap height
         DisjointBoxLayout& levelGrids    = m_amrGrids[lev];
         DataIterator dit = levelGrids.dataIterator();
-        for (dit.begin(); dit.ok(); ++dit) {
-
-            FArrayBox& oldB    = leveloldB[dit];
-            FArrayBox& newB    = levelnewB[dit];
-            FArrayBox& RHS     = levelRHS_b[dit];
-
-            // DO NOT TOUCH GHOST CELLS
-            BoxIterator bit(RHS.box()); 
-            for (bit.begin(); bit.ok(); ++bit) {
-                IntVect iv = bit(); 
-                newB(iv,0) = RHS(iv,0) * a_dt + oldB(iv,0);
-                //pout() << "old B " << oldB(iv,0) <<  "new B " << newB(iv,0) << endl;
-            }
-        }
         
-        // Temporal probe ...
-        LevelData<FArrayBox>& levelQw       = *m_qw[lev]; 
         for (dit.begin(); dit.ok(); ++dit) {
             BoxIterator bit(levelQw[dit].box()); 
             for (bit.begin(); bit.ok(); ++bit) {
@@ -1630,7 +1657,6 @@ AmrHydro::timeStep(Real a_dt)
                 }
             }
         }
-        
     }  // loop on levs
 
     // allocate face-centered storage
