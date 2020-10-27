@@ -372,7 +372,7 @@ AmrHydro::SolveForHead(
                       &mixBCValues, //bc
                       0.0,
                       a_aCoef,
-                      1.0,
+                      - 1.0,
                       a_bCoef);
 
     RefCountedPtr< AMRLevelOpFactory<LevelData<FArrayBox> > > opFactoryPtr(poissonOpF_head);
@@ -1107,6 +1107,8 @@ AmrHydro::CalcRHS_head(LevelData<FArrayBox>& levelRHS_h,
        BoxIterator bit(RHS.box()); // can use gridBox? 
        for (bit.begin(); bit.ok(); ++bit) {
            IntVect iv = bit();
+           Real x_loc = (iv[0]+0.5)*m_amrDx[0][0];
+           Real y_loc = (iv[1]+0.5)*m_amrDx[0][1];
            if ( B(iv,0) < m_suhmoParm->m_br) {
                RHS(iv,0) -= ub_norm * (m_suhmoParm->m_br - B(iv,0));
            }
@@ -1114,6 +1116,10 @@ AmrHydro::CalcRHS_head(LevelData<FArrayBox>& levelRHS_h,
            Real PimPw = (Pressi(iv,0) - Pw(iv,0));
            Real AbsPimPw = std::abs(PimPw);
            RHS(iv,0) += m_suhmoParm->m_A * std::pow(AbsPimPw, 2) * PimPw * B(iv,0);
+           //if ( (iv[0] == 15) && (iv[1] == 15) ) {
+           //    pout() << "Moulin location "<< iv << endl;
+           //    RHS(iv,0) += 4.0 / (30. * 30. );  // m3s-1 / m2
+           //}
        }
    }
 }
@@ -1503,8 +1509,8 @@ AmrHydro::timeStep(Real a_dt)
         Real max_res = computeMax(a_head_lagged, m_refinement_ratios, Interval(0,0), 0);
         pout() <<ite_idx<< "         x "<<max_res<< endl;
 
-        if ((max_res < 1.0e-7) || (ite_idx > 20)) {
-            if (ite_idx > 20) {
+        if ((max_res < 5.0e-6) || (ite_idx > 100)) {
+            if (ite_idx > 100) {
                 pout() <<"        does not converge."<< endl;
                 MayDay::Error("Abort");
             } else {
