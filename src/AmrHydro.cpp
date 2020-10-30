@@ -1116,10 +1116,10 @@ AmrHydro::CalcRHS_head(LevelData<FArrayBox>& levelRHS_h,
            Real PimPw = (Pressi(iv,0) - Pw(iv,0));
            Real AbsPimPw = std::abs(PimPw);
            RHS(iv,0) += m_suhmoParm->m_A * std::pow(AbsPimPw, 2) * PimPw * B(iv,0);
-           //if ( (iv[0] == 32) && (iv[1] == 32) ) {
-           //    //pout() << "Moulin location "<< iv << endl;
-           //    RHS(iv,0) += 4.0 / (m_amrDx[0][0] * m_amrDx[0][1]);  // m3s-1 / m2
-           //}
+           if ( (iv[0] == 32) && (iv[1] == 32) ) {
+               //pout() << "Moulin location "<< iv << endl;
+               RHS(iv,0) += 4.0 / (m_amrDx[0][0] * m_amrDx[0][1]);  // m3s-1 / m2
+           }
        }
    }
 }
@@ -1577,7 +1577,7 @@ AmrHydro::timeStep(Real a_dt)
         pout() <<ite_idx<< "         x(h,b) "<<max_resH<<" "<<max_resB<<endl;
 
         //if (ite_idx > 1) {
-            if (ite_idx > 100) {
+            if (ite_idx > 500) {
                 pout() <<"        does not converge."<< endl;
                 MayDay::Error("Abort");
             } else {
@@ -1592,24 +1592,36 @@ AmrHydro::timeStep(Real a_dt)
         // debug print
         if (m_PrintCustom) {
             Vector<std::string> vectName;
-            vectName.resize(5);
+            vectName.resize(8);
             vectName[0]="head";
             vectName[1]="gapHeight";
             vectName[2]="bedelevation";
             vectName[3]="head_residual";
-            vectName[4]="RHS_head";
+            vectName[4]="gapHeight_residual";
+            vectName[5]="RHS_head";
+            vectName[6]="RHS_b";
+            vectName[7]="gradH";
+            //vectName[8]="gradPw";
             Vector<Vector<LevelData<FArrayBox>*>> stuffToPlot;
-            stuffToPlot.resize(5);
+            stuffToPlot.resize(8);
             stuffToPlot[0].resize(m_max_level + 1, NULL);
             stuffToPlot[1].resize(m_max_level + 1, NULL);
             stuffToPlot[2].resize(m_max_level + 1, NULL);
             stuffToPlot[3].resize(m_max_level + 1, NULL);
             stuffToPlot[4].resize(m_max_level + 1, NULL);
+            stuffToPlot[5].resize(m_max_level + 1, NULL);
+            stuffToPlot[6].resize(m_max_level + 1, NULL);
+            stuffToPlot[7].resize(m_max_level + 1, NULL);
+            //stuffToPlot[8].resize(m_max_level + 1, NULL);
             stuffToPlot[0][0]  = new LevelData<FArrayBox>(m_amrGrids[0], 1, m_num_head_ghost * IntVect::Unit);
             stuffToPlot[1][0]  = new LevelData<FArrayBox>(m_amrGrids[0], 1, m_num_head_ghost * IntVect::Unit);
             stuffToPlot[2][0]  = new LevelData<FArrayBox>(m_amrGrids[0], 1, m_num_head_ghost * IntVect::Unit);
             stuffToPlot[3][0]  = new LevelData<FArrayBox>(m_amrGrids[0], 1, m_num_head_ghost * IntVect::Unit);
-            stuffToPlot[4][0]  = new LevelData<FArrayBox>(m_amrGrids[0], 1, IntVect::Zero);
+            stuffToPlot[4][0]  = new LevelData<FArrayBox>(m_amrGrids[0], 1, m_num_head_ghost * IntVect::Unit);
+            stuffToPlot[5][0]  = new LevelData<FArrayBox>(m_amrGrids[0], 1, IntVect::Zero);
+            stuffToPlot[6][0]  = new LevelData<FArrayBox>(m_amrGrids[0], 1, IntVect::Zero);
+            stuffToPlot[7][0]  = new LevelData<FArrayBox>(m_amrGrids[0], 1, m_num_head_ghost * IntVect::Unit);
+            //stuffToPlot[8][0]  = new LevelData<FArrayBox>(m_amrGrids[0], 1, IntVect::Zero);
             for (int lev = 0; lev <= m_finest_level; lev++)
             {
                 LevelData<FArrayBox>& levelHead      = *m_head[lev];
@@ -1618,20 +1630,39 @@ AmrHydro::timeStep(Real a_dt)
                 LevelData<FArrayBox>& levelGapSTP    = *stuffToPlot[1][lev];
                 LevelData<FArrayBox>& levelzBed      = *m_bedelevation[lev];
                 LevelData<FArrayBox>& levelZbSTP     = *stuffToPlot[2][lev];
+
                 LevelData<FArrayBox>& levelRes       = *a_head_lagged[lev];
                 LevelData<FArrayBox>& levelResSTP    = *stuffToPlot[3][lev];
+                LevelData<FArrayBox>& levelResB      = *a_gapheight_lagged[lev];
+                LevelData<FArrayBox>& levelResBSTP   = *stuffToPlot[4][lev];
+
                 LevelData<FArrayBox>& levelRHS       = *RHS_h[lev];
-                LevelData<FArrayBox>& levelRHSSTP    = *stuffToPlot[4][lev];
+                LevelData<FArrayBox>& levelRHSSTP    = *stuffToPlot[5][lev];
+                LevelData<FArrayBox>& levelRHSB      = *RHS_b[lev];
+                LevelData<FArrayBox>& levelRHSBSTP   = *stuffToPlot[6][lev];
+
+                LevelData<FArrayBox>& levelGradH     = *m_gradhead[lev];
+                LevelData<FArrayBox>& levelgHSTP     = *stuffToPlot[7][lev];
+                //LevelData<FArrayBox>& levelGradPw    = *RHS_b[lev];
+                //LevelData<FArrayBox>& levelgPwSTP    = *stuffToPlot[8][lev];
+
                 DataIterator dit = levelHead.dataIterator();
                 for (dit.begin(); dit.ok(); ++dit) {
+
                     levelHeadSTP[dit].copy(levelHead[dit], 0, 0, 1);
                     levelGapSTP[dit].copy(levelGap[dit], 0, 0, 1);
                     levelZbSTP[dit].copy(levelzBed[dit], 0, 0, 1);
+
                     levelResSTP[dit].copy(levelRes[dit], 0, 0, 1);
+                    levelResBSTP[dit].copy(levelResB[dit], 0, 0, 1);
+
                     levelRHSSTP[dit].copy(levelRHS[dit], 0, 0, 1);
+                    levelRHSBSTP[dit].copy(levelRHSB[dit], 0, 0, 1);
+
+                    levelgHSTP[dit].copy(levelGradH[dit], 0, 0, 1);
                 }
             } // loop on levs
-            writePltCustom(5, vectName, stuffToPlot, std::to_string(ite_idx));
+            writePltCustom(8, vectName, stuffToPlot, std::to_string(ite_idx));
         }
 
         ite_idx++;
@@ -2781,7 +2812,7 @@ AmrHydro::writePltCustom(int numPlotComps,
 
     // generate plotfile name
     char iter_str[100];
-    sprintf(iter_str, "%s%06d.", m_plot_prefix.c_str(), m_cur_step);
+    sprintf(iter_str, "%s%06d_custom", m_plot_prefix.c_str(), m_cur_step);
 
     string filename(iter_str);
     
@@ -2789,15 +2820,15 @@ AmrHydro::writePltCustom(int numPlotComps,
 
     if (SpaceDim == 1)
     {
-        filename.append("1d_custom.hdf5");
+        filename.append(".hdf5");
     }
     else if (SpaceDim == 2)
     {
-        filename.append("2d_custom.hdf5");
+        filename.append(".hdf5");
     }
     else if (SpaceDim == 3)
     {
-        filename.append("3d_custom.hdf5");
+        filename.append(".hdf5");
     }
 
     WriteAMRHierarchyHDF5(
