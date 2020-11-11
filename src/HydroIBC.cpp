@@ -100,11 +100,16 @@ HydroIBC::initializeData(RealVect& a_dx,
         {
             IntVect iv = bit();
             Real x_loc = (iv[0]+0.5)*a_dx[0];
+            //Real y_loc = (iv[1]+0.5)*a_dx[1];
 
             // bed topography
             //thiszbed(iv, 0)      = std::max(Params.m_slope*x_loc, 0.0);
             thiszbed(iv, 0)      = Params.m_slope*x_loc;
             thisGradzbed(iv, 0)  = Params.m_slope;
+            thisGradzbed(iv, 1)  = 0.0;
+            //thiszbed(iv, 0)      = Params.m_slope*std::sqrt(x_loc*x_loc + y_loc*y_loc);
+            //thisGradzbed(iv, 0)  = Params.m_slope*Params.m_slope*x_loc / thiszbed(iv, 0);
+            //thisGradzbed(iv, 1)  = Params.m_slope*Params.m_slope*y_loc / thiszbed(iv, 0);
             // initial gap height
             thisGapHeight(iv, 0) = Params.m_gapInit;
             // Ice height (should be ice only, so surface - (bed + gap))
