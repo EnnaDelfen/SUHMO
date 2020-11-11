@@ -2565,7 +2565,7 @@ AmrHydro::levelSetup(int a_level, const DisjointBoxLayout& a_grids)
         m_iceheight[a_level] = new LevelData<FArrayBox>(a_grids, nPhiComp, HeadGhostVect);
         m_bedelevation[a_level] = new LevelData<FArrayBox>(a_grids, nPhiComp, HeadGhostVect);
         m_overburdenpress[a_level] = new LevelData<FArrayBox>(a_grids, nPhiComp, HeadGhostVect);
-        m_gradZb[a_level] = new LevelData<FArrayBox>(a_grids, nPhiComp, HeadGhostVect);
+        m_gradZb[a_level] = new LevelData<FArrayBox>(a_grids, SpaceDim*nPhiComp, HeadGhostVect);
     }
     else
     {
