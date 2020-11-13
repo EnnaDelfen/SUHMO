@@ -19,6 +19,7 @@
 #include "MultilevelLinearOp.H"
 #include "BiCGStabSolver.H"
 #include "CellToEdge.H"
+#include "EdgeToCell.H"
 
 #include "NamespaceHeader.H"
 
