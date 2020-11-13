@@ -1529,25 +1529,42 @@ AmrHydro::timeStep(Real a_dt)
             //         Update melting rate = f(Qw, grad(h), grad(Pw))
             pout() <<"        Update melting rate "<< endl;
             for (dit.begin(); dit.ok(); ++dit) {
-                FArrayBox& gradH   = levelgradH[dit];
+                // EC quantities
+                FluxBox& Qwater_ec = levelQw_ec[dit];
+                FluxBox& gradH_ec  = levelgradH_ec[dit];
+                FluxBox& gradPw_ec = levelgradPw_ec[dit];
+                FluxBox& tmp_ec    = leveltmp_ec[dit];
+                // loop over directions
+                for (int dir = 0; dir<SpaceDim; dir++) {
+                    FArrayBox& Qwater_ecFab = Qwater_ec[dir];
+                    FArrayBox& gradH_ecFab  = gradH_ec[dir];
+                    FArrayBox& gradPw_ecFab = gradPw_ec[dir];
+                    FArrayBox& tmp_ecFab    = tmp_ec[dir];
 
+                    BoxIterator bitEC(Qwater_ecFab.box()); // can use gridBox? 
+
+                    for (bitEC.begin(); bitEC.ok(); ++bitEC) {
+                        IntVect iv = bitEC();
+                        tmp_ecFab(iv, 0)  = - m_suhmoParm->m_rho_w * m_suhmoParm->m_gravity * (
+                                              Qwater_ecFab(iv, 0) * gradH_ecFab(iv, 0) );
+                        tmp_ecFab(iv, 0)  -=  m_suhmoParm->m_ct * m_suhmoParm->m_cw * m_suhmoParm->m_rho_w * (
+                                              Qwater_ecFab(iv, 0) * gradPw_ecFab(iv, 0) );
+                    }
+                } // loop over dir
+            }
+            EdgeToCell(leveltmp_ec, leveltmp_cc);
+            leveltmp_cc.exchange();
+            ExtrapGhostCells( leveltmp_cc, m_amrDomains[0]);
+
+            for (dit.begin(); dit.ok(); ++dit) {
+                // CC
                 FArrayBox& meltR   = levelmR[dit];
-                FArrayBox& Qwater  = levelQw[dit];
-
-                FArrayBox& gradPw  = levelgradPw[dit];
-
+                FArrayBox& tmp_cc  = leveltmp_cc[dit];
                 BoxIterator bit(meltR.box());
                 for (bit.begin(); bit.ok(); ++bit) {
                     IntVect iv = bit();
-                    meltR(iv, 0)  = m_suhmoParm->m_G; // / m_suhmoParm->m_L;
                     //meltR(iv, 0) += term in ub and stress  <-- TODO
-                    meltR(iv, 0) -= m_suhmoParm->m_rho_w * m_suhmoParm->m_gravity * (
-                                    Qwater(iv, 0) * gradH(iv, 0) + 
-                                    Qwater(iv, 1) * gradH(iv, 1) ); 
-                    meltR(iv, 0) -=  m_suhmoParm->m_ct * m_suhmoParm->m_cw * m_suhmoParm->m_rho_w * (
-                                    Qwater(iv, 0) * gradPw(iv, 0) + 
-                                    Qwater(iv, 1) * gradPw(iv, 1) );
-                    meltR(iv, 0) = meltR(iv, 0) / m_suhmoParm->m_L;
+                    meltR(iv, 0)  = (m_suhmoParm->m_G + tmp_cc(iv, 0) + tmp_cc(iv, 1)) / m_suhmoParm->m_L;
                 }
             }
 
