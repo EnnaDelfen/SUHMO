@@ -1374,8 +1374,6 @@ AmrHydro::timeStep(Real a_dt)
         //         Update melting rate = f(Qw, grad(h), grad(Pw))
         for (int lev = 0; lev <= m_finest_level; lev++)
         {
-            LevelData<FArrayBox>& levelB        = *m_gapheight[lev];    
-
             LevelData<FArrayBox>& levelcurrentH = *m_head[lev];
             LevelData<FArrayBox>& levelgradH    = *m_gradhead[lev];
 
@@ -1580,20 +1578,19 @@ AmrHydro::timeStep(Real a_dt)
             LevelData<FArrayBox>& levelB     = *m_gapheight[lev];    
 
             LevelData<FArrayBox>& levelacoef = *aCoef[lev];
-            LevelData<FluxBox>&   levelbcoef = *bCoef[lev];
             LevelData<FArrayBox>& levelRHS_h = *RHS_h[lev];
 
             LevelData<FArrayBox>& levelmR    = *m_meltRate[lev];
             LevelData<FArrayBox>& levelPw    = *m_Pw[lev];
             LevelData<FArrayBox>& levelPi    = *m_overburdenpress[lev];
-            LevelData<FArrayBox>& levelRe    = *m_Re[lev]; 
 
-            LevelData<FArrayBox> levelbcoef_cc(m_amrGrids[lev], 1, IntVect::Unit);
+            //EC quantities
+            LevelData<FluxBox>& levelbcoef  = *bCoef[lev];
+            LevelData<FluxBox>& levelRe_ec  = *a_Re_ec[lev]; 
+            LevelData<FluxBox>& levelB_ec   = *a_GapHeight_ec[lev];    
 
             // Compute aCoeff and bCoeff_cc using updated qtites
-            aCoeff_bCoeff_CC(levelacoef, levelbcoef_cc, levelRe, levelB);
-            // bCoeff_cc -> bCoeff via CC->Edge
-            CellToEdge(levelbcoef_cc, levelbcoef);
+            aCoeff_bCoeff(levelacoef, levelbcoef, levelRe_ec, levelB_ec);
             // Form RHS for h using updated qtites
             CalcRHS_head(levelRHS_h, levelPi, 
                          levelPw, levelmR, 
