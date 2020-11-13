@@ -1416,7 +1416,7 @@ AmrHydro::timeStep(Real a_dt)
                 //Pw *= m_suhmoParm->m_rho_w * m_suhmoParm->m_gravity;;
             }
         
-            // Compute grad(h) and grad(Pw)
+            // Compute grad(h) -EC and CC- and grad(Pw) -EC-
             pout() <<"        Compute grad(h) and grad(Pw) "<< endl;
             // tmp holder for grad(Pw)
             LevelData<FluxBox>   levelgradPw_ec(levelGrids, 1, IntVect::Zero);
@@ -1437,14 +1437,15 @@ AmrHydro::timeStep(Real a_dt)
                                      crsePsiPtr, finePsiPtr,
                                      dx, nRefCrse, nRefFine,
                                      m_amrDomains[lev]);
+            // Need to fill the ghost cells of gradH -- extrapolate on the no perio boundaries   
+            levelgradH.exchange();
+            ExtrapGhostCells( levelgradH, m_amrDomains[0]);
+
             // EC version
             Gradient::compGradientMAC(levelgradH_ec, levelcurrentH,
                                      crsePsiPtr, finePsiPtr,
                                      dx, nRefCrse, nRefFine,
                                      m_amrDomains[lev]);
-            // Need to fill the ghost cells of gradH -- extrapolate on the no perio boundaries   
-            levelgradH.exchange();
-            ExtrapGhostCells( levelgradH, m_amrDomains[0]);
 
             // EC version
             Gradient::compGradientMAC(levelgradPw_ec, levelPw,
@@ -1456,45 +1457,69 @@ AmrHydro::timeStep(Real a_dt)
             //             Update VECTOR Qw = f(Re, grad(h))
             //             Update Re = f(Qw)
             pout() <<"        Re/Qw dependency "<< endl;
-            for (dit.begin(); dit.ok(); ++dit) {
-                FArrayBox& oldB    = levelB[dit];
-                //FArrayBox& currH   = levelcurrentH[dit];
+            int max_ite_Re = 10; 
+            Real max_Re_diff = 0.0;
+            for (int it = 0; it <= max_ite_Re; it++) {
+                //pout() << "           ------------------------" << endl;
+                //pout() << "           ite " << it << endl;
+           
+                max_Re_diff = -10000;
 
-                FArrayBox& gradH   = levelgradH[dit];
-                //FArrayBox& gradPw  = levelgradPw[dit];
+                CellToEdge(levelRe, levelRe_ec);
 
-                FArrayBox& Qwater  = levelQw[dit];
-                FArrayBox& Re      = levelRe[dit];
+                // Get Qw at EC
+                for (dit.begin(); dit.ok(); ++dit) {
 
-                BoxIterator bit(Qwater.box()); // can use gridBox? 
-                int max_ite_Re = 5; 
-                Real max_Re_diff = 0.0;
-                for (int it = 0; it <= max_ite_Re; it++) {
-                    //pout() << "           ------------------------" << endl;
-                    //pout() << "           ite " << it;
+                    FArrayBox& Qwater  = levelQw[dit];
+                    FArrayBox& Re      = levelRe[dit];
+
                     levelReQwIter[dit].copy(Re, 0, 0, 1);
+                    //pout() << "BEG Max Re "<< levelRe[dit].max() << endl;
+
+                    // EC quantities
+                    FluxBox& Qwater_ec = levelQw_ec[dit];
+                    FluxBox& gradH_ec  = levelgradH_ec[dit];
+                    FluxBox& currB_ec  = levelB_ec[dit];
+                    FluxBox& Re_ec     = levelRe_ec[dit];
+
+                    // loop over directions
+                    for (int dir = 0; dir<SpaceDim; dir++) {
+                        FArrayBox& Qwater_ecFab = Qwater_ec[dir];
+                        FArrayBox& gradH_ecFab  = gradH_ec[dir];
+                        FArrayBox& currB_ecFab  = currB_ec[dir];
+                        FArrayBox& Re_ecFab     = Re_ec[dir];
+
+                        BoxIterator bitEC(Qwater_ecFab.box()); // can use gridBox? 
+
+                        for (bitEC.begin(); bitEC.ok(); ++bitEC) {
+                            IntVect iv = bitEC();
+                            Real num_q = - std::pow(currB_ecFab(iv, 0),3) * m_suhmoParm->m_gravity * gradH_ecFab(iv, 0);
+                            Real denom_q = 12.0 * m_suhmoParm->m_nu * (1 + m_suhmoParm->m_omega * Re_ecFab(iv, 0));
+                            Qwater_ecFab(iv, 0) = num_q/denom_q;
+                        }
+                    }
+                    EdgeToCell(Qwater_ec, Qwater); 
+
+                    //Get Re at CC
+                    BoxIterator bit(Qwater.box()); // can use gridBox? 
                     for (bit.begin(); bit.ok(); ++bit) {
                         IntVect iv = bit();
-                        //pout() << "Re before " << Re(iv, 0);
-                        // Update water flux, using old-time Re
-                        Real num_q = - std::pow(oldB(iv, 0),3) * m_suhmoParm->m_gravity * gradH(iv, 0);
-                        Real denom_q = 12.0 * m_suhmoParm->m_nu * (1 + m_suhmoParm->m_omega * Re(iv, 0));
-                        Qwater(iv, 0) = num_q/denom_q;
-                        num_q = - std::pow(oldB(iv, 0),3) * m_suhmoParm->m_gravity * gradH(iv, 1);
-                        // 2nd comp (2D pb)
-                        Qwater(iv, 1) = num_q/denom_q;
-                        // Update Re using this new Qw ... short loop for now !!
+                        // Update Re using this new Qw
                         Re(iv, 0) = std::sqrt( Qwater(iv, 0) * Qwater(iv, 0) 
                                              + Qwater(iv, 1) * Qwater(iv, 1)) / m_suhmoParm->m_nu;
-                        
                     }
                     levelReQwIter[dit].minus(Re, 0, 0, 1);
                     levelReQwIter[dit].abs();
-                    max_Re_diff = levelReQwIter[dit].max();
-                    //pout() << ", max : " << max_Re_diff << endl;
+                    max_Re_diff = std::max(max_Re_diff, levelReQwIter[dit].max());
+                    //pout() << "END Max levelReQwIter, Re "<< levelReQwIter[dit].max() << " " << levelRe[dit].max() << endl;
                 }
+                // Need to fill the ghost cells of Re -- extrapolate on the no perio boundaries   
+                levelRe.exchange();
+                ExtrapGhostCells( levelRe, m_amrDomains[0]);
+
                 //pout() << "           ------------------------" << endl;
-            }
+
+            } // end Qw/Re ites
 
             //         Update melting rate = f(Qw, grad(h), grad(Pw))
             pout() <<"        Update melting rate "<< endl;
