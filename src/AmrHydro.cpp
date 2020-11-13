@@ -1162,9 +1162,9 @@ AmrHydro::CalcRHS_head(LevelData<FArrayBox>& levelRHS_h,
            Real PimPw = (Pressi(iv,0) - Pw(iv,0));
            Real AbsPimPw = std::abs(PimPw);
            RHS(iv,0) += m_suhmoParm->m_A * std::pow(AbsPimPw, 2) * PimPw * B(iv,0);
-           if ( (iv[0] == 32) && (iv[1] == 32) ) {
+           if ( (iv[0] == m_suhmoParm->m_moulin_position[0]) && (iv[1] == m_suhmoParm->m_moulin_position[1]) ) {
                //pout() << "Moulin location "<< iv << endl;
-               RHS(iv,0) += 4.0 / (m_amrDx[0][0] * m_amrDx[0][1]);  // m3s-1 / m2
+               RHS(iv,0) += m_suhmoParm->m_moulin_flux / (m_amrDx[0][0] * m_amrDx[0][1]);  // m3s-1 / m2
            }
        }
    }

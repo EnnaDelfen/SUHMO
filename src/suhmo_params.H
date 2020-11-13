@@ -47,6 +47,10 @@ public:
     Real m_slope;         // bed slope
     Real m_gapInit;       // subglacial init gap height 
     Real m_ReInit;        // Initial Reynolds number 
+    // Moulin
+    std::vector<int> m_moulin_position;    // m.s-1 Sliding velocity
+    Real m_moulin_flux;    // m3.s-1 
+    
 };
 
 #include "NamespaceFooter.H"
