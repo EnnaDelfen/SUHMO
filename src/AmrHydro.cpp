@@ -1420,6 +1420,9 @@ AmrHydro::timeStep(Real a_dt)
             pout() <<"        Compute grad(h) and grad(Pw) "<< endl;
             // tmp holder for grad(Pw)
             LevelData<FluxBox>   levelgradPw_ec(levelGrids, 1, IntVect::Zero);
+            // stuff for testing to remove later
+            LevelData<FluxBox>   leveltmp_ec(levelGrids, 1, IntVect::Zero);
+            LevelData<FArrayBox> leveltmp_cc(levelGrids, 1*SpaceDim, HeadGhostVect);
 
             LevelData<FArrayBox>* crsePsiPtr = NULL;
             LevelData<FArrayBox>* finePsiPtr = NULL;
