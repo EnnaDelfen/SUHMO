@@ -1521,6 +1521,11 @@ AmrHydro::timeStep(Real a_dt)
 
             } // end Qw/Re ites
 
+            // Fill GC of Qwater (not sure if useful)
+            levelQw.exchange();
+            ExtrapGhostCells( levelQw, m_amrDomains[0]);
+
+
             //         Update melting rate = f(Qw, grad(h), grad(Pw))
             pout() <<"        Update melting rate "<< endl;
             for (dit.begin(); dit.ok(); ++dit) {
