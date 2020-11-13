@@ -120,14 +120,12 @@ HydroIBC::initializeData(RealVect& a_dx,
             
             /* option 1: guess Pw, find head */
             // Water press ?? No idea --> Pi/2.0
-            thisPw(iv, 0)        = thispi(iv, 0) * 0.5;
+            //thisPw(iv, 0)        = thispi(iv, 0) * 0.5;
+            /* option 2: Pw = Patm, find head */
+            thisPw(iv, 0)        = 101325.0;
             Real Fact            = 1./(Params.m_rho_w * Params.m_gravity);
             thisHead(iv, 0)      = thisPw(iv, 0) * Fact + thiszbed(iv, 0) ;
             
-            /* option 2: Pw = Patm, find head */
-            //thisPw(iv, 0)        = 101325.0;
-            //Real Fact            = 1./(Params.m_rho_w * Params.m_gravity);
-            //thisHead(iv, 0)      = 101325.0 * Fact + thiszbed(iv, 0) ;
 
             // dummy stuff 
             thisRe(iv, 0)        = Params.m_ReInit;
