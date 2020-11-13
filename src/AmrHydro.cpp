@@ -479,6 +479,11 @@ AmrHydro::~AmrHydro()
             delete m_gradhead[lev];
             m_gradhead[lev] = NULL;
         }
+        if (m_gradhead_ec[lev] != NULL)
+        {
+            delete m_gradhead_ec[lev];
+            m_gradhead_ec[lev] = NULL;
+        }
         if (m_old_head[lev] != NULL)
         {
             delete m_old_head[lev];
@@ -836,6 +841,7 @@ AmrHydro::initialize()
         m_head.resize(m_max_level + 1, NULL);
 
         m_gradhead.resize(m_max_level + 1, NULL);
+        m_gradhead_ec.resize(m_max_level + 1, NULL);
 
         m_old_gapheight.resize(m_max_level + 1, NULL);
         m_gapheight.resize(m_max_level + 1, NULL);
@@ -860,6 +866,7 @@ AmrHydro::initialize()
             m_head[lev] = new LevelData<FArrayBox>;
             
             m_gradhead[lev] = new LevelData<FArrayBox>;
+            m_gradhead_ec[lev] = new LevelData<FluxBox>;
 
             m_old_gapheight[lev] = new LevelData<FArrayBox>;
             m_gapheight[lev] = new LevelData<FArrayBox>;
@@ -1051,6 +1058,45 @@ AmrHydro::run(Real a_max_time, int a_max_step)
 
 /* Needed routines for timeStep */
 void
+AmrHydro::aCoeff_bCoeff(LevelData<FArrayBox>&  levelacoef, 
+                           LevelData<FluxBox>&    levelbcoef, 
+                           LevelData<FluxBox>&    levelRe, 
+                           LevelData<FluxBox>&    levelB)
+{
+    DataIterator dit = levelbcoef.dataIterator();
+    for (dit.begin(); dit.ok(); ++dit) {
+
+        FluxBox& B        = levelB[dit];
+        FArrayBox& aC     = levelacoef[dit];
+        FluxBox& bC       = levelbcoef[dit];
+        FluxBox& Re       = levelRe[dit];
+
+        aC.setVal(0.0);
+
+        // loop over directions
+        for (int dir = 0; dir<SpaceDim; dir++) {
+
+            FArrayBox& bCFab = bC[dir];
+            FArrayBox& BFab  = B[dir];
+            FArrayBox& ReFab = Re[dir];
+
+            // initialize 
+            bCFab.setVal(0.0);
+
+            BoxIterator bit(bCFab.box()); 
+            for (bit.begin(); bit.ok(); ++bit) {
+                IntVect iv = bit();
+                // Update b coeff
+                Real num_q = - std::pow(BFab(iv, 0),3) * m_suhmoParm->m_gravity;
+                Real denom_q = 12.0 * m_suhmoParm->m_nu * (1 + m_suhmoParm->m_omega * ReFab(iv, 0));
+                bCFab(iv, 0) = num_q/denom_q;
+            }
+        }
+    }
+}
+
+
+void
 AmrHydro::aCoeff_bCoeff_CC(LevelData<FArrayBox>&  levelacoef, 
                            LevelData<FArrayBox>&  levelbcoef_cc, 
                            LevelData<FArrayBox>&  levelRe, 
@@ -1107,8 +1153,8 @@ AmrHydro::CalcRHS_head(LevelData<FArrayBox>& levelRHS_h,
        BoxIterator bit(RHS.box()); // can use gridBox? 
        for (bit.begin(); bit.ok(); ++bit) {
            IntVect iv = bit();
-           Real x_loc = (iv[0]+0.5)*m_amrDx[0][0];
-           Real y_loc = (iv[1]+0.5)*m_amrDx[0][1];
+           //Real x_loc = (iv[0]+0.5)*m_amrDx[0][0];
+           //Real y_loc = (iv[1]+0.5)*m_amrDx[0][1];
            if ( B(iv,0) < m_suhmoParm->m_br) {
                RHS(iv,0) -= ub_norm * (m_suhmoParm->m_br - B(iv,0));
            }
@@ -1202,7 +1248,6 @@ AmrHydro::timeStep(Real a_dt)
     IntVect HeadGhostVect = m_num_head_ghost * IntVect::Unit;
     Real coarsestDx = m_amrDx[0][0];  
 
-
     /* I Copy new h and new b into old h and old b */
 
     // Also create and initialize tmp vectors
@@ -1219,6 +1264,7 @@ AmrHydro::timeStep(Real a_dt)
     // alpha*aCoef(x)*I - beta*Div(bCoef(x)*Grad) -- note for us: alpha = 0 beta = - 1 
     Vector<RefCountedPtr<LevelData<FArrayBox> > > aCoef(m_max_level + 1);
     Vector<RefCountedPtr<LevelData<FluxBox> > > bCoef(m_max_level + 1);
+
     pout() <<"   ...Copy current into old & take care of ghost cells and BCs "<< endl;
     for (int lev = 0; lev <= m_finest_level; lev++)
     {
@@ -1228,16 +1274,13 @@ AmrHydro::timeStep(Real a_dt)
         LevelData<FArrayBox>& oldB       = *m_old_gapheight[lev];
         LevelData<FArrayBox>& currentB   = *m_gapheight[lev];
 
-        LevelData<FArrayBox>& levelgradH = *m_gradhead[lev];
-
         // fill internal ghost cells
         currentH.exchange();
         currentB.exchange();
 
         // Get the valid boxes
         const DisjointBoxLayout& levelGrids = m_amrGrids[lev];
-
-        DataIterator dit = oldH.dataIterator();
+        DataIterator dit                    = oldH.dataIterator();
         for (dit.begin(); dit.ok(); ++dit)
         {
             // get the validBox
@@ -1250,9 +1293,6 @@ AmrHydro::timeStep(Real a_dt)
             // Copy curr into old -- copy ghost cells too 
             oldH[dit].copy(currentH[dit], 0, 0, 1);
             oldB[dit].copy(currentB[dit], 0, 0, 1);
-
-            // Extra precaution
-            levelgradH[dit].setVal(0.0);
         }
 
         // Head and b RHS
@@ -2557,6 +2597,7 @@ AmrHydro::levelSetup(int a_level, const DisjointBoxLayout& a_grids)
         // First pass or first level
         m_head[a_level] = new LevelData<FArrayBox>(a_grids, nPhiComp, HeadGhostVect);
         m_gradhead[a_level] = new LevelData<FArrayBox>(a_grids, SpaceDim*nPhiComp, HeadGhostVect);
+        m_gradhead_ec[a_level] = new LevelData<FluxBox>(a_grids, nPhiComp, IntVect::Zero);
         m_gapheight[a_level] = new LevelData<FArrayBox>(a_grids, nPhiComp, HeadGhostVect);
         m_Pw[a_level] = new LevelData<FArrayBox>(a_grids, nPhiComp, HeadGhostVect);
         m_qw[a_level] = new LevelData<FArrayBox>(a_grids, SpaceDim*nPhiComp, HeadGhostVect);

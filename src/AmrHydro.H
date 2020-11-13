@@ -83,6 +83,11 @@ public:
                    const Vector<LevelData<FluxBox>*>& a_fluxes,
                    Real a_dt);
 
+    void aCoeff_bCoeff(LevelData<FArrayBox>&  levelacoef, 
+                       LevelData<FluxBox>&  levelbcoef, 
+                       LevelData<FluxBox>&  levelRe, 
+                       LevelData<FluxBox>&  levelB);
+
     void aCoeff_bCoeff_CC(LevelData<FArrayBox>&  levelacoef, 
                            LevelData<FArrayBox>&  levelbcoef_cc, 
                            LevelData<FArrayBox>&  levelRe, 
@@ -391,6 +396,7 @@ protected:
     Vector<LevelData<FArrayBox>*> m_gapheight;              // Subglacial height
 
     Vector<LevelData<FArrayBox>*> m_gradhead;               // Grad of Hydraulic head
+    Vector<LevelData<FluxBox>*> m_gradhead_ec;               // Grad of Hydraulic head
 
     /* */
     Vector<LevelData<FArrayBox>*> m_Pw;                     // Water pressure
