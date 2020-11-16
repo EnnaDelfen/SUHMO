@@ -444,7 +444,7 @@ AmrHydro::setDefaults()
     m_plot_prefix = "plot";
     m_plot_interval = 10000000;
     m_plot_time_interval = 1.0e+12;
-    m_write_gradPhi = true;
+    m_write_gradPhi = false;
 
     m_check_prefix = "chk";
     m_check_interval = -1;
@@ -529,11 +529,11 @@ AmrHydro::~AmrHydro()
             delete m_bedelevation[lev];
             m_bedelevation[lev] = NULL;
         }
-        if (m_gradZb[lev] != NULL)
-        {
-            delete m_gradZb[lev];
-            m_gradZb[lev] = NULL;
-        }
+        //if (m_gradZb[lev] != NULL)
+        //{
+        //    delete m_gradZb[lev];
+        //    m_gradZb[lev] = NULL;
+        //}
         if (m_overburdenpress[lev] != NULL)
         {
             delete m_overburdenpress[lev];
@@ -556,93 +556,66 @@ AmrHydro::~AmrHydro()
 void
 AmrHydro::initialize()
 {
-    if (m_verbosity > 3)
-    {
+    if (m_verbosity > 3) {
         pout() << "AmrHydro::initialize" << endl;
     }
 
-    // time stepping
-    m_time = 0.0;
-    m_cur_step = 0;
 
+    /* PARSING */
     ParmParse ppAmr("AmrHydro");
-    // num cells in each dir
-    Vector<int> ancells(SpaceDim);
-    // allows for domains with lower indices which are not positive
-    Vector<int> domLoIndex(SpaceDim, 0);
-    // assumption is that domains are not periodic
-    bool is_periodic[SpaceDim];
-    for (int dir = 0; dir < SpaceDim; dir++) is_periodic[dir] = false;
-    Vector<int> is_periodic_int(SpaceDim, 0);
-
-    // max level
-    ppAmr.get("maxLevel", m_max_level);
-    if (m_max_level > 0)
-    {
+    m_time     = 0.0;  // start at t = 0
+    m_cur_step = 0;    // start at dt = 0
+    ppAmr.get("maxLevel", m_max_level);  // max level
+    if (m_max_level > 0) {
         m_refinement_ratios.resize(m_max_level, -1);
         ppAmr.getarr("ref_ratios", m_refinement_ratios, 0, m_max_level);
-    }
-    else
-    {
+    } else {
         m_refinement_ratios.resize(1);
         m_refinement_ratios[0] = -1;
     }
-
-
-    ppAmr.query("PrintCustom", m_PrintCustom);
-
+    ppAmr.query("PrintCustom", m_PrintCustom); // To plot after each Picard ite -- debug mode
     ppAmr.query("verbosity", m_verbosity);
-
     ppAmr.query("block_factor", m_block_factor);
-    ppAmr.query("regrid_lbase", m_regrid_lbase);
+    ppAmr.query("regrid_lbase", m_regrid_lbase);  // smaller lev subject to regridding
     ppAmr.query("regrid_interval", m_regrid_interval);
-    ppAmr.query("tagCap", m_tag_cap);
+    ppAmr.query("tagCap", m_tag_cap);               // no idea yet
     ppAmr.query("block_factor", m_block_factor);
     ppAmr.query("max_box_size", m_max_box_size);
     m_max_base_grid_size = m_max_box_size;
     ppAmr.query("max_base_grid_size", m_max_base_grid_size);
-
-    ppAmr.getarr("num_cells", ancells, 0, ancells.size());
-
+    Vector<int> ancells(SpaceDim);
+    ppAmr.getarr("num_cells", ancells, 0, ancells.size());  // num cells in each dir
     // this one doesn't have a vertical dimension
-    ppAmr.queryarr("domainLoIndex", domLoIndex, 0, SpaceDim);
-
+    Vector<int> domLoIndex(SpaceDim, 0);
+    ppAmr.queryarr("domainLoIndex", domLoIndex, 0, SpaceDim);  // allows for domains with lower indices which are not positive
+    bool is_periodic[SpaceDim];
+    for (int dir = 0; dir < SpaceDim; dir++) is_periodic[dir] = false; // assumption is that domains are not periodic
+    Vector<int> is_periodic_int(SpaceDim, 0);
     ppAmr.getarr("is_periodic", is_periodic_int, 0, SpaceDim);
-    for (int dir = 0; dir < SpaceDim; dir++)
-    {
+    for (int dir = 0; dir < SpaceDim; dir++) {
         is_periodic[dir] = (is_periodic_int[dir] == 1);
     }
-
     ppAmr.query("cfl", m_cfl);
-    m_initial_cfl = m_cfl;
+    m_initial_cfl = m_cfl;  // cfl subject to change
     ppAmr.query("initial_cfl", m_initial_cfl);
-
-    ppAmr.query("max_dt_grow_factor", m_max_dt_grow);
-
+    ppAmr.query("max_dt_grow_factor", m_max_dt_grow);   // not sure
     ppAmr.query("fixed_dt", m_fixed_dt);
-    ppAmr.query("offsetTime", m_offsetTime);
-
+    ppAmr.query("offsetTime", m_offsetTime);    // not sure
     ppAmr.query("plot_interval", m_plot_interval);
     ppAmr.query("plot_time_interval", m_plot_time_interval);
     ppAmr.query("plot_prefix", m_plot_prefix);
-
-    ppAmr.query("write_gradPhi", m_write_gradPhi);
-
-    ppAmr.query("check_interval", m_check_interval);
+    //ppAmr.query("write_gradPhi", m_write_gradPhi);  // do not bother with outputing grad for now
+    ppAmr.query("check_interval", m_check_interval);   // not sure
     ppAmr.query("check_prefix", m_check_prefix);
     ppAmr.query("check_overwrite", m_check_overwrite);
-    ppAmr.query("check_exit", m_check_exit);
-
-    ppAmr.get("fill_ratio", m_fill_ratio);
-
+    ppAmr.query("check_exit", m_check_exit);   // no idea
+    ppAmr.get("fill_ratio", m_fill_ratio);     // no idea
     ppAmr.query("nestingRadius", m_nesting_radius);
-
     ppAmr.query("tags_grow", m_tags_grow);
     {
         Vector<int> tgd(SpaceDim, 0);
         ppAmr.queryarr("tags_grow_dir", tgd, 0, tgd.size());
-        for (int dir = 0; dir < SpaceDim; dir++)
-        {
+        for (int dir = 0; dir < SpaceDim; dir++) {
             m_tags_grow_dir[dir] = tgd[dir];
         }
     }
@@ -650,13 +623,11 @@ AmrHydro::initialize()
     ppAmr.query("tag_on_phi", m_tagOnGradPhi);
     isThereATaggingCriterion |= m_tagOnGradPhi;
     // if we set this to be true, require that we also provide the threshold
-    if (m_tagOnGradPhi)
-    {
+    if (m_tagOnGradPhi) {
         ppAmr.query("tagging_val", m_tagging_val);
     }
     // abort if there isn't a tagging criterion
-    if (m_max_level > 0 && !isThereATaggingCriterion)
-    {
+    if (m_max_level > 0 && !isThereATaggingCriterion) {
         MayDay::Error("No Tagging criterion defined");
     }
 
@@ -827,7 +798,7 @@ AmrHydro::initialize()
 
     // check to see if we're restarting from a checkpoint file
     if (!ppAmr.contains("restart_file")) {
-        // we are restarting from a checkpoint file
+        // we are NOT restarting from a checkpoint file
         if (m_verbosity > 3) {
             pout() << "\nAmrHydro::initialize - Initializing data containers" << endl;
         }
@@ -856,7 +827,7 @@ AmrHydro::initialize()
         m_bedelevation.resize(m_max_level + 1, NULL);
         m_overburdenpress.resize(m_max_level + 1, NULL);
 
-        m_gradZb.resize(m_max_level + 1, NULL);
+        //m_gradZb.resize(m_max_level + 1, NULL);
 
         //-------------------------------------------------
         // For each level, define a collection of FArrayBox
@@ -880,7 +851,7 @@ AmrHydro::initialize()
             m_bedelevation[lev] = new LevelData<FArrayBox>;
             m_overburdenpress[lev] = new LevelData<FArrayBox>;
 
-            m_gradZb[lev] = new LevelData<FArrayBox>;
+            //m_gradZb[lev] = new LevelData<FArrayBox>;
         }
 
         int finest_level = -1;
@@ -1164,7 +1135,19 @@ AmrHydro::CalcRHS_head(LevelData<FArrayBox>& levelRHS_h,
            RHS(iv,0) += m_suhmoParm->m_A * std::pow(AbsPimPw, 2) * PimPw * B(iv,0);
            if ( (iv[0] == m_suhmoParm->m_moulin_position[0]) && (iv[1] == m_suhmoParm->m_moulin_position[1]) ) {
                //pout() << "Moulin location "<< iv << endl;
-               RHS(iv,0) += m_suhmoParm->m_moulin_flux / (m_amrDx[0][0] * m_amrDx[0][1]);  // m3s-1 / m2
+               RHS(iv,0) += m_suhmoParm->m_moulin_flux / (4.0 * m_amrDx[0][0] * m_amrDx[0][1]);  // m3s-1 / m2
+           }
+           if ( (iv[0] == (m_suhmoParm->m_moulin_position[0]+1)) && (iv[1] == m_suhmoParm->m_moulin_position[1]) ) {
+               //pout() << "Moulin location "<< iv << endl;
+               RHS(iv,0) += m_suhmoParm->m_moulin_flux / (4.0 * m_amrDx[0][0] * m_amrDx[0][1]);  // m3s-1 / m2
+           }
+           if ( (iv[0] == m_suhmoParm->m_moulin_position[0]) && (iv[1] == (m_suhmoParm->m_moulin_position[1]+1)) ) {
+               //pout() << "Moulin location "<< iv << endl;
+               RHS(iv,0) += m_suhmoParm->m_moulin_flux / (4.0 * m_amrDx[0][0] * m_amrDx[0][1]);  // m3s-1 / m2
+           }
+           if ( (iv[0] == (m_suhmoParm->m_moulin_position[0]+1)) && (iv[1] == (m_suhmoParm->m_moulin_position[1]+1)) ) {
+               //pout() << "Moulin location "<< iv << endl;
+               RHS(iv,0) += m_suhmoParm->m_moulin_flux / (4.0 * m_amrDx[0][0] * m_amrDx[0][1]);  // m3s-1 / m2
            }
        }
    }
@@ -2351,14 +2334,11 @@ AmrHydro::tagCellsLevel(IntVectSet& a_tags, int a_level)
     //}         // end if tag on laplacian(phi)
 
     // now buffer tags
-
     local_tags.grow(m_tags_grow);
-    for (int dir = 0; dir < SpaceDim; dir++)
-    {
+    for (int dir = 0; dir < SpaceDim; dir++) {
         if (m_tags_grow_dir[dir] > m_tags_grow) local_tags.grow(dir, std::max(0, m_tags_grow_dir[dir] - m_tags_grow));
     }
     local_tags &= m_amrDomains[a_level];
-
     a_tags = local_tags;
 }
 
@@ -2378,8 +2358,7 @@ AmrHydro::tagCellsInit(Vector<IntVectSet>& a_tags)
 void
 AmrHydro::initGrids(int a_finest_level)
 {
-    if (m_verbosity > 3)
-    {
+    if (m_verbosity > 3) {
         pout() << "AmrHydro::initGrids" << endl;
     }
 
@@ -2393,8 +2372,7 @@ AmrHydro::initGrids(int a_finest_level)
 
     DisjointBoxLayout baseGrids(baseBoxes, procAssign, m_amrDomains[0]);
 
-    if (m_verbosity > 3)
-    {
+    if (m_verbosity > 3) {
         long long numCells0 = baseGrids.numCells();
         pout() << "    Level 0: " << numCells0 << " cells: " << baseGrids << endl;
     }
@@ -2407,13 +2385,13 @@ AmrHydro::initGrids(int a_finest_level)
     levelSetup(0, baseGrids);
 
     // AF: really necessary ?
-    LevelData<FArrayBox>& baseLevelVel = *m_head[0];
-    DataIterator baseDit = baseGrids.dataIterator();
-    for (baseDit.begin(); baseDit.ok(); ++baseDit)
-    {
-        // initial guess at base-level velocity is zero
-        baseLevelVel[baseDit].setVal(0.0);
-    }
+    //LevelData<FArrayBox>& baseLevelVel = *m_head[0];
+    //DataIterator baseDit = baseGrids.dataIterator();
+    //for (baseDit.begin(); baseDit.ok(); ++baseDit)
+    //{
+    //    // initial guess at base-level velocity is zero
+    //    baseLevelVel[baseDit].setVal(0.0);
+    //}
 
     // initialize base level data
     initData(m_head);
@@ -2670,7 +2648,7 @@ AmrHydro::levelSetup(int a_level, const DisjointBoxLayout& a_grids)
         m_iceheight[a_level] = new LevelData<FArrayBox>(a_grids, nPhiComp, HeadGhostVect);
         m_bedelevation[a_level] = new LevelData<FArrayBox>(a_grids, nPhiComp, HeadGhostVect);
         m_overburdenpress[a_level] = new LevelData<FArrayBox>(a_grids, nPhiComp, HeadGhostVect);
-        m_gradZb[a_level] = new LevelData<FArrayBox>(a_grids, SpaceDim*nPhiComp, HeadGhostVect);
+        //m_gradZb[a_level] = new LevelData<FArrayBox>(a_grids, SpaceDim*nPhiComp, HeadGhostVect);
     }
     else
     {
@@ -2714,15 +2692,12 @@ AmrHydro::levelSetup(int a_level, const DisjointBoxLayout& a_grids)
 
 void
 AmrHydro::initData(Vector<LevelData<FArrayBox>*>& a_head)
-
 {
-    if (m_verbosity > 3)
-    {
+    if (m_verbosity > 3) {
         pout() << "AmrHydro::initData" << endl;
     }
 
-    for (int lev = 0; lev <= m_finest_level; lev++)
-    {
+    for (int lev = 0; lev <= m_finest_level; lev++) {
         LevelData<FArrayBox>& levelHead      = *m_head[lev];
         LevelData<FArrayBox>& levelGapHeight = *m_gapheight[lev];
         LevelData<FArrayBox>& levelPw        = *m_Pw[lev];
@@ -2732,7 +2707,7 @@ AmrHydro::initData(Vector<LevelData<FArrayBox>*>& a_head)
         LevelData<FArrayBox>& levelIceHeight = *m_iceheight[lev];
         LevelData<FArrayBox>& levelzBed      = *m_bedelevation[lev];
         LevelData<FArrayBox>& levelPi        = *m_overburdenpress[lev];
-        LevelData<FArrayBox>& levelgradzBed  = *m_gradZb[lev];
+        //LevelData<FArrayBox>& levelgradzBed  = *m_gradZb[lev];
         if (lev > 0)
         {
             // AF: !!! deal with multiple levels later !!!
@@ -2770,9 +2745,9 @@ AmrHydro::initData(Vector<LevelData<FArrayBox>*>& a_head)
                                  levelPw, levelqw,
                                  levelRe, levelmR,
                                  levelzBed, levelPi,
-                                 levelIceHeight, levelgradzBed);
+                                 levelIceHeight); //, levelgradzBed);
 
-        // initialize oldPhi to be the current value
+        // initialize old h and b to be the current value
         levelHead.copyTo(*m_old_head[lev]);
         levelGapHeight.copyTo(*m_old_gapheight[lev]);
     }
@@ -3289,107 +3264,128 @@ AmrHydro::writeCheckpointFile() const
 void
 AmrHydro::readCheckpointFile(HDF5Handle& a_handle)
 {
-    if (m_verbosity > 3)
-    {
+    if (m_verbosity > 3) {
         pout() << "AmrHydro::readCheckpointFile" << endl;
     }
 
     CH_TIME("AmrHydro::readCheckpointFile");
 
-    HDF5HeaderData header;
+    HDF5HeaderData& header = m_headerData;
     header.readFromFile(a_handle);
+    ParmParse ppAmr("amr");
+    
+    //check for various components.
+    //bool containsgapHeight(false);
+    //bool containsHead(false);
+    //bool containsbedTopology(false);
+    //bool containsRe(false);
+    //bool containsPi(false);
 
-    if (m_verbosity >= 3)
-    {
+    //map<std::string, std::string>::const_iterator i;
+    //for (i = header.m_string.begin(); i!= header.m_string.end(); ++i) {
+    //    if (i->second == "gapHeight") { 
+    //        containsgapHeight = true;
+    //    }
+    //    if (i->second == "head") {
+    //        containsHead = true;
+    //    }
+    //    if (i->second == "bedelevation") {
+    //        containsbedTopology = true;
+    //    }
+    //    if (i->second == "Re") {
+    //        containsRe = true;
+    //    }
+    //    if (i->second == "overburdenPress") {
+    //        containsPi = true;
+    //    }
+    //}
+
+    if (m_verbosity >= 3) {
         pout() << "hdf5 header data: " << endl;
         pout() << header << endl;
     }
 
     // read max level
-    if (header.m_int.find("max_level") == header.m_int.end())
-    {
+    if (header.m_int.find("max_level") == header.m_int.end()) {
         MayDay::Error("checkpoint file does not contain max_level");
     }
     // we can change max level upon restart
     int max_level_check = header.m_int["max_level"];
-    if (max_level_check != m_max_level)
-    {
-        if (m_verbosity > 0)
-        {
+    if (max_level_check != m_max_level) {
+        if (m_verbosity > 0) {
             pout() << "Restart file has a different max level than inputs file" << endl;
-            pout() << "     max level from inputs file = " << m_max_level << endl;
-            pout() << "     max level in checkpoint file = " << max_level_check << endl;
+            pout() << "     ** max level from inputs file = "   << m_max_level << endl;
+            pout() << "     ** max level in checkpoint file = " << max_level_check << endl;
             pout() << "Using max level from inputs file" << endl;
         }
     }
     // read finest level
-    if (header.m_int.find("finest_level") == header.m_int.end())
-    {
+    if (header.m_int.find("finest_level") == header.m_int.end()) {
         MayDay::Error("checkpoint file does not contain finest_level");
     }
-
     m_finest_level = header.m_int["finest_level"];
-    if (m_finest_level > m_max_level)
-    {
-        MayDay::Error("finest level in restart file > max allowable level!");
+    if (m_finest_level > m_max_level) {
+        MayDay::Error("finest level in restart file > inputs file max allowable level!");
     }
 
     // read current step
-    if (header.m_int.find("current_step") == header.m_int.end())
-    {
+    if (header.m_int.find("current_step") == header.m_int.end()){
         MayDay::Error("checkpoint file does not contain current_step");
     }
-
     m_cur_step = header.m_int["current_step"];
     m_restart_step = m_cur_step;
+    // optionally, over-ride the step number in the restart checkpoint file with one specified in the inputs
+    if (ppAmr.contains("restart_step") ) {
+        int restart_step;
+        ppAmr.get("restart_step", restart_step);
+        m_cur_step = restart_step;
+        m_restart_step = restart_step;
+    }
 
     // read time
-    if (header.m_real.find("time") == header.m_real.end())
-    {
+    if (header.m_real.find("time") == header.m_real.end()) {
         MayDay::Error("checkpoint file does not contain time");
     }
-
     m_time = header.m_real["time"];
-
-    // read timestep
-    if (header.m_real.find("dt") == header.m_real.end())
-    {
-        MayDay::Error("checkpoint file does not contain dt");
+    //optionally, over-ride the time in the restart checkpoint file with one specified in the inputs 
+    if (ppAmr.contains("restart_time") ) { 
+        bool set_time = true;
+        ppAmr.query("restart_set_time",set_time); // set amr.restart_set_time = false to prevent time reset
+        if (set_time){
+            Real restart_time;
+            ppAmr.get("restart_time", restart_time);
+            m_time = restart_time;
+        }
     }
 
+    // read timestep
+    if (header.m_real.find("dt") == header.m_real.end()) {
+        MayDay::Error("checkpoint file does not contain dt");
+    }
     m_dt = header.m_real["dt"];
 
     // read num comps
-    if (header.m_int.find("num_comps") == header.m_int.end())
-    {
+    if (header.m_int.find("num_comps") == header.m_int.end()) {
         MayDay::Error("checkpoint file does not contain num_comps");
     }
 
     // read cfl
-    if (header.m_real.find("cfl") == header.m_real.end())
-    {
+    if (header.m_real.find("cfl") == header.m_real.end()) {
         MayDay::Error("checkpoint file does not contain cfl");
     }
-
     Real check_cfl = header.m_real["cfl"];
     ParmParse ppCheck("AMRDriver");
-
-    if (ppCheck.contains("cfl"))
-    {
+    if (ppCheck.contains("cfl")) {
         // check for consistency and warn if different
-        if (check_cfl != m_cfl)
-        {
-            if (m_verbosity > 0)
-            {
+        if (check_cfl != m_cfl) {
+            if (m_verbosity > 0) {
                 pout() << "CFL in checkpoint file different from inputs file" << endl;
                 pout() << "     cfl in inputs file = " << m_cfl << endl;
                 pout() << "     cfl in checkpoint file = " << check_cfl << endl;
                 pout() << "Using cfl from inputs file" << endl;
             }
         } // end if cfl numbers differ
-    }     // end if cfl present in inputs file
-    else
-    {
+    } else { //cfl not present in inputs file
         m_cfl = check_cfl;
     }
 
@@ -3397,19 +3393,20 @@ AmrHydro::readCheckpointFile(HDF5Handle& a_handle)
     // Get the periodicity info -- this is more complicated than it really
     // needs to be in order to preserve backward compatibility
     bool isPeriodic[SpaceDim];
-    D_TERM(if (!(header.m_int.find("is_periodic_0") == header.m_int.end())) isPeriodic[0] =
-               (header.m_int["is_periodic_0"] == 1);
-           else isPeriodic[0] = false;
-           ,
+    D_TERM(if (!(header.m_int.find("is_periodic_0") == header.m_int.end())) 
+               isPeriodic[0] =  (header.m_int["is_periodic_0"] == 1);
+           else 
+               isPeriodic[0] = false; ,
 
-           if (!(header.m_int.find("is_periodic_1") == header.m_int.end())) isPeriodic[1] =
-               (header.m_int["is_periodic_1"] == 1);
-           else isPeriodic[1] = false;
-           ,
+           if (!(header.m_int.find("is_periodic_1") == header.m_int.end())) 
+               isPeriodic[1] =  (header.m_int["is_periodic_1"] == 1);
+           else 
+               isPeriodic[1] = false; ,
 
-           if (!(header.m_int.find("is_periodic_2") == header.m_int.end())) isPeriodic[2] =
-               (header.m_int["is_periodic_2"] == 1);
-           else isPeriodic[2] = false;);
+           if (!(header.m_int.find("is_periodic_2") == header.m_int.end())) 
+               isPeriodic[2] = (header.m_int["is_periodic_2"] == 1);
+           else 
+               isPeriodic[2] = false;);
 
     // now resize stuff
     m_amrDomains.resize(m_max_level + 1);
@@ -3417,10 +3414,21 @@ AmrHydro::readCheckpointFile(HDF5Handle& a_handle)
     m_amrDx.resize(m_max_level + 1);
     m_old_head.resize(m_max_level + 1, NULL);
     m_head.resize(m_max_level + 1, NULL);
+    m_gradhead.resize(m_max_level + 1, NULL);
+    m_gradhead_ec.resize(m_max_level + 1, NULL);
+    m_old_gapheight.resize(m_max_level + 1, NULL);
+    m_gapheight.resize(m_max_level + 1, NULL);
+    m_Pw.resize(m_max_level + 1, NULL);
+    m_qw.resize(m_max_level + 1, NULL);
+    m_Re.resize(m_max_level + 1, NULL);
+    m_meltRate.resize(m_max_level + 1, NULL);
+    m_iceheight.resize(m_max_level + 1, NULL);
+    m_bedelevation.resize(m_max_level + 1, NULL);
+    m_overburdenpress.resize(m_max_level + 1, NULL);
+    //m_gradZb.resize(m_max_level + 1, NULL);
 
-    // now read in level-by-level data
-    for (int lev = 0; lev <= max_level_check; lev++)
-    {
+    // now read in level-by-level data -- go to Max lev of checkfile
+    for (int lev = 0; lev <= max_level_check; lev++) {
         // set up the level string
         char levelStr[20];
         sprintf(levelStr, "%d", lev);
@@ -3429,57 +3437,54 @@ AmrHydro::readCheckpointFile(HDF5Handle& a_handle)
         a_handle.setGroup(label);
 
         // read header info
-        HDF5HeaderData header;
-        header.readFromFile(a_handle);
+        HDF5HeaderData levheader;
+        levheader.readFromFile(a_handle);
 
-        if (m_verbosity >= 3)
-        {
+        if (m_verbosity >= 3) {
             pout() << "level " << lev << " header data" << endl;
-            pout() << header << endl;
+            pout() << levheader << endl;
         }
 
         // Get the refinement ratio
-        if (lev < max_level_check)
-        {
+        if (lev < max_level_check) {
             int checkRefRatio;
-            if (header.m_int.find("ref_ratio") == header.m_int.end())
-            {
+            if (levheader.m_int.find("ref_ratio") == levheader.m_int.end()) {
                 MayDay::Error("checkpoint file does not contain ref_ratio");
             }
-            checkRefRatio = header.m_int["ref_ratio"];
+            checkRefRatio = levheader.m_int["ref_ratio"];
 
             // check for consistency
-            if (checkRefRatio != m_refinement_ratios[lev])
-            {
+            if (checkRefRatio != m_refinement_ratios[lev]){
                 MayDay::Error("inputs file and checkpoint file ref ratios inconsistent");
             }
         }
 
         // read dx
-        if (header.m_real.find("dx") == header.m_real.end())
-        {
+        if (levheader.m_real.find("dx") == levheader.m_real.end()) {
             MayDay::Error("checkpoint file does not contain dx");
         }
-
-        m_amrDx[lev] = RealVect::Unit * (header.m_real["dx"]);
+        // TODO check why that Abs doesn't work
+        //if (lev <= max_level_check) {
+        //    if ( Abs(m_amrDx[lev] - levheader.m_real["dx"]) > TINY_NORM ) {
+        //        MayDay::Error("restart file dx != input file dx");
+        //    }
+        //}
+        m_amrDx[lev] = RealVect::Unit * (levheader.m_real["dx"]);
 
         // read problem domain box
-        if (header.m_box.find("prob_domain") == header.m_box.end())
-        {
+        if (levheader.m_box.find("prob_domain") == levheader.m_box.end()) {
             MayDay::Error("checkpoint file does not contain prob_domain");
         }
-        Box domainBox = header.m_box["prob_domain"];
+        Box domainBox = levheader.m_box["prob_domain"];
 
         m_amrDomains[lev] = ProblemDomain(domainBox, isPeriodic);
 
         // the rest is only applicable if this level is defined
-        if (lev <= m_finest_level)
-        {
+        if (lev <=  m_finest_level && lev <= max_level_check) {
             // read grids
             Vector<Box> grids;
             const int grid_status = read(a_handle, grids);
-            if (grid_status != 0)
-            {
+            if (grid_status != 0) {
                 MayDay::Error("checkpoint file does not contain a Vector<Box>");
             }
             // do load balancing
@@ -3490,25 +3495,86 @@ AmrHydro::readCheckpointFile(HDF5Handle& a_handle)
             m_amrGrids[lev] = levelDBL;
 
             // allocate this level's storage
-            IntVect nGhost = m_num_head_ghost * IntVect::Unit;
-            m_old_head[lev] = new LevelData<FArrayBox>(levelDBL, 1, nGhost);
-            m_head[lev]     = new LevelData<FArrayBox>(levelDBL, SpaceDim, nGhost);
+            IntVect nGhost  = m_num_head_ghost * IntVect::Unit;
+            int nPhiComp = 1;
+            m_old_head[lev]      = new LevelData<FArrayBox>(levelDBL, nPhiComp, nGhost);
+            m_head[lev]          = new LevelData<FArrayBox>(levelDBL, nPhiComp, nGhost);
+            m_gradhead[lev]      = new LevelData<FArrayBox>(levelDBL, SpaceDim*nPhiComp, nGhost);
+            m_gradhead_ec[lev]   = new LevelData<FluxBox>(levelDBL, nPhiComp, IntVect::Zero);
+            m_old_gapheight[lev] = new LevelData<FArrayBox>(levelDBL, nPhiComp, nGhost);
+            m_gapheight[lev]     = new LevelData<FArrayBox>(levelDBL, nPhiComp, nGhost);
+            m_Pw[lev]            = new LevelData<FArrayBox>(levelDBL, nPhiComp, nGhost);
+            m_qw[lev]            = new LevelData<FArrayBox>(levelDBL, SpaceDim*nPhiComp, nGhost);
+            m_Re[lev]            = new LevelData<FArrayBox>(levelDBL, nPhiComp, nGhost);
+            m_meltRate[lev]      = new LevelData<FArrayBox>(levelDBL, nPhiComp, nGhost);
+            m_iceheight[lev]     = new LevelData<FArrayBox>(levelDBL, nPhiComp, nGhost);
+            m_bedelevation[lev]  = new LevelData<FArrayBox>(levelDBL, nPhiComp, nGhost);
+            m_overburdenpress[lev] = new LevelData<FArrayBox>(levelDBL, nPhiComp, nGhost);
+            //m_gradZb[lev] = new LevelData<FArrayBox>(levelDBL, SpaceDim*nPhiComp, nGhost);
 
             // read this level's data
-
+            /* HEAD */
             LevelData<FArrayBox>& old_head = *m_old_head[lev];
             LevelData<FArrayBox> tmpHead;
             tmpHead.define(old_head);
-
-            int dataStatus = read<FArrayBox>(a_handle, tmpHead, "headData", levelDBL);
-            for (DataIterator dit(levelDBL); dit.ok(); ++dit)
-            {
-                old_head[dit].copy(tmpHead[dit]);
-            }
-
-            if (dataStatus != 0)
-            {
+            int dataStatus = read<FArrayBox>(a_handle, tmpHead, "head", levelDBL);
+            if (dataStatus != 0) {
                 MayDay::Error("checkpoint file does not contain head data");
+            }
+            for (DataIterator dit(levelDBL); dit.ok(); ++dit) {
+                old_head[dit].copy(tmpHead[dit]);
+                (*m_head[lev])[dit].copy(tmpHead[dit]);
+            }
+            /* B */
+            LevelData<FArrayBox> tmpB;
+            tmpB.define(old_head);
+            dataStatus = read<FArrayBox>(a_handle, tmpB, "gapHeight", levelDBL);
+            if (dataStatus != 0) {
+                MayDay::Error("checkpoint file does not contain gap height data");
+            }
+            for (DataIterator dit(levelDBL); dit.ok(); ++dit) {
+                (*m_old_gapheight[lev])[dit].copy(tmpB[dit]);
+                (*m_gapheight[lev])[dit].copy(tmpB[dit]);
+            }
+            /* Re */
+            LevelData<FArrayBox> tmpRe;
+            tmpRe.define(old_head);
+            dataStatus = read<FArrayBox>(a_handle, tmpRe, "Re", levelDBL);
+            if (dataStatus != 0) {
+                MayDay::Error("checkpoint file does not contain Re data");
+            }
+            for (DataIterator dit(levelDBL); dit.ok(); ++dit) {
+                (*m_Re[lev])[dit].copy(tmpRe[dit]);
+            }
+            /* Ice Height */
+            LevelData<FArrayBox> tmpIceHeight;
+            tmpIceHeight.define(old_head);
+            dataStatus = read<FArrayBox>(a_handle, tmpIceHeight, "iceHeight", levelDBL);
+            if (dataStatus != 0) {
+                MayDay::Error("checkpoint file does not contain H data");
+            }
+            for (DataIterator dit(levelDBL); dit.ok(); ++dit) {
+                (*m_iceheight[lev])[dit].copy(tmpIceHeight[dit]);
+            }
+            /* Ice Pressure */
+            LevelData<FArrayBox> tmpPi;
+            tmpPi.define(old_head);
+            dataStatus = read<FArrayBox>(a_handle, tmpPi, "overburdenPress", levelDBL);
+            if (dataStatus != 0) {
+                MayDay::Error("checkpoint file does not contain Pi data");
+            }
+            for (DataIterator dit(levelDBL); dit.ok(); ++dit) {
+                (*m_overburdenpress[lev])[dit].copy(tmpPi[dit]);
+            }
+            /* Bed Topo */
+            LevelData<FArrayBox> tmpZb;
+            tmpZb.define(old_head);
+            dataStatus = read<FArrayBox>(a_handle, tmpZb, "bedelevation", levelDBL);
+            if (dataStatus != 0) {
+                MayDay::Error("checkpoint file does not contain ZB data");
+            }
+            for (DataIterator dit(levelDBL); dit.ok(); ++dit) {
+                (*m_bedelevation[lev])[dit].copy(tmpZb[dit]);
             }
 
         } // end if this level is defined
@@ -3523,8 +3589,7 @@ AmrHydro::readCheckpointFile(HDF5Handle& a_handle)
 void
 AmrHydro::restart(string& a_restart_file)
 {
-    if (m_verbosity > 3)
-    {
+    if (m_verbosity > 3) {
         pout() << "AmrHydro::restart" << endl;
     }
 
@@ -3532,7 +3597,6 @@ AmrHydro::restart(string& a_restart_file)
     // first read in data from checkpoint file
     readCheckpointFile(handle);
     handle.close();
-    // don't think I need to do anything else, do I?
 }
 
 #endif

@@ -20,6 +20,7 @@
 #include "BiCGStabSolver.H"
 #include "CellToEdge.H"
 #include "EdgeToCell.H"
+#include "CH_HDF5.H"
 
 #include "NamespaceHeader.H"
 
@@ -122,6 +123,12 @@ public:
 
 #ifdef CH_USE_HDF5
 
+private:
+    HDF5HeaderData m_headerData; 
+
+    void writeMetaDataHDF5(HDF5Handle& a_handle) const;
+
+public: 
     void writePltCustom(int numPlotComps,
                         Vector<std::string>& vectName,
                         Vector<Vector<LevelData<FArrayBox>*>> stp,
