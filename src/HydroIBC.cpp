@@ -72,8 +72,8 @@ HydroIBC::initializeData(RealVect& a_dx,
                            LevelData<FArrayBox>& a_meltRate,
                            LevelData<FArrayBox>& a_zbed,
                            LevelData<FArrayBox>& a_Pi,
-                           LevelData<FArrayBox>& a_iceHeight,
-                           LevelData<FArrayBox>& a_Gradzbed)
+                           LevelData<FArrayBox>& a_iceHeight)
+                           //LevelData<FArrayBox>& a_Gradzbed)
 {
     
     pout() << "HydroIBC::initializeData" << endl;
@@ -93,7 +93,7 @@ HydroIBC::initializeData(RealVect& a_dx,
         FArrayBox& thiszbed      = a_zbed[dit];
         FArrayBox& thispi        = a_Pi[dit];
         FArrayBox& thisiceHeight = a_iceHeight[dit];
-        FArrayBox& thisGradzbed  = a_Gradzbed[dit];
+        //FArrayBox& thisGradzbed  = a_Gradzbed[dit];
 
         BoxIterator bit(thisHead.box()); // Default .box() have ghostcells ?
         for (bit.begin(); bit.ok(); ++bit)
@@ -105,8 +105,8 @@ HydroIBC::initializeData(RealVect& a_dx,
             // bed topography
             //thiszbed(iv, 0)      = std::max(Params.m_slope*x_loc, 0.0);
             thiszbed(iv, 0)      = Params.m_slope*x_loc;
-            thisGradzbed(iv, 0)  = Params.m_slope;
-            thisGradzbed(iv, 1)  = 0.0;
+            //thisGradzbed(iv, 0)  = Params.m_slope;
+            //thisGradzbed(iv, 1)  = 0.0;
             //thiszbed(iv, 0)      = Params.m_slope*std::sqrt(x_loc*x_loc + y_loc*y_loc);
             //thisGradzbed(iv, 0)  = Params.m_slope*Params.m_slope*x_loc / thiszbed(iv, 0);
             //thisGradzbed(iv, 1)  = Params.m_slope*Params.m_slope*y_loc / thiszbed(iv, 0);
