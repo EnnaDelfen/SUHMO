@@ -3133,43 +3133,31 @@ AmrHydro::writePlotFile()
 void
 AmrHydro::writeCheckpointFile() const
 {
-    if (m_verbosity > 3)
-    {
+    if (m_verbosity > 3) {
         pout() << "AmrHydro::writeCheckpointfile" << endl;
     }
 
     CH_TIME("AmrHydro::writeCheckpointFile");
 
-    string headName("head");
-    Vector<string> vectName(1);
-    for (int comp = 0; comp < 1; comp++)
-    {
-        char idx[4];
-        sprintf(idx, "%d", comp);
-        vectName[comp] = headName + string(idx);
-    }
-    Box domain = m_amrDomains[0].domainBox();
-    // int numLevels = m_finest_level +1;
-
-    // generate checkpointfile name
-    char(iter_str[100]);
-
-    if (m_check_overwrite)
-    {
+    char* iter_str;
+    if (m_check_overwrite) {
         // overwrite the same checkpoint file, rather than re-writing them
+        std::string fs("%s.%dd.hdf5");
+        iter_str = new char[m_check_prefix.size() + fs.size() + 16];
         sprintf(iter_str, "%s.%dd.hdf5", m_check_prefix.c_str(), SpaceDim);
-    }
-    else
-    {
-        // or hang on to them, if you are a bit sentimental. It's better than keeping
-        // every core dump you generate.
+    } else {
+        // or hang on to them
+        std::string fs;
+        fs.assign("%s%06d.%dd.hdf5");
+        iter_str = new char[m_check_prefix.size() + fs.size() + 16];
         sprintf(iter_str, "%s%06d.%dd.hdf5", m_check_prefix.c_str(), m_cur_step, SpaceDim);
     }
 
-    if (m_verbosity > 3)
-    {
+    if (m_verbosity > 3) {
         pout() << "checkpoint file name = " << iter_str << endl;
     }
+
+    // Equivalent of AmrIce::writeCheckpointFile(const string& a_file) in Bisicles
 
     HDF5Handle handle(iter_str, HDF5Handle::CREATE);
 
@@ -3187,45 +3175,66 @@ AmrHydro::writeCheckpointFile() const
     header.m_int["current_step"] = m_cur_step;
     header.m_real["time"] = m_time;
     header.m_real["dt"] = m_dt;
-    header.m_int["num_comps"] = 1;
-    // at the moment, save cfl, but it can be changed by the inputs
-    // file if desired.
+    header.m_int["num_comps"] = 6; // H/B/Pice/Zb/Re/Hice
     header.m_real["cfl"] = m_cfl;
 
     // periodicity info
-    D_TERM(if (m_amrDomains[0].isPeriodic(0)) header.m_int["is_periodic_0"] = 1; else header.m_int["is_periodic_0"] = 0;
-           ,
+    D_TERM(if (m_amrDomains[0].isPeriodic(0)) 
+               header.m_int["is_periodic_0"] = 1; 
+           else 
+               header.m_int["is_periodic_0"] = 0; ,
 
-           if (m_amrDomains[0].isPeriodic(1)) header.m_int["is_periodic_1"] = 1;
-           else header.m_int["is_periodic_1"] = 0;
-           ,
+           if (m_amrDomains[0].isPeriodic(1)) 
+               header.m_int["is_periodic_1"] = 1;
+           else 
+               header.m_int["is_periodic_1"] = 0; ,
 
-           if (m_amrDomains[0].isPeriodic(2)) header.m_int["is_periodic_2"] = 1;
-           else header.m_int["is_periodic_2"] = 0;);
+           if (m_amrDomains[0].isPeriodic(2)) 
+               header.m_int["is_periodic_2"] = 1;
+           else 
+               header.m_int["is_periodic_2"] = 0;
+           );
 
     // set up component names
-    char compStr[30];
-    // string thicknessName("thickness");
-    string compName;
+    string headName("head");
+    string gapHeightName("gapHeight");
+    string piName("overburdenPress");
+    string zbedName("bedelevation");
+    string ReName("Re"); 
+    string IceHeightName("iceHeight"); 
+
     int nComp = 0;
-    for (int comp = 0; comp < 1; comp++)
-    {
-        // first generate component name
-        char idx[5];
-        sprintf(idx, "%04d", comp);
-        compName = headName + string(idx);
-        sprintf(compStr, "component_%04d", comp);
-        header.m_string[compStr] = compName;
-    }
+    char compStr[30];
+    // HEAD
+    sprintf(compStr, "component_%04d", nComp);
+    header.m_string[compStr] = headName;
     nComp++;
+    // GapHeight
+    sprintf(compStr, "component_%04d", nComp);
+    header.m_string[compStr] = gapHeightName;
+    nComp++;
+    // Pi
+    sprintf(compStr, "component_%04d", nComp);
+    header.m_string[compStr] = piName;
+    nComp++;
+    // Zb
+    sprintf(compStr, "component_%04d", nComp);
+    header.m_string[compStr] = zbedName;
+    nComp++;
+    // Re
+    sprintf(compStr, "component_%04d", nComp);
+    header.m_string[compStr] = ReName;
+    nComp++;
+    // Hice
+    sprintf(compStr, "component_%04d", nComp);
+    header.m_string[compStr] = IceHeightName;
 
     header.writeToFile(handle);
 
     // now loop over levels and write out each level's data
     // note that we loop over all allowed levels, even if they
     // are not defined at the moment.
-    for (int lev = 0; lev <= m_max_level; lev++)
-    {
+    for (int lev = 0; lev <= m_max_level; lev++) {
         // set up the level string
         char levelStr[20];
         sprintf(levelStr, "%d", lev);
@@ -3235,8 +3244,7 @@ AmrHydro::writeCheckpointFile() const
 
         // set up the header info
         HDF5HeaderData levelHeader;
-        if (lev < m_max_level)
-        {
+        if (lev < m_max_level) {
             levelHeader.m_int["ref_ratio"] = m_refinement_ratios[lev];
         }
         levelHeader.m_real["dx"] = m_amrDx[lev][0];
@@ -3246,14 +3254,15 @@ AmrHydro::writeCheckpointFile() const
 
         // now write the data for this level
         // only try to write data if level is defined.
-        if (lev <= m_finest_level)
-        {
+        if (lev <= m_finest_level) {
             write(handle, m_amrGrids[lev]);
-
-            const IntVect ghost = IntVect::Unit * 2;
-
+            const IntVect ghost = IntVect::Unit * 1;
             write(handle, *m_head[lev], "headData", m_head[lev]->ghostVect());
-
+            write(handle, *m_gapheight[lev], "gapHeightData", m_gapheight[lev]->ghostVect());
+            write(handle, *m_overburdenpress[lev], "overburdenPressData", m_overburdenpress[lev]->ghostVect());
+            write(handle, *m_bedelevation[lev], "bedelevationData", m_bedelevation[lev]->ghostVect());
+            write(handle, *m_Re[lev], "ReData", m_Re[lev]->ghostVect());
+            write(handle, *m_iceheight[lev], "iceHeightData", m_iceheight[lev]->ghostVect());
         } // end loop over levels
     }
 
