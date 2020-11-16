@@ -872,6 +872,7 @@ AmrHydro::initialize()
         // once we've set up everything, this lets us over-ride the
         // time and step number in the restart checkpoint file with
         // one specified in the inputs
+        // AF dunno if we still need that
         if (ppAmr.contains("restart_time")) {
             Real restart_time;
             ppAmr.get("restart_time", restart_time);
@@ -3350,6 +3351,9 @@ AmrHydro::readCheckpointFile(HDF5Handle& a_handle)
         m_cur_step = restart_step;
         m_restart_step = restart_step;
     }
+    if (m_verbosity >= 3) {
+        pout() << "restart step ? " << m_cur_step << endl;
+    }
 
     // read time
     if (header.m_real.find("time") == header.m_real.end()) {
@@ -3526,7 +3530,7 @@ AmrHydro::readCheckpointFile(HDF5Handle& a_handle)
             LevelData<FArrayBox>& old_head = *m_old_head[lev];
             LevelData<FArrayBox> tmpHead;
             tmpHead.define(old_head);
-            int dataStatus = read<FArrayBox>(a_handle, tmpHead, "head", levelDBL);
+            int dataStatus = read<FArrayBox>(a_handle, tmpHead, "headData", levelDBL);
             if (dataStatus != 0) {
                 MayDay::Error("checkpoint file does not contain head data");
             }
@@ -3537,7 +3541,7 @@ AmrHydro::readCheckpointFile(HDF5Handle& a_handle)
             /* B */
             LevelData<FArrayBox> tmpB;
             tmpB.define(old_head);
-            dataStatus = read<FArrayBox>(a_handle, tmpB, "gapHeight", levelDBL);
+            dataStatus = read<FArrayBox>(a_handle, tmpB, "gapHeightData", levelDBL);
             if (dataStatus != 0) {
                 MayDay::Error("checkpoint file does not contain gap height data");
             }
@@ -3548,7 +3552,7 @@ AmrHydro::readCheckpointFile(HDF5Handle& a_handle)
             /* Re */
             LevelData<FArrayBox> tmpRe;
             tmpRe.define(old_head);
-            dataStatus = read<FArrayBox>(a_handle, tmpRe, "Re", levelDBL);
+            dataStatus = read<FArrayBox>(a_handle, tmpRe, "ReData", levelDBL);
             if (dataStatus != 0) {
                 MayDay::Error("checkpoint file does not contain Re data");
             }
@@ -3558,7 +3562,7 @@ AmrHydro::readCheckpointFile(HDF5Handle& a_handle)
             /* Ice Height */
             LevelData<FArrayBox> tmpIceHeight;
             tmpIceHeight.define(old_head);
-            dataStatus = read<FArrayBox>(a_handle, tmpIceHeight, "iceHeight", levelDBL);
+            dataStatus = read<FArrayBox>(a_handle, tmpIceHeight, "iceHeightData", levelDBL);
             if (dataStatus != 0) {
                 MayDay::Error("checkpoint file does not contain H data");
             }
@@ -3568,7 +3572,7 @@ AmrHydro::readCheckpointFile(HDF5Handle& a_handle)
             /* Ice Pressure */
             LevelData<FArrayBox> tmpPi;
             tmpPi.define(old_head);
-            dataStatus = read<FArrayBox>(a_handle, tmpPi, "overburdenPress", levelDBL);
+            dataStatus = read<FArrayBox>(a_handle, tmpPi, "overburdenPressData", levelDBL);
             if (dataStatus != 0) {
                 MayDay::Error("checkpoint file does not contain Pi data");
             }
@@ -3578,7 +3582,7 @@ AmrHydro::readCheckpointFile(HDF5Handle& a_handle)
             /* Bed Topo */
             LevelData<FArrayBox> tmpZb;
             tmpZb.define(old_head);
-            dataStatus = read<FArrayBox>(a_handle, tmpZb, "bedelevation", levelDBL);
+            dataStatus = read<FArrayBox>(a_handle, tmpZb, "bedelevationData", levelDBL);
             if (dataStatus != 0) {
                 MayDay::Error("checkpoint file does not contain ZB data");
             }
