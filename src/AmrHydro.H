@@ -63,8 +63,7 @@ public:
     void initialize();
 
     /* set domain size (in meters) */
-    void setDomainSize(const RealVect& a_domainSize)
-    {
+    void setDomainSize(const RealVect& a_domainSize) {
         m_domainSize = a_domainSize;
     }
 
@@ -76,14 +75,6 @@ public:
 
     /* compute one timestep */
     void timeStep(Real a_dt);
-
-    /* compute fluxes */
-    void computeFluxes(Vector<LevelData<FluxBox>*>& a_vectFluxes, Real a_dt);
-
-    void updateHead(Vector<LevelData<FArrayBox>*>& a_new_head,
-                   const Vector<LevelData<FArrayBox>*>& a_old_head,
-                   const Vector<LevelData<FluxBox>*>& a_fluxes,
-                   Real a_dt);
 
     void aCoeff_bCoeff(LevelData<FArrayBox>&  levelacoef, 
                        LevelData<FluxBox>&  levelbcoef, 
@@ -154,94 +145,74 @@ public:
 #endif
 
     /* set current solution time */
-    void setTime(Real a_time)
-    {
+    void setTime(Real a_time) {
         m_time = a_time;
     }
 
-    Real time() const
-    {
+    Real time() const {
         return m_time + m_offsetTime;
     };
 
-    Real dt() const
-    {
+    Real dt() const {
         return m_dt;
     }
 
-    int finestLevel() const
-    {
+    int finestLevel() const {
         return m_finest_level;
     }
 
     /* is this object defined and initialized? */
-    bool isDefined() const
-    {
+    bool isDefined() const {
         return m_is_defined;
     }
 
-    const RealVect dx(int a_level) const
-    {
+    const RealVect dx(int a_level) const {
         return m_amrDx[a_level];
     };
 
-    const DisjointBoxLayout& grids(int a_level) const
-    {
+    const DisjointBoxLayout& grids(int a_level) const {
         return m_amrGrids[a_level];
     }
 
-    const Vector<int>& refRatios() const
-    {
+    const Vector<int>& refRatios() const {
         return m_refinement_ratios;
     }
 
-    const Vector<RealVect>& amrDx() const
-    {
+    const Vector<RealVect>& amrDx() const {
         return m_amrDx;
     }
     
-    const Vector<ProblemDomain>& amrDomains() const
-    {
+    const Vector<ProblemDomain>& amrDomains() const {
         return m_amrDomains;
     }
 
     /* Access functions */
     // m_gapheight
-    const LevelData<FArrayBox>* gapHeight(int a_level) const
-    {
+    const LevelData<FArrayBox>* gapHeight(int a_level) const {
         return m_gapheight[a_level];
     }
-    Vector<LevelData<FArrayBox>*>& amrGapHeight()
-    {
+    Vector<LevelData<FArrayBox>*>& amrGapHeight() {
         return m_gapheight;
     }
 
     // m_head
-    const LevelData<FArrayBox>* head(int a_level) const
-    {
+    const LevelData<FArrayBox>* head(int a_level) const {
         return m_head[a_level];
     }
-    Vector<LevelData<FArrayBox>*>& amrHead()
-    {
+    Vector<LevelData<FArrayBox>*>& amrHead() {
         return m_head;
     }
 
     // m_bedelevation
-    const LevelData<FArrayBox>* zBed(int a_level) const
-    {
+    const LevelData<FArrayBox>* zBed(int a_level) const {
         return m_bedelevation[a_level];
     }
-    Vector<LevelData<FArrayBox>*>& amrZBed()
-    {
+    Vector<LevelData<FArrayBox>*>& amrZBed() {
         return m_bedelevation;
     }
 
-    /* set physical parameters (useful when calling from another driver) */
-    //void setPhysicalConstants(Real a_gravity);
-
     /* accessor for AMR grids */
-    const Vector<DisjointBoxLayout>& amrGrids() const
-    {
+    const Vector<DisjointBoxLayout>& amrGrids() const {
         return m_amrGrids;
     }
 
@@ -267,9 +238,6 @@ protected:
     /// initialize data on hierarchy
     void initData(Vector<LevelData<FArrayBox>*>& a_initialVelocity);
 
-    /// define elliptic solver for computing velocity field
-    virtual void defineSolver();
-
     /// compute timestep
     Real computeDt();
 
@@ -294,11 +262,6 @@ protected:
     /// blocking factor
     int m_block_factor;
 
-    /// only allow tagging within a subset of the coarse domain
-    IntVectSet m_tag_subset;
-
-    Vector<IntVectSet> m_vectTagSubset;
-
     /// grid efficiency
     Real m_fill_ratio;
 
@@ -318,20 +281,13 @@ protected:
     int m_regrid_interval;
     int m_n_regrids;
 
-    /* stores tags from previous regrids */
-    Vector<IntVectSet> m_vectTags;
-
-    /// tag on grad(phi)?
-    bool m_tagOnGradPhi;
-
-    /// tagging value (undivided gradient(phi) threshold for regridding)
-    Real m_tagging_val;
-
-    /// tag on Laplacian(phi)
-    bool m_tagOnLapPhi;
-
-    /// tagging value for Laplacian(phi)
-    Real m_laplacian_tagging_val;
+    /* tag variable */
+    bool m_tag_defined;                  // did we define a m_tag_var
+    string m_tag_var;
+    Real m_tagging_val;                  // tagging value
+    Vector<IntVectSet> m_vectTags;       // stores tags from previous regrids 
+    IntVectSet m_tag_subset;             // only allow tagging within a subset of the coarse domain 
+    Vector<IntVectSet> m_vectTagSubset;
 
     /// amount to buffer tags used in regridding
     // grow tags in all directions by m_tags_grow
@@ -360,30 +316,26 @@ protected:
     /// book-keeping; keeps track of number of cells per level
     Vector<int> m_num_cells;
 
-    /// current time
-    Real m_time;
+    /* num ghost cells */
+    int m_num_head_ghost;  // 
+
+    /* time and timestepping*/
+    Real m_time;        // current time
     Real m_offsetTime;
+    Real m_fixed_dt;    //fixed time step > 0 , if desired 
+    Real m_dt;          // most recent timestep
+    Real m_stable_dt;   // most recent stable timestep (> m_dt if we took a step just to hit a plot interval)
 
-    /// most recent timestep
-    Real m_dt;
+    int m_cur_step;     // current step
 
-    /// most recent stable timestep (> m_dt if we took a step just to hit a plot interval)
-    Real m_stable_dt;
+    Real m_cfl;         // timestep scaling
 
-    /// timestep scaling
-    Real m_cfl;
+    Real m_initial_cfl; // cfl number for initial timestep (useful if initial data needs small cfl)
 
-    /// cfl number for initial timestep (useful if initial data needs small cfl)
-    Real m_initial_cfl;
-
-    /// maximum amount cfl number may grow in one timestep
-    Real m_max_dt_grow;
+    Real m_max_dt_grow; // maximum amount cfl number may grow in one timestep
 
     // debug 
     bool m_PrintCustom;
-
-    /* current step */
-    int m_cur_step;
 
     /** Model outputs include spatio temporal fields of Hydraulic head,  effective  Pressure,  
         subglacial  gap  height  (the  effective  geometry  representative  of  an  entire  element),  
@@ -417,11 +369,7 @@ protected:
     Vector<LevelData<FArrayBox>*> m_bedelevation;           //
     Vector<LevelData<FArrayBox>*> m_overburdenpress;        // rhoi*g*H
 
-    Vector<LevelData<FArrayBox>*> m_gradZb;        // rhoi*g*H
-
-
-    /* Solver */
-    //VCAMRPoissonOp2Factory* m_poisson_h;
+    //Vector<LevelData<FArrayBox>*> m_gradZb;      
 
     /* verbosity level */
     int m_verbosity;
@@ -429,37 +377,19 @@ protected:
     /* is this object initialized? */
     bool m_is_defined;
 
-    ///
-    bool m_do_restart;
+    /* plotting and restarting */
+    bool m_do_restart;  // bool : true if we are restarting from checkfile
+    int m_restart_step;  //if starting from a restart, timestep of restart
 
-    /// if starting from a restart, timestep of restart
-    int m_restart_step;
-
-    ///
-    string m_plot_prefix;
-
-    ///
-    string m_check_prefix;
+    string m_check_prefix;  // name of checkpoint files
+    int m_check_interval;   // write checkfile every ... ite
 
     bool m_check_overwrite; // overwrite check point files
     bool m_check_exit;      // exit immediately after writing checkpoint?
 
-    ///
-    int m_plot_interval;
-    /// write a plot file every m_plot_time_interval years (rather than steps)
-    Real m_plot_time_interval;
-
-    /// if true, include grad(phi) in plotfiles
-    bool m_write_gradPhi;
-
-    ///
-    int m_check_interval;
-
-    // used to store a fixed time step > 0 , if desired
-    Real m_fixed_dt;
-
-    /* num ghost cells */
-    int m_num_head_ghost;
+    string m_plot_prefix; // name of solutions
+    int m_plot_interval; // write a plot file every ... ite 
+    Real m_plot_time_interval; // write a plot file every ... sec
 
     /* SUHMO Params */
     suhmo_params* m_suhmoParm;

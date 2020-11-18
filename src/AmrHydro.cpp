@@ -435,8 +435,8 @@ AmrHydro::setDefaults()
     // set the rest of these to reasonable defaults
     m_regrid_lbase = 0;
     m_nesting_radius = 1;
-    m_tagging_val = 0.1;
-    m_tagOnGradPhi = true;
+    m_tag_defined = false;
+    m_tag_var = "none";
     m_tagging_val = 1.0;
     m_tags_grow = 0;
     m_tags_grow_dir = IntVect::Zero;
@@ -444,7 +444,7 @@ AmrHydro::setDefaults()
     m_plot_prefix = "plot";
     m_plot_interval = 10000000;
     m_plot_time_interval = 1.0e+12;
-    m_write_gradPhi = false;
+    //m_write_gradPhi = false;
 
     m_check_prefix = "chk";
     m_check_interval = -1;
@@ -565,7 +565,7 @@ AmrHydro::initialize()
     ParmParse ppAmr("AmrHydro");
     m_time     = 0.0;  // start at t = 0
     m_cur_step = 0;    // start at dt = 0
-    ppAmr.get("maxLevel", m_max_level);  // max level
+    ppAmr.get("max_level", m_max_level);  // max level
     if (m_max_level > 0) {
         m_refinement_ratios.resize(m_max_level, -1);
         ppAmr.getarr("ref_ratios", m_refinement_ratios, 0, m_max_level);
@@ -619,16 +619,16 @@ AmrHydro::initialize()
             m_tags_grow_dir[dir] = tgd[dir];
         }
     }
-    bool isThereATaggingCriterion = false;
-    ppAmr.query("tag_on_phi", m_tagOnGradPhi);
-    isThereATaggingCriterion |= m_tagOnGradPhi;
+    ppAmr.query("tag_variable", m_tag_var);
     // if we set this to be true, require that we also provide the threshold
-    if (m_tagOnGradPhi) {
+    if (m_tag_var.compare("none") != 0) {
         ppAmr.query("tagging_val", m_tagging_val);
-    }
-    // abort if there isn't a tagging criterion
-    if (m_max_level > 0 && !isThereATaggingCriterion) {
-        MayDay::Error("No Tagging criterion defined");
+        m_tag_defined = true;
+    } else {
+        if (m_max_level > 0) {
+            // abort if there isn't a tagging criterion
+            MayDay::Error("No Tagging criterion defined");
+        }
     }
 
     // Set up problem domains
@@ -653,30 +653,25 @@ AmrHydro::initialize()
         }
     } // leaving problem domain setup scope
 
-    // Tagging crap, see later
+    // Tagging via an external file of boxes ? not sure I get this 
     std::string tagSubsetBoxesFile = "";
     m_vectTagSubset.resize(m_max_level);
     ppAmr.query("tagSubsetBoxesFile", tagSubsetBoxesFile);
-    if (tagSubsetBoxesFile != "")
-    {
-        if (procID() == uniqueProc(SerialTask::compute))
-        {
+    if (tagSubsetBoxesFile != "") {
+        if (procID() == uniqueProc(SerialTask::compute)) {
             ifstream is(tagSubsetBoxesFile.c_str(), ios::in);
             int lineno = 1;
-            if (is.fail())
-            {
+            if (is.fail()) {
                 pout() << "Can't open " << tagSubsetBoxesFile << std::endl;
                 MayDay::Error("Cannot open refine boxes file");
             }
-            for (int lev = 0; lev < m_max_level; lev++)
-            {
+            for (int lev = 0; lev < m_max_level; lev++) {
                 // allowable tokens to identify levels in tag subset file
                 const char level[6] = "level";
                 const char domain[7] = "domain";
                 char s[6];
                 is >> s;
-                if (std::string(level) == std::string(s))
-                {
+                if (std::string(level) == std::string(s)) {
                     int inlev;
                     is >> inlev;
                     if (inlev != lev)
@@ -684,9 +679,7 @@ AmrHydro::initialize()
                         pout() << "expected ' " << lev << "' at line " << lineno << std::endl;
                         MayDay::Error("bad input file");
                     }
-                }
-                else if (std::string(domain) == std::string(s))
-                {
+                } else if (std::string(domain) == std::string(s)) {
                     // basic idea here is that we read in domain box
                     // (domains must be ordered from coarse->fine)
                     // until we get to a domain box which matches ours.
@@ -694,17 +687,13 @@ AmrHydro::initialize()
                     // which we can use for any coarsening/refining of the domain
                     const Box& levelDomainBox = m_amrDomains[lev].domainBox();
                     bool stillLooking = true;
-                    while (stillLooking)
-                    {
+                    while (stillLooking) {
                         Box domainBox;
                         is >> domainBox;
-                        if (domainBox == levelDomainBox)
-                        {
+                        if (domainBox == levelDomainBox) {
                             pout() << "Found a domain matching level " << lev << endl;
                             stillLooking = false;
-                        }
-                        else // move on until we find our level
-                        {
+                        } else { // move on until we find our level
                             // read in info for the level we're ignoring
                             // advance to next line
                             while (is.get() != '\n')
@@ -712,10 +701,8 @@ AmrHydro::initialize()
                             lineno++;
                             int nboxes;
                             is >> nboxes;
-                            if (nboxes > 0)
-                            {
-                                for (int i = 0; i < nboxes; ++i)
-                                {
+                            if (nboxes > 0) {
+                                for (int i = 0; i < nboxes; ++i) {
                                     Box box;
                                     is >> box;
                                     while (is.get() != '\n')
@@ -724,17 +711,14 @@ AmrHydro::initialize()
                                 }
                             }
                             is >> s;
-                            if (std::string(domain) != std::string(s))
-                            {
+                            if (std::string(domain) != std::string(s)) {
                                 pout() << "expected '" << domain << "' at line " << lineno << ", got " << s
                                        << std::endl;
                                 MayDay::Error("bad input file");
                             }
                         }
                     }
-                }
-                else
-                {
+                } else {
                     pout() << "expected '" << level << "' or '" << domain << "' at line " << lineno << ", got " << s
                            << std::endl;
                     MayDay::Error("bad input file");
@@ -745,10 +729,8 @@ AmrHydro::initialize()
                 lineno++;
                 int nboxes;
                 is >> nboxes;
-                if (nboxes > 0)
-                {
-                    for (int i = 0; i < nboxes; ++i)
-                    {
+                if (nboxes > 0) {
+                    for (int i = 0; i < nboxes; ++i) {
                         Box box;
                         is >> box;
                         while (is.get() != '\n')
@@ -763,37 +745,31 @@ AmrHydro::initialize()
                     ;
                 lineno++;
 
-                if (lev > 0)
-                {
+                if (lev > 0) {
                     // add lower level's subset to this subset
                     IntVectSet crseSet(m_vectTagSubset[lev - 1]);
-                    if (!crseSet.isEmpty())
-                    {
+                    if (!crseSet.isEmpty()) {
                         crseSet.refine(m_refinement_ratios[lev - 1]);
                         // crseSet.nestingRegion(m_block_factor,m_amrDomains[lev]);
-                        if (m_vectTagSubset[lev].isEmpty())
-                        {
+                        if (m_vectTagSubset[lev].isEmpty()) {
                             m_vectTagSubset[lev] = crseSet;
-                        }
-                        else
-                        {
+                        } else {
                             m_vectTagSubset[lev] &= crseSet;
                         }
                     }
                 }
-
             } // end loop over levels
 
         } // end if serial compute
         for (int lev = 0; lev < m_max_level; lev++) broadcast(m_vectTagSubset[lev], uniqueProc(SerialTask::compute));
-    }
+    } // end if (tagSubsetBoxesFile != "")
 
     // check to see if we're using predefined grids
     bool usePredefinedGrids = false;
     std::string gridFile;
-    if (ppAmr.contains("gridsFile")) {
+    if (ppAmr.contains("grids_file")) {
         usePredefinedGrids = true;
-        ppAmr.get("gridsFile", gridFile);
+        ppAmr.get("grids_file", gridFile);
     }
 
     // check to see if we're restarting from a checkpoint file
@@ -806,7 +782,6 @@ AmrHydro::initialize()
         //---------------------------------
         // Set AMR hierarchy vector
         //---------------------------------
-        // AF: add vars here
         // Time-dependent variables    
         m_old_head.resize(m_max_level + 1, NULL);
         m_head.resize(m_max_level + 1, NULL);
@@ -827,10 +802,8 @@ AmrHydro::initialize()
         m_bedelevation.resize(m_max_level + 1, NULL);
         m_overburdenpress.resize(m_max_level + 1, NULL);
 
-        //m_gradZb.resize(m_max_level + 1, NULL);
-
         //-------------------------------------------------
-        // For each level, define a collection of FArrayBox
+        // For each level, define a collection of FArray/FluxBox
         //-------------------------------------------------
         for (int lev = 0; lev < m_head.size(); lev++) {
             m_old_head[lev] = new LevelData<FArrayBox>;
@@ -850,8 +823,6 @@ AmrHydro::initialize()
 
             m_bedelevation[lev] = new LevelData<FArrayBox>;
             m_overburdenpress[lev] = new LevelData<FArrayBox>;
-
-            //m_gradZb[lev] = new LevelData<FArrayBox>;
         }
 
         int finest_level = -1;
@@ -891,8 +862,7 @@ AmrHydro::initialize()
     m_num_cells.resize(m_max_level + 1, 0);
     for (int lev = 0; lev <= m_finest_level; lev++) {
         const DisjointBoxLayout& levelGrids = m_amrGrids[lev];
-        if (m_verbosity > 4)
-        {
+        if (m_verbosity > 4) {
             // write out initial grids
             pout() << "    Level " << lev << " grids: " << levelGrids << endl;
         }
@@ -904,6 +874,7 @@ AmrHydro::initialize()
     }
 
     // finally, set up covered_level flags
+    // AF that part is a little fuzzy
     m_covered_level.resize(m_max_level + 1, 0);
     // note that finest level can't be covered.
     for (int lev = m_finest_level - 1; lev >= 0; lev--) {
@@ -925,8 +896,7 @@ AmrHydro::initialize()
         }
     } // end loop over levels to determine covered levels
 
-    if (m_verbosity > 3)
-    {
+    if (m_verbosity > 3) {
         pout() << "Done with AmrHydro::initialize\n" << endl;
     }
 }
@@ -1007,16 +977,14 @@ AmrHydro::run(Real a_max_time, int a_max_step)
     } // end timestepping loop
 
     // dump out final plotfile, if appropriate
-    if (m_plot_interval >= 0)
-    {
+    if (m_plot_interval >= 0) {
 #ifdef CH_USE_HDF5
         writePlotFile();
 #endif
     }
 
     // dump out final checkpoint file, if appropriate
-    if (m_check_interval >= 0)
-    {
+    if (m_check_interval >= 0) {
 #ifdef CH_USE_HDF5
         writeCheckpointFile();
 #endif
@@ -1199,8 +1167,7 @@ AmrHydro::timeStep(Real a_dt)
 {
     CH_TIME("AmrHydro::timestep");
 
-    if (m_verbosity >= 2)
-    {
+    if (m_verbosity >= 2) {
         pout() << "\n\n\n-- Timestep " << m_cur_step << " Advancing solution from time " << m_time << " ( " << time()
                << ")"
                   " with dt = "
@@ -1255,6 +1222,24 @@ AmrHydro::timeStep(Real a_dt)
     // alpha*aCoef(x)*I - beta*Div(bCoef(x)*Grad) -- note for us: alpha = 0 beta = - 1 
     Vector<RefCountedPtr<LevelData<FArrayBox> > > aCoef(m_max_level + 1);
     Vector<RefCountedPtr<LevelData<FluxBox> > > bCoef(m_max_level + 1);
+
+    ///* Averaging down and fill in ghost cells */
+    // AF I don t think you need that for first dt, and for dt>0 you should be all set
+    //int headGhost = m_head[0]->ghostVect()[0];
+    //for (int lev = m_finest_level; lev > 0; lev--) {
+    //    CoarseAverage averager(m_amrGrids[lev], 1, m_refinement_ratios[lev - 1]);
+    //    averager.averageToCoarse(*m_head[lev - 1], *m_head[lev]);
+    //    averager.averageToCoarse(*m_gapheight[lev - 1], *m_gapheight[lev]);
+    //}
+    // for (int lev = 1; lev <= m_finest_level; lev++) {
+    //     PiecewiseLinearFillPatch filler( m_amrGrids[lev], m_amrGrids[lev - 1], 
+    //                                     1,   // num comps
+    //                                     m_amrDomains[lev - 1], m_refinement_ratios[lev - 1], 
+    //                                     m_num_head_ghost);
+   
+    //     Real interp_coef = 0;
+    //     filler.fillInterp(*m_head[lev], *m_head[lev - 1], *m_head[lev - 1], interp_coef, 0, 0, 1);
+    //}
 
     pout() <<"   ...Copy current into old & take care of ghost cells and BCs "<< endl;
     for (int lev = 0; lev <= m_finest_level; lev++)
@@ -1366,7 +1351,6 @@ AmrHydro::timeStep(Real a_dt)
             LevelData<FArrayBox>& levelQw       = *m_qw[lev]; 
             LevelData<FArrayBox>& levelRe       = *m_Re[lev]; 
             LevelData<FArrayBox>& levelzBed     = *m_bedelevation[lev];
-
            
             // EC quantities
             LevelData<FluxBox>& levelB_ec       = *a_GapHeight_ec[lev];    
@@ -1410,13 +1394,14 @@ AmrHydro::timeStep(Real a_dt)
             LevelData<FArrayBox>* finePsiPtr = NULL;
             int nRefCrse=-1;
             int nRefFine=-1;
-            // one level only for now ...
-            //if (lev > 0) {
-            //    ...
-            //}
-            //if (lev < m_level) {
-            //    ...
-            //}
+            if (lev > 0) {
+                crsePsiPtr = m_head[lev-1];
+                nRefCrse = m_refinement_ratios[lev-1];
+            }
+            if (lev < m_max_level) {
+                finePsiPtr = m_head[lev+1];
+                nRefFine = m_refinement_ratios[lev];
+            }
             Real dx = m_amrDx[lev][0];  
             Gradient::compGradientCC(levelgradH, levelcurrentH,
                                      crsePsiPtr, finePsiPtr,
@@ -1552,7 +1537,6 @@ AmrHydro::timeStep(Real a_dt)
                     meltR(iv, 0)  = (m_suhmoParm->m_G + tmp_cc(iv, 0) + tmp_cc(iv, 1)) / m_suhmoParm->m_L;
                 }
             }
-
         }// loop on levs
 
 
@@ -1636,6 +1620,23 @@ AmrHydro::timeStep(Real a_dt)
             }
         }  // loop on levs
 
+        /* Averaging down and fill in ghost cells */
+        for (int lev = m_finest_level; lev > 0; lev--) {
+            CoarseAverage averager(m_amrGrids[lev], 1, m_refinement_ratios[lev - 1]);
+            averager.averageToCoarse(*m_head[lev - 1], *m_head[lev]);
+            averager.averageToCoarse(*m_gapheight[lev - 1], *m_gapheight[lev]);
+        }
+        for (int lev = 1; lev <= m_finest_level; lev++) {
+            PiecewiseLinearFillPatch filler( m_amrGrids[lev], m_amrGrids[lev - 1], 
+                                            1,   // num comps
+                                            m_amrDomains[lev - 1], m_refinement_ratios[lev - 1], 
+                                            m_num_head_ghost);
+   
+            Real interp_coef = 0;
+            filler.fillInterp(*m_head[lev], *m_head[lev - 1], *m_head[lev - 1], interp_coef, 0, 0, 1);
+            filler.fillInterp(*m_gapheight[lev], *m_gapheight[lev - 1], *m_gapheight[lev - 1], interp_coef, 0, 0, 1);
+        }
+
 
         /* CONVERGENCE TESTS with LAGGED quantities */
         Real maxHead = computeMax(m_head, m_refinement_ratios, Interval(0,0), 0);
@@ -1664,20 +1665,17 @@ AmrHydro::timeStep(Real a_dt)
         Real max_resB = computeMax(a_gapheight_lagged, m_refinement_ratios, Interval(0,0), 0);
         pout() <<ite_idx<< "         x(h,b) "<<max_resH<<" "<<max_resB<<endl;
 
-        //if (ite_idx > 1) {
-            if (ite_idx > 500) {
-                pout() <<"        does not converge."<< endl;
-                MayDay::Error("Abort");
-            } else {
-                if ((max_resH < 1.0e-6) && (max_resB < 1.0e-6)) {
-                    pout() <<"        converged."<< endl;
-                    converged_h = true;
-                }
+        if (ite_idx > 500) {
+            pout() <<"        does not converge."<< endl;
+            MayDay::Error("Abort");
+        } else {
+            if ((max_resH < 1.0e-6) && (max_resB < 1.0e-6)) {
+                pout() <<"        converged."<< endl;
+                converged_h = true;
             }
-        //}
+        }
      
-        // custom plt here
-        // debug print
+        /* custom plt here -- debug print */
         if (m_PrintCustom) {
             Vector<std::string> vectName;
             vectName.resize(8);
@@ -1751,16 +1749,15 @@ AmrHydro::timeStep(Real a_dt)
                 }
             } // loop on levs
             writePltCustom(8, vectName, stuffToPlot, std::to_string(ite_idx));
-        }
+        } // end customPlt
 
         ite_idx++;
         pout() << endl;
     } // end while h solve
 
 
-     // Temporal probe ...
-    for (int lev = m_finest_level; lev >= 0; lev--)
-    {
+     /* Temporal probe ... very ugly */
+    for (int lev = m_finest_level; lev >= 0; lev--) {
         LevelData<FArrayBox>& levelQw       = *m_qw[lev]; 
 
         DisjointBoxLayout& levelGrids    = m_amrGrids[lev];
@@ -1777,53 +1774,6 @@ AmrHydro::timeStep(Real a_dt)
             }
         }
     }  // loop on levs
-
-    // allocate face-centered storage
-    //Vector<LevelData<FluxBox>*> vectFluxes(m_head.size(), NULL);
-    //for (int lev = m_finest_level; lev >= 0; lev--)
-    //{
-    //    const DisjointBoxLayout& levelGrids = m_amrGrids[lev];
-
-    //    IntVect ghostVect = IntVect::Unit;
-
-    //    // if we're doing AMR, we'll need to average these fluxes
-    //    // down to coarser levels. As things stand now,
-    //    // CoarseAverageFace requires that the coarse LevelData<FluxBox>
-    //    // have a ghost cell.
-    //    vectFluxes[lev] = new LevelData<FluxBox>(m_amrGrids[lev], 1, ghostVect);
-
-    //    LevelData<FArrayBox>& levelOldHead = *m_old_head[lev];
-
-    //    // ensure that ghost cells for head are filled in
-    //    if (lev > 0)
-    //    {
-    //        int nGhost = levelOldHead.ghostVect()[0];
-    //        PiecewiseLinearFillPatch headFiller(
-    //            levelGrids, m_amrGrids[lev - 1], 1, m_amrDomains[lev - 1], m_refinement_ratios[lev - 1], nGhost);
-
-    //        // since we're not subcycling, don't need to interpolate in time
-    //        Real time_interp_coeff = 0.0;
-    //        headFiller.fillInterp(levelOldHead, *m_old_head[lev - 1], *m_old_head[lev - 1], time_interp_coeff, 0, 0, 1);
-    //    }
-    //    // these are probably unnecessary...
-    //    levelOldHead.exchange();
-    //}
-
-    // compute flux
-    //computeFluxes(vectFluxes, a_dt);
-
-    // compute div(F) and update solution
-    //updateHead(m_head, m_old_head, vectFluxes, a_dt);
-
-    // clean up temp storage
-    //for (int lev = 0; lev <= m_finest_level; lev++)
-    //{
-    //    if (vectFluxes[lev] != NULL)
-    //    {
-    //        delete vectFluxes[lev];
-    //        vectFluxes[lev] = NULL;
-    //    }
-    //}
 
     // finally, update to new time and increment current step
     m_dt = a_dt;
@@ -1893,112 +1843,86 @@ AmrHydro::timeStep(Real a_dt)
 
 }
 
-// compute half-time face-centered thickness using unsplit PPM
-void
-AmrHydro::computeFluxes(Vector<LevelData<FluxBox>*>& a_Flux, Real a_dt)
-{
-    for (int lev = 0; lev <= m_finest_level; lev++)
-    {
-        LevelData<FluxBox>& levelFlux = *a_Flux[lev];
-
-        DataIterator dit = m_amrGrids[lev].dataIterator();
-        for (dit.begin(); dit.ok(); ++dit)
-        {
-            // this is just an example, after all..,
-            levelFlux[dit].setVal(1.0);
-
-        } // end loop over grids
-
-    } // end loop over levels for computing fluxes
-
-    // coarse average new fluxes to covered regions
-    for (int lev = m_finest_level; lev > 0; lev--)
-    {
-        CoarseAverageFace faceAverager(m_amrGrids[lev], 1, m_refinement_ratios[lev - 1]);
-        faceAverager.averageToCoarse(*a_Flux[lev - 1], *a_Flux[lev]);
-    }
-}
-
 /* update head */
-void
-AmrHydro::updateHead(Vector<LevelData<FArrayBox>*>& a_new_head,
-                     const Vector<LevelData<FArrayBox>*>& a_old_head,
-                     const Vector<LevelData<FluxBox>*>& a_vectFluxes,
-                     Real a_dt)
-{
-    for (int lev = 0; lev <= m_finest_level; lev++)
-    {
-        DisjointBoxLayout& levelGrids = m_amrGrids[lev];
-        LevelData<FluxBox>& levelFlux = *a_vectFluxes[lev];
-        LevelData<FArrayBox>& levelNewH = *a_new_head[lev];
-        LevelData<FArrayBox>& levelOldH = *a_old_head[lev];
-
-        const RealVect& dx = m_amrDx[lev];
-
-        DataIterator dit = levelGrids.dataIterator();
-
-        for (dit.begin(); dit.ok(); ++dit)
-        {
-            const Box& gridBox = levelGrids[dit];
-            FArrayBox& newH    = levelNewH[dit];
-            FArrayBox& oldH    = levelOldH[dit];
-            FluxBox& thisFlux  = levelFlux[dit];
-            newH.setVal(0.0);
-
-            // loop over directions and increment with div(F)
-            for (int dir = 0; dir < SpaceDim; dir++)
-            {
-                // use the divergence from
-                // Chombo/example/fourthOrderMappedGrids/util/DivergenceF.ChF
-                FORT_DIVERGENCE(CHF_CONST_FRA(thisFlux[dir]),
-                                CHF_FRA(newH),
-                                CHF_BOX(gridBox),
-                                CHF_CONST_REAL(dx[dir]),
-                                CHF_INT(dir));
-            }
-
-            newH *= -1 * a_dt;
-            newH.plus(oldH, 0, 0, 1);
-
-        } // end loop over grids
-    }     // end loop over levels
-
-    // average down thickness to coarser levels and fill in ghost cells
-    // before calling recomputeGeometry.
-    int headGhost = a_new_head[0]->ghostVect()[0];
-    // average from the finest level down
-    for (int lev = m_finest_level; lev > 0; lev--)
-    {
-        CoarseAverage averager(m_amrGrids[lev], 1, m_refinement_ratios[lev - 1]);
-        averager.averageToCoarse(*a_new_head[lev - 1], *a_new_head[lev]);
-    }
-
-    // now pass back over and do PiecewiseLinearFillPatch
-    for (int lev = 1; lev <= m_finest_level; lev++)
-    {
-        PiecewiseLinearFillPatch filler(
-            m_amrGrids[lev], m_amrGrids[lev - 1], 1, m_amrDomains[lev - 1], m_refinement_ratios[lev - 1], headGhost);
-
-        Real interp_coef = 0;
-        filler.fillInterp(*a_new_head[lev], *a_new_head[lev - 1], *a_new_head[lev - 1], interp_coef, 0, 0, 1);
-    }
-
-    // average from the finest level down
-    for (int lev = m_finest_level; lev > 0; lev--)
-    {
-        CoarseAverage averager(m_amrGrids[lev], 1, m_refinement_ratios[lev - 1]);
-        averager.averageToCoarse(*a_new_head[lev - 1], *a_new_head[lev]);
-    }
-
-    for (int lev = 1; lev <= m_finest_level; lev++)
-    {
-        PiecewiseLinearFillPatch filler(
-            m_amrGrids[lev], m_amrGrids[lev - 1], 1, m_amrDomains[lev - 1], m_refinement_ratios[lev - 1], headGhost);
-
-        Real interp_coef = 0;
-        filler.fillInterp(*a_new_head[lev], *a_new_head[lev - 1], *a_new_head[lev - 1], interp_coef, 0, 0, 1);
-    }
-}
+//void
+//AmrHydro::updateHead(Vector<LevelData<FArrayBox>*>& a_new_head,
+//                     const Vector<LevelData<FArrayBox>*>& a_old_head,
+//                     const Vector<LevelData<FluxBox>*>& a_vectFluxes,
+//                     Real a_dt)
+//{
+//    for (int lev = 0; lev <= m_finest_level; lev++)
+//    {
+//        DisjointBoxLayout& levelGrids = m_amrGrids[lev];
+//        LevelData<FluxBox>& levelFlux = *a_vectFluxes[lev];
+//        LevelData<FArrayBox>& levelNewH = *a_new_head[lev];
+//        LevelData<FArrayBox>& levelOldH = *a_old_head[lev];
+//
+//        const RealVect& dx = m_amrDx[lev];
+//
+//        DataIterator dit = levelGrids.dataIterator();
+//
+//        for (dit.begin(); dit.ok(); ++dit)
+//        {
+//            const Box& gridBox = levelGrids[dit];
+//            FArrayBox& newH    = levelNewH[dit];
+//            FArrayBox& oldH    = levelOldH[dit];
+//            FluxBox& thisFlux  = levelFlux[dit];
+//            newH.setVal(0.0);
+//
+//            // loop over directions and increment with div(F)
+//            for (int dir = 0; dir < SpaceDim; dir++)
+//            {
+//                // use the divergence from
+//                // Chombo/example/fourthOrderMappedGrids/util/DivergenceF.ChF
+//                FORT_DIVERGENCE(CHF_CONST_FRA(thisFlux[dir]),
+//                                CHF_FRA(newH),
+//                                CHF_BOX(gridBox),
+//                                CHF_CONST_REAL(dx[dir]),
+//                                CHF_INT(dir));
+//            }
+//
+//            newH *= -1 * a_dt;
+//            newH.plus(oldH, 0, 0, 1);
+//
+//        } // end loop over grids
+//    }     // end loop over levels
+//
+//    // average down thickness to coarser levels and fill in ghost cells
+//    // before calling recomputeGeometry.
+//    int headGhost = a_new_head[0]->ghostVect()[0];
+//    // average from the finest level down
+//    for (int lev = m_finest_level; lev > 0; lev--)
+//    {
+//        CoarseAverage averager(m_amrGrids[lev], 1, m_refinement_ratios[lev - 1]);
+//        averager.averageToCoarse(*a_new_head[lev - 1], *a_new_head[lev]);
+//    }
+//
+//    // now pass back over and do PiecewiseLinearFillPatch
+//    for (int lev = 1; lev <= m_finest_level; lev++)
+//    {
+//        PiecewiseLinearFillPatch filler(
+//            m_amrGrids[lev], m_amrGrids[lev - 1], 1, m_amrDomains[lev - 1], m_refinement_ratios[lev - 1], headGhost);
+//
+//        Real interp_coef = 0;
+//        filler.fillInterp(*a_new_head[lev], *a_new_head[lev - 1], *a_new_head[lev - 1], interp_coef, 0, 0, 1);
+//    }
+//
+//    // average from the finest level down
+//    for (int lev = m_finest_level; lev > 0; lev--)
+//    {
+//        CoarseAverage averager(m_amrGrids[lev], 1, m_refinement_ratios[lev - 1]);
+//        averager.averageToCoarse(*a_new_head[lev - 1], *a_new_head[lev]);
+//    }
+//
+//    for (int lev = 1; lev <= m_finest_level; lev++)
+//    {
+//        PiecewiseLinearFillPatch filler(
+//            m_amrGrids[lev], m_amrGrids[lev - 1], 1, m_amrDomains[lev - 1], m_refinement_ratios[lev - 1], headGhost);
+//
+//        Real interp_coef = 0;
+//        filler.fillInterp(*a_new_head[lev], *a_new_head[lev - 1], *a_new_head[lev - 1], interp_coef, 0, 0, 1);
+//    }
+//}
 
 // do regridding
 void
@@ -2256,8 +2180,7 @@ AmrHydro::tagCellsLevel(IntVectSet& a_tags, int a_level)
     levelPhi.exchange(levelPhi.interval());
 
     IntVectSet local_tags;
-    if (m_tagOnGradPhi)
-    {
+    if (m_tag_defined) {
         for (dit.begin(); dit.ok(); ++dit)
         {
             // note that we only need one component here
@@ -2483,10 +2406,7 @@ AmrHydro::initGrids(int a_finest_level)
 
         // finally, initialize data on final hierarchy
         // only do this if we've created new levels
-        if (m_finest_level > 0)
-        {
-            defineSolver();
-
+        if (m_finest_level > 0) {
             initData(m_head);
         }
     } // end while more levels to do
@@ -2495,21 +2415,16 @@ AmrHydro::initGrids(int a_finest_level)
 void
 AmrHydro::setupFixedGrids(const std::string& a_gridFile)
 {
-    if (m_verbosity > 3)
-    {
+    if (m_verbosity > 3) {
         pout() << "AmrHydro::setupFixedGrids" << endl;
     }
     Vector<Vector<Box> > gridvect;
 
-    if (procID() == uniqueProc(SerialTask::compute))
-    {
+    if (procID() == uniqueProc(SerialTask::compute)) {
         gridvect.push_back(Vector<Box>(1, m_amrDomains[0].domainBox()));
-
         // read in predefined grids
         ifstream is(a_gridFile.c_str(), ios::in);
-
-        if (is.fail())
-        {
+        if (is.fail()) {
             MayDay::Error("Cannot open grids file");
         }
 
@@ -2518,70 +2433,51 @@ AmrHydro::setupFixedGrids(const std::string& a_gridFile)
         //   number of grids on level, list of boxes
         int inNumLevels;
         is >> inNumLevels;
-
         CH_assert(inNumLevels <= m_max_level + 1);
-
-        if (m_verbosity > 3)
-        {
+        if (m_verbosity > 3) {
             pout() << "numLevels = " << inNumLevels << endl;
         }
-
         while (is.get() != '\n')
             ;
-
         gridvect.resize(inNumLevels);
 
         // check to see if coarsest level needs to be broken up
         domainSplit(m_amrDomains[0], gridvect[0], m_max_base_grid_size, m_block_factor);
 
-        if (m_verbosity >= 3)
-        {
+        // some printing
+        if (m_verbosity >= 3) {
             pout() << "level 0: ";
-            for (int n = 0; n < gridvect[0].size(); n++)
-            {
+            for (int n = 0; n < gridvect[0].size(); n++) {
                 pout() << gridvect[0][n] << endl;
             }
         }
 
         // now loop over levels, starting with level 1
         int numGrids = 0;
-        for (int lev = 1; lev < inNumLevels; lev++)
-        {
+        for (int lev = 1; lev < inNumLevels; lev++) {
             is >> numGrids;
-
-            if (m_verbosity >= 3)
-            {
+            if (m_verbosity >= 3) {
                 pout() << "level " << lev << " numGrids = " << numGrids << endl;
                 pout() << "Grids: ";
             }
-
             while (is.get() != '\n')
                 ;
-
             gridvect[lev].resize(numGrids);
 
-            for (int i = 0; i < numGrids; i++)
-            {
+            for (int i = 0; i < numGrids; i++) {
                 Box bx;
                 is >> bx;
-
                 while (is.get() != '\n')
                     ;
-
                 // quick check on box size
                 Box bxRef(bx);
-
-                if (bxRef.longside() > m_max_box_size)
-                {
+                if (bxRef.longside() > m_max_box_size) {
                     pout() << "Grid " << bx << " too large" << endl;
                     MayDay::Error();
                 }
-
-                if (m_verbosity >= 3)
-                {
+                if (m_verbosity >= 3) {
                     pout() << bx << endl;
                 }
-
                 gridvect[lev][i] = bx;
             } // end loop over boxes on this level
         }     // end loop over levels
@@ -2590,27 +2486,17 @@ AmrHydro::setupFixedGrids(const std::string& a_gridFile)
     // broadcast results
     broadcast(gridvect, uniqueProc(SerialTask::compute));
 
-    // now create disjointBoxLayouts and allocate grids
-
     m_amrGrids.resize(m_max_level + 1);
-
-    // probably eventually want to do this differently
     RealVect dx = m_amrDx[0] * RealVect::Unit;
-
-    for (int lev = 0; lev < gridvect.size(); lev++)
-    {
+    for (int lev = 0; lev < gridvect.size(); lev++) {
         int numGridsLev = gridvect[lev].size();
         Vector<int> procIDs(numGridsLev);
         LoadBalance(procIDs, gridvect[lev]);
         const DisjointBoxLayout newDBL(gridvect[lev], procIDs, m_amrDomains[lev]);
-
         m_amrGrids[lev] = newDBL;
-
         // build storage for this level
-
         levelSetup(lev, m_amrGrids[lev]);
-        if (lev < gridvect.size() - 1)
-        {
+        if (lev < gridvect.size() - 1) {
             dx /= m_refinement_ratios[lev];
         }
     }
@@ -2624,9 +2510,8 @@ AmrHydro::setupFixedGrids(const std::string& a_gridFile)
 void
 AmrHydro::levelSetup(int a_level, const DisjointBoxLayout& a_grids)
 {
-    if (m_verbosity > 3)
-    {
-        pout() << "AmrHydro::levelSetup - level " << endl;
+    if (m_verbosity > 3) {
+        pout() << "AmrHydro::levelSetup - level " << a_level << endl;
     }
     int nPhiComp = 1;
     IntVect ghostVect = IntVect::Unit;
@@ -2634,9 +2519,7 @@ AmrHydro::levelSetup(int a_level, const DisjointBoxLayout& a_grids)
     m_old_head[a_level]->define(a_grids, nPhiComp, HeadGhostVect);
     m_old_gapheight[a_level]->define(a_grids, nPhiComp, HeadGhostVect);
 
-    // AF: setup struct for level a_level
-    if (a_level == 0 || m_head[a_level] == NULL)
-    {
+    //if (a_level == 0 || m_head[a_level] == NULL) {
         // First pass or first level
         m_head[a_level] = new LevelData<FArrayBox>(a_grids, nPhiComp, HeadGhostVect);
         m_gradhead[a_level] = new LevelData<FArrayBox>(a_grids, SpaceDim*nPhiComp, HeadGhostVect);
@@ -2649,46 +2532,40 @@ AmrHydro::levelSetup(int a_level, const DisjointBoxLayout& a_grids)
         m_iceheight[a_level] = new LevelData<FArrayBox>(a_grids, nPhiComp, HeadGhostVect);
         m_bedelevation[a_level] = new LevelData<FArrayBox>(a_grids, nPhiComp, HeadGhostVect);
         m_overburdenpress[a_level] = new LevelData<FArrayBox>(a_grids, nPhiComp, HeadGhostVect);
-        //m_gradZb[a_level] = new LevelData<FArrayBox>(a_grids, SpaceDim*nPhiComp, HeadGhostVect);
-    }
-    else
-    {
-        // AF: not here yet but at some point to do
-        // do phi a bit differently in order to use previously
-        // computed velocity field as an initial guess
-        {
-            LevelData<FArrayBox>* newHeadPtr = new LevelData<FArrayBox>(a_grids, nPhiComp, HeadGhostVect);
-            LevelData<FArrayBox>* newGapHeightPtr = new LevelData<FArrayBox>(a_grids, nPhiComp, HeadGhostVect);
+    //} else {
+        // AF: I don't think it's relevant in my case but I'll keep for now
+        // use computed velocity field as an initial guess
+        //    LevelData<FArrayBox>* newHeadPtr = new LevelData<FArrayBox>(a_grids, nPhiComp, HeadGhostVect);
+        //    LevelData<FArrayBox>* newGapHeightPtr = new LevelData<FArrayBox>(a_grids, nPhiComp, HeadGhostVect);
 
-            // first do interp from coarser level
-            FineInterp HeadInterp(a_grids, nPhiComp, m_refinement_ratios[a_level - 1], m_amrDomains[a_level]);
-            FineInterp GapHeightInterp(a_grids, nPhiComp, m_refinement_ratios[a_level - 1], m_amrDomains[a_level]);
+        //    // first do interp from coarser level
+        //    FineInterp HeadInterp(a_grids, nPhiComp, m_refinement_ratios[a_level - 1], m_amrDomains[a_level]);
+        //    FineInterp GapHeightInterp(a_grids, nPhiComp, m_refinement_ratios[a_level - 1], m_amrDomains[a_level]);
 
-            HeadInterp.interpToFine(*newHeadPtr, *m_head[a_level - 1]);
-            GapHeightInterp.interpToFine(*newGapHeightPtr, *m_gapheight[a_level - 1]);
+        //    HeadInterp.interpToFine(*newHeadPtr, *m_head[a_level - 1]);
+        //    GapHeightInterp.interpToFine(*newGapHeightPtr, *m_gapheight[a_level - 1]);
 
-            // can only copy from existing level if we're not on the
-            // newly created level
-            // if (a_level != new_finest_level)
-            if (m_head[a_level]->isDefined())
-            {
-                m_head[a_level]->copyTo(*newHeadPtr);
-                m_gapheight[a_level]->copyTo(*newGapHeightPtr);
-            }
+        //    // can only copy from existing level if we're not on the
+        //    // newly created level
+        //    // if (a_level != new_finest_level)
+        //    if (m_head[a_level]->isDefined())
+        //    {
+        //        m_head[a_level]->copyTo(*newHeadPtr);
+        //        m_gapheight[a_level]->copyTo(*newGapHeightPtr);
+        //    }
 
-            // finally, do an exchange (this may wind up being unnecessary)
-            newHeadPtr->exchange();
-            newGapHeightPtr->exchange();
+        //    // finally, do an exchange (this may wind up being unnecessary)
+        //    newHeadPtr->exchange();
+        //    newGapHeightPtr->exchange();
 
-            delete (m_head[a_level]);
-            delete (m_gapheight[a_level]);
-            m_head[a_level] = newHeadPtr;
-            m_gapheight[a_level] = newGapHeightPtr;
-        }
-    } // end interpolate/copy new velocity
+        //    delete (m_head[a_level]);
+        //    delete (m_gapheight[a_level]);
+        //    m_head[a_level] = newHeadPtr;
+        //    m_gapheight[a_level] = newGapHeightPtr;
+    //} 
 
     // probably eventually want to do this differently
-    RealVect dx = m_amrDx[a_level] * RealVect::Unit;
+    //RealVect dx = m_amrDx[a_level] * RealVect::Unit;
 }
 
 void
@@ -2708,33 +2585,30 @@ AmrHydro::initData(Vector<LevelData<FArrayBox>*>& a_head)
         LevelData<FArrayBox>& levelIceHeight = *m_iceheight[lev];
         LevelData<FArrayBox>& levelzBed      = *m_bedelevation[lev];
         LevelData<FArrayBox>& levelPi        = *m_overburdenpress[lev];
-        //LevelData<FArrayBox>& levelgradzBed  = *m_gradZb[lev];
-        if (lev > 0)
-        {
-            // AF: !!! deal with multiple levels later !!!
-            // fill the ghost cells of a_vectCoordSys[lev]->getH();
-            // m_head
-            LevelData<FArrayBox>& coarseHead = *m_head[lev - 1];
-            int nGhost = levelHead.ghostVect()[0];
-            PiecewiseLinearFillPatch headFiller(m_amrGrids[lev],
-                                               m_amrGrids[lev - 1],
-                                               levelHead.nComp(),
-                                               m_amrDomains[lev - 1],
-                                               m_refinement_ratios[lev - 1],
-                                               nGhost);
-            headFiller.fillInterp(levelHead, coarseHead, coarseHead, 0.0, 0, 0, 1);
+        //if (lev > 0) {
+        //    // fill the ghost cells of a_vectCoordSys[lev]->getH();
+        //    // m_head
+        //    LevelData<FArrayBox>& coarseHead = *m_head[lev - 1];
+        //    int nGhost = levelHead.ghostVect()[0];
+        //    PiecewiseLinearFillPatch headFiller(m_amrGrids[lev],
+        //                                       m_amrGrids[lev - 1],
+        //                                       levelHead.nComp(),
+        //                                       m_amrDomains[lev - 1],
+        //                                       m_refinement_ratios[lev - 1],
+        //                                       nGhost);
+        //    headFiller.fillInterp(levelHead, coarseHead, coarseHead, 0.0, 0, 0, 1);
 
-            // m_gapheight
-            LevelData<FArrayBox>& coarseGapHeight = *m_gapheight[lev - 1];
-            //int nGhost = levelGapHeight.ghostVect()[0]; Same number of ghost cells ?
-            PiecewiseLinearFillPatch gapHeightFiller(m_amrGrids[lev],
-                                               m_amrGrids[lev - 1],
-                                               levelGapHeight.nComp(),
-                                               m_amrDomains[lev - 1],
-                                               m_refinement_ratios[lev - 1],
-                                               nGhost);
-            gapHeightFiller.fillInterp(levelGapHeight, coarseGapHeight, coarseGapHeight, 0.0, 0, 0, 1);
-        }
+        //    // m_gapheight
+        //    LevelData<FArrayBox>& coarseGapHeight = *m_gapheight[lev - 1];
+        //    //int nGhost = levelGapHeight.ghostVect()[0]; Same number of ghost cells ?
+        //    PiecewiseLinearFillPatch gapHeightFiller(m_amrGrids[lev],
+        //                                       m_amrGrids[lev - 1],
+        //                                       levelGapHeight.nComp(),
+        //                                       m_amrDomains[lev - 1],
+        //                                       m_refinement_ratios[lev - 1],
+        //                                       nGhost);
+        //    gapHeightFiller.fillInterp(levelGapHeight, coarseGapHeight, coarseGapHeight, 0.0, 0, 0, 1);
+        //}
 
         RealVect levelDx = m_amrDx[lev] * RealVect::Unit;
         m_IBCPtr->define(m_amrDomains[lev], levelDx[0]);
@@ -2754,11 +2628,11 @@ AmrHydro::initData(Vector<LevelData<FArrayBox>*>& a_head)
     }
 
     // may be necessary to average down here
-    for (int lev = m_finest_level; lev > 0; lev--)
-    {
-        CoarseAverage avgDown(m_amrGrids[lev], m_head[lev]->nComp(), m_refinement_ratios[lev - 1]);
-        avgDown.averageToCoarse(*m_head[lev - 1], *m_head[lev]);
-    }
+    //for (int lev = m_finest_level; lev > 0; lev--)
+    //{
+    //    CoarseAverage avgDown(m_amrGrids[lev], m_head[lev]->nComp(), m_refinement_ratios[lev - 1]);
+    //    avgDown.averageToCoarse(*m_head[lev - 1], *m_head[lev]);
+    //}
 
 //#define writePlotsImmediately
 #ifdef writePlotsImmediately
@@ -2769,12 +2643,6 @@ AmrHydro::initData(Vector<LevelData<FArrayBox>*>& a_head)
 #endif
     }
 #endif
-}
-
-void
-AmrHydro::defineSolver()
-{
-    // just a stub for when we might actually need it...
 }
 
 // compute timestep
@@ -2995,6 +2863,7 @@ AmrHydro::writePlotFile()
     for (int lev = 0; lev < numLevels; lev++)
     {
         // now copy new-time solution into plotData
+        pout() << "level  "<< lev <<endl;
 
         LevelData<FArrayBox>& plotDataLev = *plotData[lev];
 
@@ -3593,9 +3462,6 @@ AmrHydro::readCheckpointFile(HDF5Handle& a_handle)
         } // end if this level is defined
     }     // end loop over levels
 
-    // do we need to close the handle?
-
-    // defineSolver();
 }
 
 /// set up for restart
