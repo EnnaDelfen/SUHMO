@@ -530,11 +530,6 @@ AmrHydro::~AmrHydro()
             delete m_bedelevation[lev];
             m_bedelevation[lev] = NULL;
         }
-        //if (m_gradZb[lev] != NULL)
-        //{
-        //    delete m_gradZb[lev];
-        //    m_gradZb[lev] = NULL;
-        //}
         if (m_overburdenpress[lev] != NULL)
         {
             delete m_overburdenpress[lev];
@@ -2435,15 +2430,6 @@ AmrHydro::initGrids(int a_finest_level)
     // levelSetup now create the data container for each box in level 0
     levelSetup(0, baseGrids);
 
-    // AF: really necessary ?
-    //LevelData<FArrayBox>& baseLevelVel = *m_head[0];
-    //DataIterator baseDit = baseGrids.dataIterator();
-    //for (baseDit.begin(); baseDit.ok(); ++baseDit)
-    //{
-    //    // initial guess at base-level velocity is zero
-    //    baseLevelVel[baseDit].setVal(0.0);
-    //}
-
     // initialize base level data
     initData(m_head);
 
@@ -2646,53 +2632,18 @@ AmrHydro::levelSetup(int a_level, const DisjointBoxLayout& a_grids)
     m_old_head[a_level]->define(a_grids, nPhiComp, HeadGhostVect);
     m_old_gapheight[a_level]->define(a_grids, nPhiComp, HeadGhostVect);
 
-    //if (a_level == 0 || m_head[a_level] == NULL) {
-        // First pass or first level
-        m_head[a_level] = new LevelData<FArrayBox>(a_grids, nPhiComp, HeadGhostVect);
-        m_gradhead[a_level] = new LevelData<FArrayBox>(a_grids, SpaceDim*nPhiComp, HeadGhostVect);
-        m_gradhead_ec[a_level] = new LevelData<FluxBox>(a_grids, nPhiComp, IntVect::Zero);
-        m_gapheight[a_level] = new LevelData<FArrayBox>(a_grids, nPhiComp, HeadGhostVect);
-        m_Pw[a_level] = new LevelData<FArrayBox>(a_grids, nPhiComp, HeadGhostVect);
-        m_qw[a_level] = new LevelData<FArrayBox>(a_grids, SpaceDim*nPhiComp, HeadGhostVect);
-        m_Re[a_level] = new LevelData<FArrayBox>(a_grids, nPhiComp, HeadGhostVect);
-        m_meltRate[a_level] = new LevelData<FArrayBox>(a_grids, nPhiComp, HeadGhostVect);
-        m_iceheight[a_level] = new LevelData<FArrayBox>(a_grids, nPhiComp, HeadGhostVect);
-        m_bedelevation[a_level] = new LevelData<FArrayBox>(a_grids, nPhiComp, HeadGhostVect);
-        m_overburdenpress[a_level] = new LevelData<FArrayBox>(a_grids, nPhiComp, HeadGhostVect);
-    //} else {
-        // AF: I don't think it's relevant in my case but I'll keep for now
-        // use computed velocity field as an initial guess
-        //    LevelData<FArrayBox>* newHeadPtr = new LevelData<FArrayBox>(a_grids, nPhiComp, HeadGhostVect);
-        //    LevelData<FArrayBox>* newGapHeightPtr = new LevelData<FArrayBox>(a_grids, nPhiComp, HeadGhostVect);
+    m_head[a_level] = new LevelData<FArrayBox>(a_grids, nPhiComp, HeadGhostVect);
+    m_gradhead[a_level] = new LevelData<FArrayBox>(a_grids, SpaceDim*nPhiComp, HeadGhostVect);
+    m_gradhead_ec[a_level] = new LevelData<FluxBox>(a_grids, nPhiComp, IntVect::Zero);
+    m_gapheight[a_level] = new LevelData<FArrayBox>(a_grids, nPhiComp, HeadGhostVect);
+    m_Pw[a_level] = new LevelData<FArrayBox>(a_grids, nPhiComp, HeadGhostVect);
+    m_qw[a_level] = new LevelData<FArrayBox>(a_grids, SpaceDim*nPhiComp, HeadGhostVect);
+    m_Re[a_level] = new LevelData<FArrayBox>(a_grids, nPhiComp, HeadGhostVect);
+    m_meltRate[a_level] = new LevelData<FArrayBox>(a_grids, nPhiComp, HeadGhostVect);
+    m_iceheight[a_level] = new LevelData<FArrayBox>(a_grids, nPhiComp, HeadGhostVect);
+    m_bedelevation[a_level] = new LevelData<FArrayBox>(a_grids, nPhiComp, HeadGhostVect);
+    m_overburdenpress[a_level] = new LevelData<FArrayBox>(a_grids, nPhiComp, HeadGhostVect);
 
-        //    // first do interp from coarser level
-        //    FineInterp HeadInterp(a_grids, nPhiComp, m_refinement_ratios[a_level - 1], m_amrDomains[a_level]);
-        //    FineInterp GapHeightInterp(a_grids, nPhiComp, m_refinement_ratios[a_level - 1], m_amrDomains[a_level]);
-
-        //    HeadInterp.interpToFine(*newHeadPtr, *m_head[a_level - 1]);
-        //    GapHeightInterp.interpToFine(*newGapHeightPtr, *m_gapheight[a_level - 1]);
-
-        //    // can only copy from existing level if we're not on the
-        //    // newly created level
-        //    // if (a_level != new_finest_level)
-        //    if (m_head[a_level]->isDefined())
-        //    {
-        //        m_head[a_level]->copyTo(*newHeadPtr);
-        //        m_gapheight[a_level]->copyTo(*newGapHeightPtr);
-        //    }
-
-        //    // finally, do an exchange (this may wind up being unnecessary)
-        //    newHeadPtr->exchange();
-        //    newGapHeightPtr->exchange();
-
-        //    delete (m_head[a_level]);
-        //    delete (m_gapheight[a_level]);
-        //    m_head[a_level] = newHeadPtr;
-        //    m_gapheight[a_level] = newGapHeightPtr;
-    //} 
-
-    // probably eventually want to do this differently
-    //RealVect dx = m_amrDx[a_level] * RealVect::Unit;
 }
 
 void
@@ -2776,31 +2727,16 @@ AmrHydro::initData(Vector<LevelData<FArrayBox>*>& a_head)
 Real
 AmrHydro::computeDt()
 {
-    if (m_verbosity > 3)
-    {
+    if (m_verbosity > 3) {
         pout() << "AmrHydro::computeDt" << endl;
     }
 
     if (m_fixed_dt > TINY_NORM) return m_fixed_dt;
 
     Real dt = 1.0e50;
-    for (int lev = 0; lev <= m_finest_level; lev++)
-    {
+    for (int lev = 0; lev <= m_finest_level; lev++) {
         Real dtLev = dt;
-        //// pretend phi is velocity here --> totally wrong for problem at hand ...
-        //const DisjointBoxLayout& levelGrids = m_amrGrids[lev];
-        //const LevelData<FArrayBox>& levelVel = *m_head[lev];
-        //DataIterator levelDit = levelVel.dataIterator();
-        //for (levelDit.reset(); levelDit.ok(); ++levelDit)
-        //{
-        //    int p = 0;
-        //    const Box& gridBox = levelGrids[levelDit];
-        //    Real maxVel = 1.0 + levelVel[levelDit].norm(gridBox, p, 0, 1);
-        //    maxVel = max(maxVel,1.0);    
-        //    Real localDt = m_amrDx[lev][0] / maxVel;
-        //    dtLev = min(dtLev, localDt);
-        //}
-
+        // AF todo
         dt = min(dt, dtLev);
     }
 
@@ -2839,8 +2775,7 @@ AmrHydro::computeDt()
 Real
 AmrHydro::computeInitialDt()
 {
-    if (m_verbosity > 3)
-    {
+    if (m_verbosity > 3) {
         pout() << "AmrHydro::computeInitialDt" << endl;
     }
 
@@ -3276,32 +3211,6 @@ AmrHydro::readCheckpointFile(HDF5Handle& a_handle)
     header.readFromFile(a_handle);
     ParmParse ppAmr("amr");
     
-    //check for various components.
-    //bool containsgapHeight(false);
-    //bool containsHead(false);
-    //bool containsbedTopology(false);
-    //bool containsRe(false);
-    //bool containsPi(false);
-
-    //map<std::string, std::string>::const_iterator i;
-    //for (i = header.m_string.begin(); i!= header.m_string.end(); ++i) {
-    //    if (i->second == "gapHeight") { 
-    //        containsgapHeight = true;
-    //    }
-    //    if (i->second == "head") {
-    //        containsHead = true;
-    //    }
-    //    if (i->second == "bedelevation") {
-    //        containsbedTopology = true;
-    //    }
-    //    if (i->second == "Re") {
-    //        containsRe = true;
-    //    }
-    //    if (i->second == "overburdenPress") {
-    //        containsPi = true;
-    //    }
-    //}
-
     if (m_verbosity >= 3) {
         pout() << "hdf5 header data: " << endl;
         pout() << header << endl;
@@ -3430,7 +3339,6 @@ AmrHydro::readCheckpointFile(HDF5Handle& a_handle)
     m_iceheight.resize(m_max_level + 1, NULL);
     m_bedelevation.resize(m_max_level + 1, NULL);
     m_overburdenpress.resize(m_max_level + 1, NULL);
-    //m_gradZb.resize(m_max_level + 1, NULL);
 
     // now read in level-by-level data -- go to Max lev of checkfile
     for (int lev = 0; lev <= max_level_check; lev++) {
@@ -3515,7 +3423,6 @@ AmrHydro::readCheckpointFile(HDF5Handle& a_handle)
             m_iceheight[lev]     = new LevelData<FArrayBox>(levelDBL, nPhiComp, nGhost);
             m_bedelevation[lev]  = new LevelData<FArrayBox>(levelDBL, nPhiComp, nGhost);
             m_overburdenpress[lev] = new LevelData<FArrayBox>(levelDBL, nPhiComp, nGhost);
-            //m_gradZb[lev] = new LevelData<FArrayBox>(levelDBL, SpaceDim*nPhiComp, nGhost);
 
             // read this level's data
             /* HEAD */
