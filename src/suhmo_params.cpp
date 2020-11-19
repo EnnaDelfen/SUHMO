@@ -54,8 +54,8 @@ void suhmo_params::readInputs()
     ppParams.get("GapInit", m_gapInit);
     ppParams.get("ReInit", m_ReInit);
     m_moulin_position.resize(SpaceDim,0.0);
-    ppParams.getarr("MoulinPosition", m_moulin_position, 0, SpaceDim);
-    ppParams.get("MoulinFlux", m_moulin_flux);
+    ppParams.getarr("moulin_position", m_moulin_position, 0, SpaceDim);
+    ppParams.get("moulin_flux", m_moulin_flux);
 }
 
 #include "NamespaceFooter.H"

@@ -86,11 +86,15 @@ public:
                            LevelData<FArrayBox>&  levelRe, 
                            LevelData<FArrayBox>&  levelB);
 
-    void CalcRHS_head(LevelData<FArrayBox>& levelRHS_h, 
+    void CalcRHS_head( int currlev, 
+                       LevelData<FArrayBox>& levelRHS_h, 
                        LevelData<FArrayBox>& levelPi, 
                        LevelData<FArrayBox>& levelPw, 
                        LevelData<FArrayBox>& levelmR, 
-                       LevelData<FArrayBox>& levelB);
+                       LevelData<FArrayBox>& levelB,
+                       LevelData<FArrayBox>& levelMoulinSrc);
+
+    void Calc_moulin_source_term(LevelData<FArrayBox>& levelMoulinSrc);
 
     void CalcRHS_gapHeight(LevelData<FArrayBox>& levelRHS_b, 
                        LevelData<FArrayBox>& levelPi, 
