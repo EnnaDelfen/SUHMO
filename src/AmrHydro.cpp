@@ -556,7 +556,6 @@ AmrHydro::initialize()
         pout() << "AmrHydro::initialize" << endl;
     }
 
-
     /* PARSING */
     ParmParse ppAmr("AmrHydro");
     m_time     = 0.0;  // start at t = 0
@@ -1511,14 +1510,8 @@ AmrHydro::timeStep(Real a_dt)
 
                 CellToEdge(levelRe, levelRe_ec);
 
-                // Get Qw at EC
+                // Get Qw at EC and interp at CC
                 for (dit.begin(); dit.ok(); ++dit) {
-
-                    FArrayBox& Qwater  = levelQw[dit];
-                    FArrayBox& Re      = levelRe[dit];
-
-                    levelReQwIter[dit].copy(Re, 0, 0, 1);
-
                     // EC quantities
                     FluxBox& currB_ec  = levelB_ec[dit];
                     FluxBox& Qwater_ec = levelQw_ec[dit];
@@ -1540,10 +1533,28 @@ AmrHydro::timeStep(Real a_dt)
                             Real denom_q = 12.0 * m_suhmoParm->m_nu * (1 + m_suhmoParm->m_omega * Re_ecFab(iv, 0));
                             Qwater_ecFab(iv, 0) = num_q/denom_q;
                         }
-                    }
-                    EdgeToCell(Qwater_ec, Qwater); 
+                    } 
+                }
+                EdgeToCell(levelQw_ec, levelQw); 
+                // handle ghost cells on the coarse-fine interface
+                if (lev > 0) {
+                    QuadCFInterp qcfi(m_amrGrids[lev], &m_amrGrids[lev-1],
+                                      m_amrDx[lev][0], m_refinement_ratios[lev-1],  
+                                      2,  // num comps
+                                      m_amrDomains[lev]);
+                    qcfi.coarseFineInterp(*m_qw[lev], *m_qw[lev-1]);
+                }
+                // Need to fill the ghost cells -- extrapolate on perio boundaries   
+                levelQw.exchange();
+                ExtrapGhostCells( levelQw, m_amrDomains[0]);
 
-                    //Get Re at CC
+                //Get Re at CC
+                for (dit.begin(); dit.ok(); ++dit) {
+                    FArrayBox& Qwater  = levelQw[dit];
+                    FArrayBox& Re      = levelRe[dit];
+
+                    levelReQwIter[dit].copy(Re, 0, 0, 1);
+
                     BoxIterator bit(Qwater.box()); // can use gridBox? 
                     for (bit.begin(); bit.ok(); ++bit) {
                         IntVect iv = bit();
@@ -1556,7 +1567,6 @@ AmrHydro::timeStep(Real a_dt)
                     levelReQwIter[dit].minus(Re, 0, 0, 1);
                     levelReQwIter[dit].abs();
                     max_Re_diff = std::max(max_Re_diff, levelReQwIter[dit].max());
-                    //pout() << "END Max levelReQwIter, Re "<< levelReQwIter[dit].max() << " " << levelRe[dit].max() << endl;
                 }
                 // handle ghost cells on the coarse-fine interface
                 if (lev > 0) {
@@ -1569,9 +1579,6 @@ AmrHydro::timeStep(Real a_dt)
                 // Need to fill the ghost cells of Re -- extrapolate on perio boundaries   
                 levelRe.exchange();
                 ExtrapGhostCells( levelRe, m_amrDomains[0]);
-                // Fill GC of Qwater (not sure if useful)
-                //levelQw.exchange();
-                //ExtrapGhostCells( levelQw, m_amrDomains[0]);
             } // end loop on levs
 
             //pout() << "           ------------------------" << endl;
@@ -1744,11 +1751,11 @@ AmrHydro::timeStep(Real a_dt)
         }  // loop on levs
 
         /* Averaging down and fill in ghost cells */
-        //for (int lev = m_finest_level; lev > 0; lev--) {
-        //    CoarseAverage averager(m_amrGrids[lev], 1, m_refinement_ratios[lev - 1]);
-        //    averager.averageToCoarse(*m_head[lev - 1], *m_head[lev]);
-        //    averager.averageToCoarse(*m_gapheight[lev - 1], *m_gapheight[lev]);
-        //}
+        for (int lev = m_finest_level; lev > 0; lev--) {
+            CoarseAverage averager(m_amrGrids[lev], 1, m_refinement_ratios[lev - 1]);
+            averager.averageToCoarse(*m_head[lev - 1], *m_head[lev]);
+            averager.averageToCoarse(*m_gapheight[lev - 1], *m_gapheight[lev]);
+        }
         // handle ghost cells on the coarse-fine interface
         for (int lev = 1; lev <= m_finest_level; lev++) {
             QuadCFInterp qcfi(m_amrGrids[lev], &m_amrGrids[lev-1],
@@ -1800,7 +1807,8 @@ AmrHydro::timeStep(Real a_dt)
         /* custom plt here -- debug print */
         if (m_PrintCustom) {
             Vector<std::string> vectName;
-            vectName.resize(8);
+            int nStuffToPlot = 9;
+            vectName.resize(nStuffToPlot);
             vectName[0]="head";
             vectName[1]="gapHeight";
             vectName[2]="bedelevation";
@@ -1809,9 +1817,9 @@ AmrHydro::timeStep(Real a_dt)
             vectName[5]="RHS_head";
             vectName[6]="RHS_b";
             vectName[7]="gradH";
-            //vectName[8]="gradPw";
+            vectName[8]="sourceMoulin";
             Vector<Vector<LevelData<FArrayBox>*>> stuffToPlot;
-            stuffToPlot.resize(8);
+            stuffToPlot.resize(nStuffToPlot);
             stuffToPlot[0].resize(m_max_level + 1, NULL);
             stuffToPlot[1].resize(m_max_level + 1, NULL);
             stuffToPlot[2].resize(m_max_level + 1, NULL);
@@ -1820,18 +1828,19 @@ AmrHydro::timeStep(Real a_dt)
             stuffToPlot[5].resize(m_max_level + 1, NULL);
             stuffToPlot[6].resize(m_max_level + 1, NULL);
             stuffToPlot[7].resize(m_max_level + 1, NULL);
-            //stuffToPlot[8].resize(m_max_level + 1, NULL);
-            stuffToPlot[0][0]  = new LevelData<FArrayBox>(m_amrGrids[0], 1, m_num_head_ghost * IntVect::Unit);
-            stuffToPlot[1][0]  = new LevelData<FArrayBox>(m_amrGrids[0], 1, m_num_head_ghost * IntVect::Unit);
-            stuffToPlot[2][0]  = new LevelData<FArrayBox>(m_amrGrids[0], 1, m_num_head_ghost * IntVect::Unit);
-            stuffToPlot[3][0]  = new LevelData<FArrayBox>(m_amrGrids[0], 1, m_num_head_ghost * IntVect::Unit);
-            stuffToPlot[4][0]  = new LevelData<FArrayBox>(m_amrGrids[0], 1, m_num_head_ghost * IntVect::Unit);
-            stuffToPlot[5][0]  = new LevelData<FArrayBox>(m_amrGrids[0], 1, IntVect::Zero);
-            stuffToPlot[6][0]  = new LevelData<FArrayBox>(m_amrGrids[0], 1, IntVect::Zero);
-            stuffToPlot[7][0]  = new LevelData<FArrayBox>(m_amrGrids[0], 1, m_num_head_ghost * IntVect::Unit);
-            //stuffToPlot[8][0]  = new LevelData<FArrayBox>(m_amrGrids[0], 1, IntVect::Zero);
+            stuffToPlot[8].resize(m_max_level + 1, NULL);
             for (int lev = 0; lev <= m_finest_level; lev++)
             {
+                stuffToPlot[0][lev]  = new LevelData<FArrayBox>(m_amrGrids[lev], 1, m_num_head_ghost * IntVect::Unit);
+                stuffToPlot[1][lev]  = new LevelData<FArrayBox>(m_amrGrids[lev], 1, m_num_head_ghost * IntVect::Unit);
+                stuffToPlot[2][lev]  = new LevelData<FArrayBox>(m_amrGrids[lev], 1, m_num_head_ghost * IntVect::Unit);
+                stuffToPlot[3][lev]  = new LevelData<FArrayBox>(m_amrGrids[lev], 1, m_num_head_ghost * IntVect::Unit);
+                stuffToPlot[4][lev]  = new LevelData<FArrayBox>(m_amrGrids[lev], 1, m_num_head_ghost * IntVect::Unit);
+                stuffToPlot[5][lev]  = new LevelData<FArrayBox>(m_amrGrids[lev], 1, IntVect::Zero);
+                stuffToPlot[6][lev]  = new LevelData<FArrayBox>(m_amrGrids[lev], 1, IntVect::Zero);
+                stuffToPlot[7][lev]  = new LevelData<FArrayBox>(m_amrGrids[lev], 1, m_num_head_ghost * IntVect::Unit);
+                stuffToPlot[8][lev]  = new LevelData<FArrayBox>(m_amrGrids[lev], 1, IntVect::Zero);
+
                 LevelData<FArrayBox>& levelHead      = *m_head[lev];
                 LevelData<FArrayBox>& levelHeadSTP   = *stuffToPlot[0][lev];
                 LevelData<FArrayBox>& levelGap       = *m_gapheight[lev];    
@@ -1851,8 +1860,8 @@ AmrHydro::timeStep(Real a_dt)
 
                 LevelData<FArrayBox>& levelGradH     = *m_gradhead[lev];
                 LevelData<FArrayBox>& levelgHSTP     = *stuffToPlot[7][lev];
-                //LevelData<FArrayBox>& levelGradPw    = *RHS_b[lev];
-                //LevelData<FArrayBox>& levelgPwSTP    = *stuffToPlot[8][lev];
+                LevelData<FArrayBox>& levelGradPw    = *moulin_source_term[lev];
+                LevelData<FArrayBox>& levelgPwSTP    = *stuffToPlot[8][lev];
 
                 DataIterator dit = levelHead.dataIterator();
                 for (dit.begin(); dit.ok(); ++dit) {
@@ -1868,9 +1877,10 @@ AmrHydro::timeStep(Real a_dt)
                     levelRHSBSTP[dit].copy(levelRHSB[dit], 0, 0, 1);
 
                     levelgHSTP[dit].copy(levelGradH[dit], 0, 0, 1);
+                    levelgPwSTP[dit].copy(levelGradPw[dit], 0, 0, 1);
                 }
             } // loop on levs
-            writePltCustom(8, vectName, stuffToPlot, std::to_string(ite_idx));
+            writePltCustom(nStuffToPlot, vectName, stuffToPlot, std::to_string(ite_idx));
         } // end customPlt
 
         ite_idx++;
@@ -2865,45 +2875,33 @@ AmrHydro::writePlotFile()
     }
 
     // plot comps: head + gapHeight + bedelevation + overburdenPress
-    int numPlotComps = 9;
-    //int numPlotComps = 3;
-
-    // add in grad(head) if desired
-    //if (m_write_gradPhi)
-    //{
-    //    numPlotComps += SpaceDim;
-    //}
+    int numPlotComps = 11;
 
     // generate data names
-
     string headName("head");
     string gapHeightName("gapHeight");
     string zbedName("bedelevation");
     string piName("overburdenPress");
     string pwName("Pw"); 
     string qwName("Qw_x"); 
+    string qwNameY("Qw_y"); 
     string ReName("Re"); 
     string meltRateName("meltRate"); 
     string xGradName("GradHead_x");
+    string yGradName("GradHead_y");
 
     Vector<string> vectName(numPlotComps);
-    // int dThicknessComp;
-
     vectName[0] = headName;
     vectName[1] = gapHeightName;
     vectName[2] = zbedName;
     vectName[3] = piName;
     vectName[4] = pwName;
     vectName[5] = qwName;
-    vectName[6] = ReName;
-    vectName[7] = meltRateName;
-    vectName[8] = xGradName;
-    //if (m_write_gradPhi)
-    //{
-    //    vectName[numPlotComps] = xGradName;
-    //    if (SpaceDim > 1) vectName[numPlotComps + 1] = yGradName;
-    //    if (SpaceDim > 2) vectName[numPlotComps + 2] = zGradName;
-    //}
+    vectName[6] = qwNameY;
+    vectName[7] = ReName;
+    vectName[8] = meltRateName;
+    vectName[9] = xGradName;
+    vectName[10] = yGradName;
 
     Box domain = m_amrDomains[0].domainBox();
     Real dt = 1.;
@@ -2914,14 +2912,12 @@ AmrHydro::writePlotFile()
     // ghost vect makes things simpler
     IntVect ghostVect(IntVect::Unit);
 
-    for (int lev = 0; lev < numLevels; lev++)
-    {
+    for (int lev = 0; lev < numLevels; lev++) {
         // first allocate storage
         plotData[lev] = new LevelData<FArrayBox>(m_amrGrids[lev], numPlotComps, ghostVect);
     }
 
-    for (int lev = 0; lev < numLevels; lev++)
-    {
+    for (int lev = 0; lev < numLevels; lev++) {
         // now copy new-time solution into plotData
         LevelData<FArrayBox>& plotDataLev = *plotData[lev];
 
@@ -2960,8 +2956,7 @@ AmrHydro::writePlotFile()
         //}         // end if write_gradPhi
 
         DataIterator dit = m_amrGrids[lev].dataIterator();
-        for (dit.begin(); dit.ok(); ++dit)
-        {
+        for (dit.begin(); dit.ok(); ++dit) {
             //const Box& gridBox        = m_amrGrids[lev][dit];
             FArrayBox& thisPlotData   = plotDataLev[dit];
             int comp = 0;
@@ -2987,20 +2982,16 @@ AmrHydro::writePlotFile()
             comp++;
             thisPlotData.copy(thisqw, 0, comp, 1);
             comp++;
+            thisPlotData.copy(thisqw, 1, comp, 1);
+            comp++;
             thisPlotData.copy(thisRe, 0, comp, 1);
             comp++;
             thisPlotData.copy(thismR, 0, comp, 1);
             comp++;
             thisPlotData.copy(thisGradHead, 0, comp, 1);
             comp++;
-            // now copy for grad(head)
-            //if (m_write_gradPhi)
-            //{
-            //    const FArrayBox& thisGradPhi = levelGradPhi[dit];
-            //    thisPlotData.copy(thisGradPhi, 0, comp, SpaceDim);
-            //    comp += SpaceDim;
-
-            //} // end if we are writing grad(head)
+            thisPlotData.copy(thisGradHead, 1, comp, 1);
+            comp++;
 
         } // end loop over boxes on this level
 
@@ -3030,16 +3021,13 @@ AmrHydro::writePlotFile()
 
     string filename(iter_str);
 
-    if (SpaceDim == 1)
-    {
+    if (SpaceDim == 1) {
         filename.append("1d.hdf5");
     }
-    else if (SpaceDim == 2)
-    {
+    else if (SpaceDim == 2) {
         filename.append("2d.hdf5");
     }
-    else if (SpaceDim == 3)
-    {
+    else if (SpaceDim == 3) {
         filename.append("3d.hdf5");
     }
 
@@ -3047,10 +3035,8 @@ AmrHydro::writePlotFile()
         filename, m_amrGrids, plotData, vectName, domain, m_amrDx[0][0], dt, time(), m_refinement_ratios, numLevels);
 
     // need to delete plotData
-    for (int lev = 0; lev < numLevels; lev++)
-    {
-        if (plotData[lev] != NULL)
-        {
+    for (int lev = 0; lev < numLevels; lev++) {
+        if (plotData[lev] != NULL) {
             delete plotData[lev];
             plotData[lev] = NULL;
         }
