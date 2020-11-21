@@ -100,7 +100,10 @@ public:
                        LevelData<FArrayBox>& levelPi, 
                        LevelData<FArrayBox>& levelPw, 
                        LevelData<FArrayBox>& levelmR, 
-                       LevelData<FArrayBox>& levelB);
+                       LevelData<FArrayBox>& levelB,
+                       LevelData<FArrayBox>& levelRHS_b_A,
+                       LevelData<FArrayBox>& levelRHS_b_B,
+                       LevelData<FArrayBox>& levelRHS_b_C);
 
     void SolveForHead(
                       const Vector<DisjointBoxLayout>&               a_grids,

@@ -82,8 +82,7 @@ HydroIBC::initializeData(RealVect& a_dx,
     IntVect regionHi = m_domain.domainBox().bigEnd();
 
     DataIterator dit = a_head.dataIterator();
-    for (dit.begin(); dit.ok(); ++dit)
-    {
+    for (dit.begin(); dit.ok(); ++dit) {
         FArrayBox& thisHead      = a_head[dit];
         FArrayBox& thisGapHeight = a_gapHeight[dit];
         FArrayBox& thisPw        = a_Pw[dit];
@@ -96,8 +95,7 @@ HydroIBC::initializeData(RealVect& a_dx,
         //FArrayBox& thisGradzbed  = a_Gradzbed[dit];
 
         BoxIterator bit(thisHead.box()); // Default .box() have ghostcells ?
-        for (bit.begin(); bit.ok(); ++bit)
-        {
+        for (bit.begin(); bit.ok(); ++bit) {
             IntVect iv = bit();
             Real x_loc = (iv[0]+0.5)*a_dx[0];
             //Real y_loc = (iv[1]+0.5)*a_dx[1];
@@ -122,9 +120,12 @@ HydroIBC::initializeData(RealVect& a_dx,
             // Water press ?? No idea --> Pi/2.0
             //thisPw(iv, 0)        = thispi(iv, 0) * 0.5;
             /* option 2: Pw = Patm, find head */
-            thisPw(iv, 0)        = 101325.0;
+            thisPw(iv, 0)        = 1.0;
             Real Fact            = 1./(Params.m_rho_w * Params.m_gravity);
             thisHead(iv, 0)      = thisPw(iv, 0) * Fact + thiszbed(iv, 0) ;
+            /* option 3: fix head constant to 0 */
+            //thisHead(iv, 0)      = 20.0;
+            //thisPw(iv, 0)        = ( thisHead(iv, 0) - thiszbed(iv, 0) ) * (Params.m_rho_w * Params.m_gravity) ;
             
 
             // dummy stuff 
