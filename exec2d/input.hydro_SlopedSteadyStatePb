@@ -2,7 +2,7 @@
 main.domain_size=1000.00 1000.00 # physical dimensions of domain
 main.problem_type=basic
 main.maxTime=6000000.0
-main.maxStep= 10 #240 # 240 heures = 10 jours
+main.maxStep= 10 # 240 heures = 10 jours
 
 # bc - 0 = diri / 1 = neum
 bc.lo_bc = 0 0
@@ -35,8 +35,8 @@ suhmo.slope   = 0.02
 suhmo.GapInit = 0.01
 suhmo.ReInit  = 1000.0
 
-suhmo.moulin_position = 375. 500.  # CELL pos for now
-suhmo.moulin_flux = 2.0 # vol flux
+suhmo.moulin_position = 500. 500.  # CELL pos for now
+suhmo.moulin_flux = 4.0 # vol flux
 
 # class AmrHydro.cpp
 # misc
@@ -79,4 +79,4 @@ AmrHydro.check_prefix=chk
 AmrHydro.check_overwrite=false # if true, rewrite old checkpoints with new ones.
 AmrHydro.check_exit=false # if true, exit immediately after writing a checkpoint
 
-#AmrHydro.restart_file=chk000025.2d.hdf5
+#AmrHydro.restart_file=chk000700.2d.hdf5
