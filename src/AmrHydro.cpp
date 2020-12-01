@@ -1084,35 +1084,71 @@ AmrHydro::Calc_moulin_source_term (LevelData<FArrayBox>& levelMoulinSrc)
            if ( (m_suhmoParm->m_moulin_position[0] <= x_hi) && (m_suhmoParm->m_moulin_position[0] > x_lo) ) {
                if ( (m_suhmoParm->m_moulin_position[1] <= y_hi) && (m_suhmoParm->m_moulin_position[1] > y_lo) ) {
                     moulinSrc(iv,0) = m_suhmoParm->m_moulin_flux / 
-                             (4.0 * m_amrDx[curr_level][0] * m_amrDx[curr_level][1]);  // m3s-1 / m2
-                    // Top Left Corner
-                    int coord_TL[3];
-                    coord_TL[0] = iv[0]; 
-                    coord_TL[1] = iv[1] + 1; 
-                    coord_TL[2] = 0;
-                    IntVect iv_TL(coord_TL);
-                    moulinSrc(iv_TL,0) = m_suhmoParm->m_moulin_flux / 
-                                 (4.0 * m_amrDx[curr_level][0] * m_amrDx[curr_level][1]);  // m3s-1 / m2
-                    // Top Right Corner
-                    int coord_TR[3];
-                    coord_TR[0] = iv[0] + 1; 
-                    coord_TR[1] = iv[1] + 1; 
-                    coord_TR[2] = 0;
-                    IntVect iv_TR(coord_TR);
-                    moulinSrc(iv_TR,0) = m_suhmoParm->m_moulin_flux / 
-                                 (4.0 * m_amrDx[curr_level][0] * m_amrDx[curr_level][1]);  // m3s-1 / m2
-                    // Bottom Right Corner
-                    int coord_BR[3];
-                    coord_BR[0] = iv[0] + 1; 
-                    coord_BR[1] = iv[1]; 
-                    coord_BR[2] = 0;
-                    IntVect iv_BR(coord_BR);
-                    moulinSrc(iv_BR,0) = m_suhmoParm->m_moulin_flux / 
-                                 (4.0 * m_amrDx[curr_level][0] * m_amrDx[curr_level][1]);  // m3s-1 / m2
-                    pout() << "level is: " << curr_level << ", IV/IV_TR: " << iv << " "<< iv_TR << endl; 
+                             ( m_amrDx[curr_level][0] * m_amrDx[curr_level][1]);  // m3s-1 / m2
+                    // Y line
+                    //     o
+                    //     o
+                    // - - X - - 
+                    //     o
+                    //     o
+                    //int coord_TL[3];
+                    //coord_TL[0] = iv[0]; 
+                    //coord_TL[1] = iv[1] + 1; 
+                    //coord_TL[2] = 0;
+                    //IntVect iv_TL(coord_TL);
+                    //moulinSrc(iv_TL,0) = m_suhmoParm->m_moulin_flux / 
+                    //             (5.0 * m_amrDx[curr_level][0] * m_amrDx[curr_level][1]);  // m3s-1 / m2
+                    //coord_TL[1] = iv[1] - 1; 
+                    //IntVect iv_TL2(coord_TL);
+                    //moulinSrc(iv_TL2,0) = m_suhmoParm->m_moulin_flux / 
+                    //             (5.0 * m_amrDx[curr_level][0] * m_amrDx[curr_level][1]);  // m3s-1 / m2
+                    //coord_TL[1] = iv[1] - 2; 
+                    //IntVect iv_TL3(coord_TL);
+                    //moulinSrc(iv_TL3,0) = m_suhmoParm->m_moulin_flux / 
+                    //             (9.0 * m_amrDx[curr_level][0] * m_amrDx[curr_level][1]);  // m3s-1 / m2
+                    //coord_TL[1] = iv[1] + 2; 
+                    //IntVect iv_TL4(coord_TL);
+                    //moulinSrc(iv_TL4,0) = m_suhmoParm->m_moulin_flux / 
+                    //             (9.0 * m_amrDx[curr_level][0] * m_amrDx[curr_level][1]);  // m3s-1 / m2
+                    // X line
+                    //     I
+                    //     I
+                    // o o X o o 
+                    //     I
+                    //     I
+                    //int coord_TR[3];
+                    //coord_TR[0] = iv[0] + 1; 
+                    //coord_TR[1] = iv[1]; 
+                    //coord_TR[2] = 0;
+                    //IntVect iv_TR(coord_TR);
+                    //moulinSrc(iv_TR,0) = m_suhmoParm->m_moulin_flux / 
+                    //             (3.0 * m_amrDx[curr_level][0] * m_amrDx[curr_level][1]);  // m3s-1 / m2
+                    //coord_TR[0] = iv[0] - 1; 
+                    //IntVect iv_TR2(coord_TR);
+                    //moulinSrc(iv_TR2,0) = m_suhmoParm->m_moulin_flux / 
+                    //             (3.0 * m_amrDx[curr_level][0] * m_amrDx[curr_level][1]);  // m3s-1 / m2
+                    //coord_TR[0] = iv[0] - 2; 
+                    //IntVect iv_TR3(coord_TR);
+                    //moulinSrc(iv_TR3,0) = m_suhmoParm->m_moulin_flux / 
+                    //             (9.0 * m_amrDx[curr_level][0] * m_amrDx[curr_level][1]);  // m3s-1 / m2
+                    //coord_TR[0] = iv[0] + 2; 
+                    //IntVect iv_TR4(coord_TR);
+                    //moulinSrc(iv_TR4,0) = m_suhmoParm->m_moulin_flux / 
+                    //             (9.0 * m_amrDx[curr_level][0] * m_amrDx[curr_level][1]);  // m3s-1 / m2
+                    //pout() << "level is: " << curr_level << ", IV: " << iv << endl; 
                }
            }
        }
+   }
+   for (dit.begin(); dit.ok(); ++dit) {
+       FArrayBox& moulinSrc = levelMoulinSrc[dit];
+       BoxIterator bit(moulinSrc.box());
+       Real integ_moulin = 0.0;
+       for (bit.begin(); bit.ok(); ++bit) {
+           IntVect iv = bit();
+           integ_moulin += moulinSrc(iv,0) * m_amrDx[curr_level][0] * m_amrDx[curr_level][1]; 
+       }
+       pout() << "level is: " << curr_level << ", Integral of moulin vol. rate: " << integ_moulin << endl; 
    }
 }
 
@@ -1324,9 +1360,9 @@ AmrHydro::timeStep(Real a_dt)
         // Re/Qw iterations -- testing
         a_ReQwIter[lev]         = new LevelData<FArrayBox>(m_amrGrids[lev], 1, HeadGhostVect);
         // DEBUG
-        RHS_b_A[lev]              = new LevelData<FArrayBox>(m_amrGrids[lev], 1, IntVect::Zero);
-        RHS_b_B[lev]              = new LevelData<FArrayBox>(m_amrGrids[lev], 1, IntVect::Zero);
-        RHS_b_C[lev]              = new LevelData<FArrayBox>(m_amrGrids[lev], 1, IntVect::Zero);
+        RHS_b_A[lev]            = new LevelData<FArrayBox>(m_amrGrids[lev], 1, IntVect::Zero);
+        RHS_b_B[lev]            = new LevelData<FArrayBox>(m_amrGrids[lev], 1, IntVect::Zero);
+        RHS_b_C[lev]            = new LevelData<FArrayBox>(m_amrGrids[lev], 1, IntVect::Zero);
         // Stuff for OpLin
         aCoef[lev] = RefCountedPtr<LevelData<FArrayBox> >(new LevelData<FArrayBox>(m_amrGrids[lev], 1, IntVect::Zero));
         bCoef[lev] = RefCountedPtr<LevelData<FluxBox> >(new LevelData<FluxBox>(m_amrGrids[lev], 1, IntVect::Zero));
@@ -1784,11 +1820,11 @@ AmrHydro::timeStep(Real a_dt)
         }  // loop on levs
 
         /* Averaging down and fill in ghost cells */
-        //for (int lev = m_finest_level; lev > 0; lev--) {
-        //    CoarseAverage averager(m_amrGrids[lev], 1, m_refinement_ratios[lev - 1]);
-        //    averager.averageToCoarse(*m_head[lev - 1], *m_head[lev]);
-        //    averager.averageToCoarse(*m_gapheight[lev - 1], *m_gapheight[lev]);
-        //}
+        for (int lev = m_finest_level; lev > 0; lev--) {
+            CoarseAverage averager(m_amrGrids[lev], 1, m_refinement_ratios[lev - 1]);
+            averager.averageToCoarse(*m_head[lev - 1], *m_head[lev]);
+            averager.averageToCoarse(*m_gapheight[lev - 1], *m_gapheight[lev]);
+        }
         // handle ghost cells on the coarse-fine interface
         for (int lev = 1; lev <= m_finest_level; lev++) {
             QuadCFInterp qcfi(m_amrGrids[lev], &m_amrGrids[lev-1],
