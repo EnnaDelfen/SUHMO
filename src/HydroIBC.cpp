@@ -136,6 +136,9 @@ HydroIBC::initializeData(RealVect& a_dx,
             thisqw(iv, 0)        = num_q/denom_q; 
             thisqw(iv, 1)        = 0.0;
             thismeltRate(iv, 0)  = (Params.m_G/Params.m_L); // - Params.m_gravity * Params.m_rho_w * thisqw(iv, 0) * Params.m_slope)/ Params.m_L;
+            //if ((iv[0] == 14) && (iv[1] == 14)){
+            //    thismeltRate(iv, 0)  += 0.05; 
+            //}
         } // end loop over cells
     }     // end loop over boxes
 

@@ -366,6 +366,7 @@ AmrHydro::SolveForHead(
     VCAMRPoissonOp2Factory* poissonOpF_head = new VCAMRPoissonOp2Factory;
 
     //BCHolder bc(ConstDiriNeumBC(IntVect::Unit, RealVect::Unit,  IntVect::Zero, RealVect::Zero));
+    pout() << "get there"<< endl;
     poissonOpF_head->define(coarsestDomain,
                       a_grids,
                       refRatio,
@@ -377,6 +378,7 @@ AmrHydro::SolveForHead(
                       a_bCoef);
 
     RefCountedPtr< AMRLevelOpFactory<LevelData<FArrayBox> > > opFactoryPtr(poissonOpF_head);
+    pout() << "get there"<< endl;
 
     MultilevelLinearOp<FArrayBox> poissonOp;
     // options ?
@@ -894,6 +896,7 @@ AmrHydro::initialize()
     if (m_verbosity > 3) {
         pout() << "Done with AmrHydro::initialize\n" << endl;
     }
+    MayDay::Error("STOP");
 }
 
 // set BC for head ?
@@ -1492,7 +1495,7 @@ AmrHydro::timeStep(Real a_dt)
                 crsePsiPtr = m_head[lev-1];
                 nRefCrse = m_refinement_ratios[lev-1];
             }
-            if (lev < m_max_level) {
+            if (lev < m_finest_level) {
                 finePsiPtr = m_head[lev+1];  // What does it do with the fine stuff ???
                 nRefFine = m_refinement_ratios[lev];
             }
@@ -1530,7 +1533,7 @@ AmrHydro::timeStep(Real a_dt)
                 crsePsiPtr = m_Pw[lev-1];
                 nRefCrse = m_refinement_ratios[lev-1];
             }
-            if (lev < m_max_level) {
+            if (lev < m_finest_level) {
                 finePsiPtr = m_Pw[lev+1];  // What does it do with the fine stuff ???
                 nRefFine = m_refinement_ratios[lev];
             }
@@ -2170,14 +2173,16 @@ AmrHydro::regrid()
 {
     CH_TIME("AmrHydro::regrid");
 
-    if (m_verbosity > 3)
-    {
+    if (m_verbosity > 3) {
         pout() << "AmrHydro::regrid" << endl;
     }
 
+    if (!m_tag_defined) {
+        MayDay::Error(" Need a tagging variable ... ");
+    }
+
     // only do any of this if the max level > 0
-    if (m_max_level > 0)
-    {
+    if (m_max_level > 0) {
         m_n_regrids++;
 
         // first generate tags
@@ -2360,21 +2365,19 @@ AmrHydro::regrid()
 void
 AmrHydro::tagCells(Vector<IntVectSet>& a_tags)
 {
-    if (m_verbosity > 3)
-    {
+    if (m_verbosity > 3) {
         pout() << "AmrHydro::tagCells" << endl;
     }
 
     int top_level = a_tags.size();
     top_level = min(m_tag_cap, min(top_level - 1, m_finest_level));
+    pout() << "Top level ?? " << top_level<< endl;
     // loop over levels
-    for (int lev = 0; lev <= top_level; lev++)
-    {
+    for (int lev = 0; lev <= top_level; lev++) {
         IntVectSet& levelTags = a_tags[lev];
         tagCellsLevel(levelTags, lev);
         IntVectSet& tagSubset = m_vectTagSubset[lev];
-        if (tagSubset.numPts() > 0)
-        {
+        if (tagSubset.numPts() > 0) {
             levelTags &= tagSubset;
         }
     }
@@ -2400,130 +2403,67 @@ AmrHydro::tagCells(Vector<IntVectSet>& a_tags)
 void
 AmrHydro::tagCellsLevel(IntVectSet& a_tags, int a_level)
 {
-    if (m_verbosity > 4)
-    {
+    if (m_verbosity > 4) {
         pout() << "AmrHydro::tagCellsLevel " << a_level << endl;
     }
 
-    // base tags on undivided gradient of phi
     // first stab -- don't do BC's; just do one-sided
     // stencils at box edges (hopefully good enough),
     // since doing BC's properly is somewhat expensive.
+    
+    if (m_tag_var == "meltingRate") { 
+        DataIterator dit = m_meltRate[a_level]->dataIterator();
+        LevelData<FArrayBox>& levelPhi = *m_meltRate[a_level];
+        const DisjointBoxLayout& levelGrids = m_amrGrids[a_level];
 
-    DataIterator dit = m_head[a_level]->dataIterator();
+        // need to ensure that ghost cells are set properly
+        levelPhi.exchange(levelPhi.interval());
 
-    LevelData<FArrayBox>& levelPhi = *m_head[a_level];
-
-    const DisjointBoxLayout& levelGrids = m_amrGrids[a_level];
-
-    // need to ensure that ghost cells are set properly
-    levelPhi.exchange(levelPhi.interval());
-
-    IntVectSet local_tags;
-    if (m_tag_defined) {
-        for (dit.begin(); dit.ok(); ++dit)
-        {
-            // note that we only need one component here
-            // because the fortran subroutine stores the max(abs(grad))
-            // over all components into the 0th position
-            FArrayBox gradPhi(levelGrids[dit()], 1);
-
-            for (int dir = 0; dir < SpaceDim; dir++)
-            {
-                const Box b = levelGrids[dit()];
-                const Box bcenter = b & grow(m_amrDomains[a_level], -BASISV(dir));
-                const Box blo = b & adjCellLo(bcenter, dir);
-                const Box bhi = b & adjCellHi(bcenter, dir);
-                const int haslo = !blo.isEmpty();
-                const int hashi = !bhi.isEmpty();
-                FORT_UNDIVIDEDGRAD(CHF_FRA1(gradPhi, 0),
-                                   CHF_CONST_FRA(levelPhi[dit()]),
-                                   CHF_BOX(bcenter),
-                                   CHF_BOX(blo),
-                                   CHF_BOX(bhi),
-                                   CHF_CONST_INT(dir),
-                                   CHF_CONST_INT(haslo),
-                                   CHF_CONST_INT(hashi));
-
-                // now tag cells based on values
-                BoxIterator bit(levelGrids[dit()]);
-                for (bit.begin(); bit.ok(); ++bit)
-                {
-                    const IntVect& iv = bit();
-                    if (fabs(gradPhi(iv, 0)) > m_tagging_val) local_tags |= iv;
-                } // end loop over cells
-            }     // end loop over directions
+        IntVectSet local_tags;
+        for (dit.begin(); dit.ok(); ++dit) {
+            FArrayBox& phi   = levelPhi[dit];
+            // now tag cells based on values
+            BoxIterator bit(levelGrids[dit()]);
+            for (bit.begin(); bit.ok(); ++bit) {
+                const IntVect& iv = bit();
+                if (fabs(phi(iv, 0)) > m_tagging_val) local_tags |= iv;
+            } // end loop over cells
         }         // end loop over grids
-    }             // end if tag on grad vel
 
-    // tag on laplacian(velocity)
-    //if (m_tagOnLapPhi)
-    //{
-    //    for (dit.begin(); dit.ok(); ++dit)
-    //    {
-    //        FArrayBox lapPhi(levelGrids[dit()], levelPhi.nComp());
-    //        lapPhi.setVal(0.0);
-    //        Real alpha = 0;
-    //        Real beta = 1.0;
-
-    //        // use undivided laplacian (set dx = 1)
-    //        Real bogusDx = 1.0;
-    //        Box lapBox = levelPhi[dit].box();
-    //        lapBox.grow(-2);
-    //        lapBox &= levelGrids[dit];
-    //        // assumes that ghost cells boundary conditions are properly set
-    //        FORT_OPERATORLAP(CHF_FRA(lapPhi),
-    //                         CHF_FRA(levelPhi[dit]),
-    //                         CHF_BOX(lapBox),
-    //                         CHF_CONST_REAL(bogusDx),
-    //                         CHF_CONST_REAL(alpha),
-    //                         CHF_CONST_REAL(beta));
-
-    //        // now tag cells based on values
-    //        BoxIterator bit(lapBox);
-
-    //        for (bit.begin(); bit.ok(); ++bit)
-    //        {
-    //            const IntVect& iv = bit();
-    //            for (int comp = 0; comp < lapPhi.nComp(); comp++)
-    //            {
-    //                if (fabs(lapPhi(iv, comp)) > m_laplacian_tagging_val)
-    //                {
-    //                    local_tags |= iv;
-    //                }
-    //            }
-
-    //        } // end loop over cells
-    //    }     // end loop over grids
-    //}         // end if tag on laplacian(phi)
-
-    // now buffer tags
-    local_tags.grow(m_tags_grow);
-    for (int dir = 0; dir < SpaceDim; dir++) {
-        if (m_tags_grow_dir[dir] > m_tags_grow) local_tags.grow(dir, std::max(0, m_tags_grow_dir[dir] - m_tags_grow));
+        // now buffer tags
+        local_tags.grow(m_tags_grow);
+        for (int dir = 0; dir < SpaceDim; dir++) {
+            if (m_tags_grow_dir[dir] > m_tags_grow) local_tags.grow(dir, std::max(0, m_tags_grow_dir[dir] - m_tags_grow));
+        }
+        local_tags &= m_amrDomains[a_level];
+        a_tags = local_tags;
+    } else {
+        MayDay::Error(" Wrong tagging value ... ");
     }
-    local_tags &= m_amrDomains[a_level];
-    a_tags = local_tags;
+
 }
 
 void
 AmrHydro::tagCellsInit(Vector<IntVectSet>& a_tags)
 {
-    if (m_verbosity > 3)
-    {
+    if (m_verbosity > 3) {
         pout() << "AmrHydro::tagCellsInit" << endl;
     }
 
-    // default is to just call regular tagging
+    if (!m_tag_defined) {
+        MayDay::Error(" Need a tagging variable ... ");
+    }
+
     tagCells(a_tags);
     m_vectTags = a_tags;
 }
 
 void
-AmrHydro::initGrids(int a_finest_level)
-{
+AmrHydro::initGrids(int a_finest_level) {
+
     if (m_verbosity > 3) {
         pout() << "AmrHydro::initGrids" << endl;
+        pout() << "m_max_level " << m_max_level << endl;
     }
 
     m_finest_level = 0;
@@ -2557,8 +2497,7 @@ AmrHydro::initGrids(int a_finest_level)
     int baseLevel = 0;
 
     BRMeshRefine meshrefine;
-    if (moreLevels)
-    {
+    if (moreLevels) {
         meshrefine.define(
             m_amrDomains[0], m_refinement_ratios, m_fill_ratio, m_block_factor, m_nesting_radius, m_max_box_size);
     }
@@ -2571,40 +2510,39 @@ AmrHydro::initGrids(int a_finest_level)
     newBoxes = oldBoxes;
     int new_finest_level = 0;
 
-    while (moreLevels)
-    {
+    while (moreLevels) {
         // default is moreLevels = false
         // (only repeat loop in the case where a new level is generated
         // which is still coarser than maxLevel)
         moreLevels = false;
         tagCellsInit(tagVect);
+        pout() << " Is tagVect empty ? " << m_finest_level << " " <<tagVect[m_finest_level].isEmpty() <<endl;
 
         // two possibilities -- need to generate grids
         // level-by-level, or we are refining all the
         // way up for the initial time.  check to
         // see which it is by seeing if the finest-level
         // tags are empty
-        if (tagVect[m_max_level - 1].isEmpty())
-        {
+        if (tagVect[m_max_level - 1].isEmpty()) {
+            pout() << " Am I here, opt 1" << endl;
             int top_level = m_finest_level;
             int old_top_level = top_level;
             new_finest_level = meshrefine.regrid(newBoxes, tagVect, baseLevel, top_level, oldBoxes);
+            pout() << " new_finest_level : " << new_finest_level << endl;
+            pout() << " newBoxes[levs].size()" << newBoxes[0].size() << " " << newBoxes[1].size() << endl;
 
             if (new_finest_level > top_level) top_level++;
             oldBoxes = newBoxes;
 
             // now see if we need another pass through grid generation
-            if ((top_level < m_max_level) && (top_level > old_top_level) && (new_finest_level <= m_tag_cap))
-            {
+            if ((top_level < m_max_level) && (top_level > old_top_level) && (new_finest_level <= m_tag_cap)) {
                 moreLevels = true;
             }
-        }
-        else
-        {
+        } else {
+            pout() << " Or here, opt 2" << endl;
             // for now, define old_grids as just domains
             oldBoxes.resize(m_max_level + 1);
-            for (int lev = 1; lev <= m_max_level; lev++)
-            {
+            for (int lev = 1; lev <= m_max_level; lev++) {
                 oldBoxes[lev].push_back(m_amrDomains[lev].domainBox());
             }
 
@@ -2613,18 +2551,19 @@ AmrHydro::initGrids(int a_finest_level)
         }
 
         numLevels = Min(new_finest_level, m_max_level) + 1;
+        pout() << "numLevels " << numLevels << endl;
 
         // now loop through levels and define
-        for (int lev = baseLevel + 1; lev <= new_finest_level; ++lev)
-        {
+        for (int lev = baseLevel + 1; lev <= new_finest_level; ++lev) {
+            pout() << "Am I looping through the levels to refine ? " << lev << endl;
             int numGridsNew = newBoxes[lev].size();
+            pout() << "numGridsNew is " << numGridsNew << endl;
             Vector<int> procIDs(numGridsNew);
             LoadBalance(procIDs, newBoxes[lev]);
             const DisjointBoxLayout newDBL(newBoxes[lev], procIDs, m_amrDomains[lev]);
             m_amrGrids[lev] = newDBL;
 
-            if (m_verbosity > 2)
-            {
+            if (m_verbosity > 2) {
                 long long levelNumCells = newDBL.numCells();
                 pout() << "   Level " << lev << ": " << levelNumCells << " cells: " << m_amrGrids[lev] << endl;
             }
