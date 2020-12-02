@@ -896,7 +896,7 @@ AmrHydro::initialize()
     if (m_verbosity > 3) {
         pout() << "Done with AmrHydro::initialize\n" << endl;
     }
-    MayDay::Error("STOP");
+    //MayDay::Error("STOP");
 }
 
 // set BC for head ?
@@ -2529,7 +2529,7 @@ AmrHydro::initGrids(int a_finest_level) {
             int old_top_level = top_level;
             new_finest_level = meshrefine.regrid(newBoxes, tagVect, baseLevel, top_level, oldBoxes);
             pout() << " new_finest_level : " << new_finest_level << endl;
-            pout() << " newBoxes[levs].size()" << newBoxes[0].size() << " " << newBoxes[1].size() << endl;
+            //pout() << " newBoxes[levs].size()" << newBoxes[0].size() << " " << newBoxes[1].size() << endl;
 
             if (new_finest_level > top_level) top_level++;
             oldBoxes = newBoxes;
