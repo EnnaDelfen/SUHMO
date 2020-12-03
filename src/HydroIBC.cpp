@@ -63,17 +63,16 @@ HydroIBC::new_hydroIBC()
  */
 void
 HydroIBC::initializeData(RealVect& a_dx,
-                           suhmo_params Params,     
-                           LevelData<FArrayBox>& a_head,
-                           LevelData<FArrayBox>& a_gapHeight,
-                           LevelData<FArrayBox>& a_Pw,
-                           LevelData<FArrayBox>& a_qw,
-                           LevelData<FArrayBox>& a_Re,
-                           LevelData<FArrayBox>& a_meltRate,
-                           LevelData<FArrayBox>& a_zbed,
-                           LevelData<FArrayBox>& a_Pi,
-                           LevelData<FArrayBox>& a_iceHeight)
-                           //LevelData<FArrayBox>& a_Gradzbed)
+                         suhmo_params Params,     
+                         LevelData<FArrayBox>& a_head,
+                         LevelData<FArrayBox>& a_gapHeight,
+                         LevelData<FArrayBox>& a_Pw,
+                         LevelData<FArrayBox>& a_qw,
+                         LevelData<FArrayBox>& a_Re,
+                         LevelData<FArrayBox>& a_meltRate,
+                         LevelData<FArrayBox>& a_zbed,
+                         LevelData<FArrayBox>& a_Pi,
+                         LevelData<FArrayBox>& a_iceHeight)
 {
     
     pout() << "HydroIBC::initializeData" << endl;
@@ -92,7 +91,6 @@ HydroIBC::initializeData(RealVect& a_dx,
         FArrayBox& thiszbed      = a_zbed[dit];
         FArrayBox& thispi        = a_Pi[dit];
         FArrayBox& thisiceHeight = a_iceHeight[dit];
-        //FArrayBox& thisGradzbed  = a_Gradzbed[dit];
 
         BoxIterator bit(thisHead.box()); // Default .box() have ghostcells ?
         for (bit.begin(); bit.ok(); ++bit) {
@@ -144,6 +142,77 @@ HydroIBC::initializeData(RealVect& a_dx,
 
     pout() << "(Done with HydroIBC::initializeData)" << endl;
 }
+
+
+/** Set up BC conditions of non evolving data
+ */
+void
+HydroIBC::BCData(RealVect& a_dx,
+                 DisjointBoxLayout& a_grids,
+                 suhmo_params Params,     
+                 LevelData<FArrayBox>& a_zbed,
+                 LevelData<FArrayBox>& a_Pi,
+                 LevelData<FArrayBox>& a_iceHeight)
+{
+    
+    pout() << "HydroIBC::BCData" << endl;
+
+    IntVect regionLo = m_domain.domainBox().bigEnd();
+    IntVect regionHi = m_domain.domainBox().bigEnd();
+
+    DataIterator dit = a_zbed.dataIterator();
+    for (dit.begin(); dit.ok(); ++dit) {
+        FArrayBox& thiszbed      = a_zbed[dit];
+        FArrayBox& thispi        = a_Pi[dit];
+        FArrayBox& thisiceHeight = a_iceHeight[dit];
+
+        const Box& validBox = a_grids.get(dit);
+
+        if(!m_domain.domainBox().contains(thiszbed.box())) {
+
+            for(int dir=0; dir<CH_SPACEDIM; ++dir) {
+
+                if (!m_domain.isPeriodic(dir)) {
+
+                    Box ghostBoxLo = adjCellBox(validBox, dir, Side::Lo, 1);
+                    Box ghostBoxHi = adjCellBox(validBox, dir, Side::Hi, 1);
+
+                    if ((!m_domain.domainBox().contains(ghostBoxLo)) && (thiszbed.box().contains(ghostBoxLo)) ) {
+                        for (BoxIterator bit(ghostBoxLo); bit.ok(); ++bit) {
+                            IntVect iv = bit();
+                            Real x_loc = (iv[0]+0.5)*a_dx[0];
+                            // bed topography
+                            thiszbed(iv, 0)      = Params.m_slope*x_loc;
+                            // Ice height (should be ice only, so surface - (bed + gap))
+                            thisiceHeight(iv, 0) = Params.m_H;
+                            // Ice overburden pressure : rho_i * g * H
+                            thispi(iv, 0)        = Params.m_rho_i * Params.m_gravity * thisiceHeight(iv, 0);
+                        }
+                    } // Lo
+                    if ((!m_domain.domainBox().contains(ghostBoxHi)) && (thiszbed.box().contains(ghostBoxHi)) ) {
+                        for (BoxIterator bit(ghostBoxHi); bit.ok(); ++bit) {
+                            IntVect iv = bit();
+                            Real x_loc = (iv[0]+0.5)*a_dx[0];
+                            // bed topography
+                            thiszbed(iv, 0)      = Params.m_slope*x_loc;
+                            // Ice height (should be ice only, so surface - (bed + gap))
+                            thisiceHeight(iv, 0) = Params.m_H;
+                            // Ice overburden pressure : rho_i * g * H
+                            thispi(iv, 0)        = Params.m_rho_i * Params.m_gravity * thisiceHeight(iv, 0);
+                        }
+
+                    } // Hi
+
+                } // end if perio
+
+            } // end loop over dirs
+
+        } 
+
+    } // end loop over data it
+    pout() << "(Done with HydroIBC::BCData)" << endl;
+}
+
 
 
 /// Set boundary fluxes
