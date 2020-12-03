@@ -109,7 +109,7 @@ public:
                       const Vector<DisjointBoxLayout>&               a_grids,
                       Vector<RefCountedPtr<LevelData<FArrayBox> > >& a_aCoef,
                       Vector<RefCountedPtr<LevelData<FluxBox> > >&   a_bCoef,
-                      ProblemDomain& coarsestDomain,
+                      Vector<ProblemDomain>& a_domains,
                       Vector<int>& refRatio,
                       Real& coarsestDx,
                       Vector<LevelData<FArrayBox>*>& a_head, 

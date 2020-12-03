@@ -2,7 +2,7 @@
 main.domain_size=1000.00 1000.00 # physical dimensions of domain
 main.problem_type=basic
 main.maxTime=6000000.0
-main.maxStep= 10 # 240 heures = 10 jours
+main.maxStep= 240 # 240 heures = 10 jours
 
 # bc - 0 = diri / 1 = neum
 bc.lo_bc = 0 0
@@ -50,7 +50,7 @@ AmrHydro.block_factor=2
 AmrHydro.max_box_size=128
 AmrHydro.max_base_grid_size=128
 AmrHydro.regrid_lbase=0  # coarsest level that you regrid
-AmrHydro.regrid_interval=50
+AmrHydro.regrid_interval=25
 AmrHydro.domainLoIndex=0 0 # 2D
 AmrHydro.is_periodic=0 1   # 2D
 AmrHydro.tagCap=1  # not sure yet
@@ -58,7 +58,7 @@ AmrHydro.fill_ratio=0.8
 AmrHydro.nestingRadius=2
 AmrHydro.tags_grow = 1  # amount to buffer tags
 AmrHydro.tag_variable=meltingRate
-AmrHydro.tagging_val=0.001
+AmrHydro.tagging_val=0.0005
 #AmrHydro.tagSubsetBoxesFile=somefile
 #AmrHydro.grids_file=grids.dat
 # Time Stepping params

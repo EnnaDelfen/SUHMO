@@ -357,7 +357,7 @@ AmrHydro::SolveForHead(
                       const Vector<DisjointBoxLayout>&               a_grids,
                       Vector<RefCountedPtr<LevelData<FArrayBox> > >& a_aCoef,
                       Vector<RefCountedPtr<LevelData<FluxBox> > >&   a_bCoef,
-                      ProblemDomain& coarsestDomain,
+                      Vector<ProblemDomain>& a_domains,
                       Vector<int>& refRatio,
                       Real& coarsestDx,
                       Vector<LevelData<FArrayBox>*>& a_head, 
@@ -366,8 +366,7 @@ AmrHydro::SolveForHead(
     VCAMRPoissonOp2Factory* poissonOpF_head = new VCAMRPoissonOp2Factory;
 
     //BCHolder bc(ConstDiriNeumBC(IntVect::Unit, RealVect::Unit,  IntVect::Zero, RealVect::Zero));
-    pout() << "get there"<< endl;
-    poissonOpF_head->define(coarsestDomain,
+    poissonOpF_head->define(a_domains[0],
                       a_grids,
                       refRatio,
                       coarsestDx,
@@ -378,14 +377,13 @@ AmrHydro::SolveForHead(
                       a_bCoef);
 
     RefCountedPtr< AMRLevelOpFactory<LevelData<FArrayBox> > > opFactoryPtr(poissonOpF_head);
-    pout() << "get there"<< endl;
 
     MultilevelLinearOp<FArrayBox> poissonOp;
     // options ?
     poissonOp.m_num_mg_iterations = 3;
     poissonOp.m_num_mg_smooth = 4;
     poissonOp.m_preCondSolverDepth = -1;
-    poissonOp.define(m_amrGrids, m_refinement_ratios, m_amrDomains, m_amrDx, opFactoryPtr, 0);
+    poissonOp.define(a_grids, refRatio, a_domains, m_amrDx, opFactoryPtr, 0);
     // bottom solver ?
     BiCGStabSolver<Vector<LevelData<FArrayBox>* > > solver;
     bool homogeneousBC = false;  
@@ -802,9 +800,9 @@ AmrHydro::initialize()
         //-------------------------------------------------
         // For each level, define a collection of FArray/FluxBox
         //-------------------------------------------------
-        for (int lev = 0; lev < m_head.size(); lev++) {
+        for (int lev = 0; lev <= m_max_level; lev++) {
             m_old_head[lev] = new LevelData<FArrayBox>;
-            m_head[lev] = new LevelData<FArrayBox>;
+            m_head[lev] =  new LevelData<FArrayBox>;
             
             m_gradhead[lev] = new LevelData<FArrayBox>;
             m_gradhead_ec[lev] = new LevelData<FluxBox>;
@@ -829,6 +827,29 @@ AmrHydro::initialize()
             // now create  grids
             initGrids(finest_level);
         }
+
+        /* Null the unused levels ... */
+        for (int lev = m_finest_level+1; lev <= m_max_level; lev++) {
+            m_old_head[lev]    = NULL;
+            m_head[lev]        = NULL;
+            
+            m_gradhead[lev]    = NULL;
+            m_gradhead_ec[lev] = NULL;
+
+            m_old_gapheight[lev] = NULL;
+            m_gapheight[lev]     = NULL;
+           
+            m_Pw[lev] = NULL;
+            m_qw[lev] = NULL;
+            m_Re[lev] = NULL;
+            m_meltRate[lev]  = NULL;
+            m_iceheight[lev] = NULL;
+
+            m_bedelevation[lev]    = NULL;
+            m_overburdenpress[lev] = NULL;
+        }
+
+
     } else {
         // we're restarting from a checkpoint file
         string restart_file;
@@ -1298,6 +1319,7 @@ AmrHydro::timeStep(Real a_dt)
     Vector<LevelData<FArrayBox>*> a_head_lagged;
     Vector<LevelData<FArrayBox>*> a_gapheight_lagged;
     Vector<LevelData<FArrayBox>*> RHS_h;
+    Vector<LevelData<FArrayBox>*> a_head_curr;
     Vector<LevelData<FArrayBox>*> moulin_source_term;
     Vector<LevelData<FArrayBox>*> RHS_b;
     Vector<LevelData<FArrayBox>*> a_ReQwIter;
@@ -1305,28 +1327,29 @@ AmrHydro::timeStep(Real a_dt)
     Vector<LevelData<FArrayBox>*> RHS_b_A;
     Vector<LevelData<FArrayBox>*> RHS_b_B;
     Vector<LevelData<FArrayBox>*> RHS_b_C;
-    a_head_lagged.resize(m_max_level + 1, NULL);
-    a_gapheight_lagged.resize(m_max_level + 1, NULL);
-    RHS_h.resize(m_max_level + 1, NULL);
-    moulin_source_term.resize(m_max_level + 1, NULL);
-    RHS_b.resize(m_max_level + 1, NULL);
-    a_ReQwIter.resize(m_max_level + 1, NULL);
+    a_head_lagged.resize(m_finest_level + 1, NULL);
+    a_head_curr.resize(m_finest_level + 1, NULL);
+    a_gapheight_lagged.resize(m_finest_level + 1, NULL);
+    RHS_h.resize(m_finest_level + 1, NULL);
+    moulin_source_term.resize(m_finest_level + 1, NULL);
+    RHS_b.resize(m_finest_level + 1, NULL);
+    a_ReQwIter.resize(m_finest_level + 1, NULL);
     // DEBUG
-    RHS_b_A.resize(m_max_level + 1, NULL);
-    RHS_b_B.resize(m_max_level + 1, NULL);
-    RHS_b_C.resize(m_max_level + 1, NULL);
+    RHS_b_A.resize(m_finest_level + 1, NULL);
+    RHS_b_B.resize(m_finest_level + 1, NULL);
+    RHS_b_C.resize(m_finest_level + 1, NULL);
     // FACE CENTERED STUFF
     Vector<LevelData<FluxBox>*> a_Qw_ec;
     Vector<LevelData<FluxBox>*> a_Re_ec;
     Vector<LevelData<FluxBox>*> a_GapHeight_ec;
     Vector<LevelData<FluxBox>*> a_gradPw_ec;
-    a_Qw_ec.resize(m_max_level + 1, NULL);
-    a_Re_ec.resize(m_max_level + 1, NULL);
-    a_GapHeight_ec.resize(m_max_level + 1, NULL);
-    a_gradPw_ec.resize(m_max_level + 1, NULL);
+    a_Qw_ec.resize(m_finest_level + 1, NULL);
+    a_Re_ec.resize(m_finest_level + 1, NULL);
+    a_GapHeight_ec.resize(m_finest_level + 1, NULL);
+    a_gradPw_ec.resize(m_finest_level + 1, NULL);
     // alpha*aCoef(x)*I - beta*Div(bCoef(x)*Grad) -- note for us: alpha = 0 beta = - 1 
-    Vector<RefCountedPtr<LevelData<FArrayBox> > > aCoef(m_max_level + 1);
-    Vector<RefCountedPtr<LevelData<FluxBox> > > bCoef(m_max_level + 1);
+    Vector<RefCountedPtr<LevelData<FArrayBox> > > aCoef(m_finest_level + 1);
+    Vector<RefCountedPtr<LevelData<FluxBox> > > bCoef(m_finest_level + 1);
 
     //     Take care of GC/BC etc.
     pout() <<"   ...Copy current into old & take care of ghost cells and BCs "<< endl;
@@ -1359,6 +1382,7 @@ AmrHydro::timeStep(Real a_dt)
         RHS_b[lev]              = new LevelData<FArrayBox>(m_amrGrids[lev], 1, IntVect::Zero);
         // Head and B lagged for iterations
         a_head_lagged[lev]      = new LevelData<FArrayBox>(m_amrGrids[lev], 1, HeadGhostVect);
+        a_head_curr[lev]        = new LevelData<FArrayBox>(m_amrGrids[lev], 1, HeadGhostVect);
         a_gapheight_lagged[lev] = new LevelData<FArrayBox>(m_amrGrids[lev], 1, HeadGhostVect);
         // Re/Qw iterations -- testing
         a_ReQwIter[lev]         = new LevelData<FArrayBox>(m_amrGrids[lev], 1, HeadGhostVect);
@@ -1731,6 +1755,10 @@ AmrHydro::timeStep(Real a_dt)
 
 
         //         Compute aCoeff and bCoeff, RHS and solve for h again
+        Vector<DisjointBoxLayout> m_amrGrids_curr;
+        Vector<ProblemDomain> m_amrDomains_curr;
+        m_amrGrids_curr.resize(m_finest_level + 1);
+        m_amrDomains_curr.resize(m_finest_level + 1);
         for (int lev = 0; lev <= m_finest_level; lev++) {
             LevelData<FArrayBox>& levelB     = *m_gapheight[lev];    
 
@@ -1760,14 +1788,21 @@ AmrHydro::timeStep(Real a_dt)
             CalcRHS_head(lev, levelRHS_h, levelPi, 
                          levelPw, levelmR, 
                          levelB, levelmoulin_source_term);
+
+            m_amrGrids_curr[lev]   = m_amrGrids[lev];
+            m_amrDomains_curr[lev] = m_amrDomains[lev];
+            a_head_curr[lev]       = m_head[lev];
         } // loop on levs
 
         // Solve for h using updated qtites
         pout() <<"        Poisson solve for h "<< endl;
-        SolveForHead(m_amrGrids, aCoef, bCoef,
-                     m_amrDomains[0], m_refinement_ratios, coarsestDx,
-                     m_head, RHS_h);
+        SolveForHead(m_amrGrids_curr, aCoef, bCoef,
+                     m_amrDomains_curr, m_refinement_ratios, coarsestDx,
+                     a_head_curr, RHS_h);
 
+        for (int lev = 0; lev <= m_finest_level; lev++) {
+            m_head[lev] = a_head_curr[lev];
+        }
 
         /* TRY TO SOLVE FOR B IN THE LOOP */
         //     Form RHS for b -- using b of current Picard iteration
@@ -1821,8 +1856,10 @@ AmrHydro::timeStep(Real a_dt)
                 }
             }
         }  // loop on levs
+        
 
         /* Averaging down and fill in ghost cells */
+        pout() <<"   ...Average down "<< endl;
         for (int lev = m_finest_level; lev > 0; lev--) {
             CoarseAverage averager(m_amrGrids[lev], 1, m_refinement_ratios[lev - 1]);
             averager.averageToCoarse(*m_head[lev - 1], *m_head[lev]);
@@ -2196,14 +2233,12 @@ AmrHydro::regrid()
 
         // this is clunky, but i don't know of a better way to turn
         // a DisjointBoxLayout into a Vector<Box>
-        for (int lev = 0; lev <= m_finest_level; lev++)
-        {
+        for (int lev = 0; lev <= m_finest_level; lev++) {
             const DisjointBoxLayout& levelDBL = m_amrGrids[lev];
             old_grids[lev].resize(levelDBL.size());
             LayoutIterator lit = levelDBL.layoutIterator();
             int boxIndex = 0;
-            for (lit.begin(); lit.ok(); ++lit, ++boxIndex)
-            {
+            for (lit.begin(); lit.ok(); ++lit, ++boxIndex) {
                 old_grids[lev][boxIndex] = levelDBL[lit()];
             }
         }
@@ -2214,11 +2249,11 @@ AmrHydro::regrid()
             m_amrDomains[0], m_refinement_ratios, m_fill_ratio, m_block_factor, m_nesting_radius, m_max_box_size);
 
         new_finest_level = meshrefine.regrid(new_grids, tagVect, m_regrid_lbase, top_level, old_grids);
+        pout() << " New finest level is " << new_finest_level << endl;
 
         // test to see if grids have changed
         bool gridsSame = true;
-        for (int lev = m_regrid_lbase + 1; lev <= new_finest_level; ++lev)
-        {
+        for (int lev = m_regrid_lbase + 1; lev <= new_finest_level; ++lev) {
             int numGridsNew = new_grids[lev].size();
             Vector<int> procIDs(numGridsNew);
             LoadBalance(procIDs, new_grids[lev]);
@@ -2226,17 +2261,18 @@ AmrHydro::regrid()
             const DisjointBoxLayout oldDBL = m_amrGrids[lev];
             gridsSame &= oldDBL.sameBoxes(newDBL);
         }
-        if (gridsSame)
-        {
-            if (m_verbosity > 3)
-            {
+        if (gridsSame) {
+            if (m_verbosity > 3) {
                 pout() << "AmrHydro::regrid -- grids unchanged" << endl;
+            }
+        } else {
+            if (m_verbosity > 3) {
+                pout() << "AmrHydro::regrid -- grids changed" << endl;
             }
         }
 
         // now loop through levels and redefine if necessary
-        for (int lev = m_regrid_lbase + 1; lev <= new_finest_level; ++lev)
-        {
+        for (int lev = m_regrid_lbase + 1; lev <= new_finest_level; ++lev) {
             int numGridsNew = new_grids[lev].size();
             Vector<int> procIDs(numGridsNew);
             LoadBalance(procIDs, new_grids[lev]);
@@ -2247,64 +2283,173 @@ AmrHydro::regrid()
 
             m_amrGrids[lev] = newDBL;
 
-            // build new storage
-            LevelData<FArrayBox>* old_oldDataPtr = m_old_head[lev];
-            LevelData<FArrayBox>* old_headDataPtr = m_head[lev];
-
-            LevelData<FArrayBox>* new_oldDataPtr =
+            // HEAD
+            LevelData<FArrayBox>* old_oldheadDataPtr  = m_old_head[lev];
+            LevelData<FArrayBox>* old_headDataPtr     = m_head[lev];
+            LevelData<FArrayBox>* new_oldheadDataPtr =
                 new LevelData<FArrayBox>(newDBL, m_old_head[0]->nComp(), m_old_head[0]->ghostVect());
-
-            LevelData<FArrayBox>* new_headDataPtr =
+            LevelData<FArrayBox>* new_headDataPtr    =
                 new LevelData<FArrayBox>(newDBL, m_head[0]->nComp(), m_head[0]->ghostVect());
+            // Gap Height
+            LevelData<FArrayBox>* old_oldgapheightDataPtr = m_old_gapheight[lev];
+            LevelData<FArrayBox>* old_gapheightDataPtr    = m_gapheight[lev];
+            LevelData<FArrayBox>* new_oldgapheightDataPtr =
+                new LevelData<FArrayBox>(newDBL, m_old_gapheight[0]->nComp(), m_old_gapheight[0]->ghostVect());
+            LevelData<FArrayBox>* new_gapheightDataPtr    =
+                new LevelData<FArrayBox>(newDBL, m_gapheight[0]->nComp(), m_gapheight[0]->ghostVect());
+            // Re
+            LevelData<FArrayBox>* old_ReDataPtr = m_Re[lev];
+            LevelData<FArrayBox>* new_ReDataPtr    =
+                new LevelData<FArrayBox>(newDBL, m_Re[0]->nComp(), m_Re[0]->ghostVect());
+            // Ice Height
+            LevelData<FArrayBox>* old_iceheightDataPtr = m_iceheight[lev];
+            LevelData<FArrayBox>* new_iceheightDataPtr    =
+                new LevelData<FArrayBox>(newDBL, m_iceheight[0]->nComp(), m_iceheight[0]->ghostVect());
+            // Bed elevation
+            LevelData<FArrayBox>* old_bedelevationDataPtr = m_bedelevation[lev];
+            LevelData<FArrayBox>* new_bedelevationDataPtr    =
+                new LevelData<FArrayBox>(newDBL, m_bedelevation[0]->nComp(), m_bedelevation[0]->ghostVect());
+            // Pi
+            LevelData<FArrayBox>* old_overburdenpressDataPtr = m_overburdenpress[lev];
+            LevelData<FArrayBox>* new_overburdenpressDataPtr    =
+                new LevelData<FArrayBox>(newDBL, m_overburdenpress[0]->nComp(), m_overburdenpress[0]->ghostVect());
 
             // first fill with interpolated data from coarser level
-
             {
                 // may eventually want to do post-regrid smoothing on this!
                 FineInterp interpolator(newDBL, 1, m_refinement_ratios[lev - 1], m_amrDomains[lev]);
 
-                interpolator.interpToFine(*new_oldDataPtr, *m_old_head[lev - 1]);
+                // HEAD
+                interpolator.interpToFine(*new_oldheadDataPtr, *m_old_head[lev - 1]);
                 interpolator.interpToFine(*new_headDataPtr, *m_head[lev - 1]);
+                // Gap Height
+                interpolator.interpToFine(*new_oldgapheightDataPtr, *m_old_gapheight[lev - 1]);
+                interpolator.interpToFine(*new_gapheightDataPtr, *m_gapheight[lev - 1]);
+                // Re
+                interpolator.interpToFine(*new_ReDataPtr, *m_Re[lev - 1]);
+                // Ice Height
+                interpolator.interpToFine(*new_iceheightDataPtr, *m_iceheight[lev - 1]);
+                // Bed elevation
+                interpolator.interpToFine(*new_bedelevationDataPtr, *m_bedelevation[lev - 1]);
+                // Pi
+                interpolator.interpToFine(*new_overburdenpressDataPtr, *m_overburdenpress[lev - 1]);
             }
 
-            // now copy old-grid data on this level into new holder
-            if (old_oldDataPtr != NULL)
-            {
-                if (oldDBL.isClosed())
-                {
-                    old_oldDataPtr->copyTo(*new_oldDataPtr);
+            // now potentially copy old-grid data on this level into new holder
+            if (old_oldheadDataPtr!= NULL) {
+                if (oldDBL.isClosed()) {
+                    // HEAD
+                    old_oldheadDataPtr->copyTo(*new_oldheadDataPtr);
                     old_headDataPtr->copyTo(*new_headDataPtr);
+                    // Gap Height
+                    old_oldgapheightDataPtr->copyTo(*new_oldgapheightDataPtr);
+                    old_gapheightDataPtr->copyTo(*new_gapheightDataPtr);
+                    // Re
+                    old_ReDataPtr->copyTo(*new_ReDataPtr);
+                    // Ice Height
+                    old_iceheightDataPtr->copyTo(*new_iceheightDataPtr);
+                    // Bed elevation
+                    old_bedelevationDataPtr->copyTo(*new_bedelevationDataPtr);
+                    // Pi
+                    old_overburdenpressDataPtr->copyTo(*new_overburdenpressDataPtr);
                 }
                 // can now delete old data
-                delete old_oldDataPtr;
+                delete old_oldheadDataPtr;
                 delete old_headDataPtr;
+                delete old_oldgapheightDataPtr;
+                delete old_gapheightDataPtr;
+                delete old_ReDataPtr;
+                delete old_iceheightDataPtr;
+                delete old_bedelevationDataPtr;
+                delete old_overburdenpressDataPtr;
+            } else {
+                // or build new storage
+                IntVect HeadGhostVect = m_num_head_ghost * IntVect::Unit;
+                m_gradhead[lev]       = new LevelData<FArrayBox>(m_amrGrids[lev], SpaceDim*1, HeadGhostVect);
+                m_gradhead_ec[lev]    = new LevelData<FluxBox>(m_amrGrids[lev], 1, IntVect::Zero);
+
+                m_Pw[lev]             = new LevelData<FArrayBox>(m_amrGrids[lev], 1, HeadGhostVect);
+                m_qw[lev]             = new LevelData<FArrayBox>(m_amrGrids[lev], SpaceDim*1, HeadGhostVect);
+                m_meltRate[lev]       = new LevelData<FArrayBox>(m_amrGrids[lev], 1, HeadGhostVect);
             }
 
             // exchange is necessary to fill periodic ghost cells
             // which aren't filled by the copyTo from oldLevelH
-            new_oldDataPtr->exchange();
+            new_oldheadDataPtr->exchange();
             new_headDataPtr->exchange();
+            new_oldgapheightDataPtr->exchange();
+            new_gapheightDataPtr->exchange();
+            new_ReDataPtr->exchange();
+            new_iceheightDataPtr->exchange();
+            new_bedelevationDataPtr->exchange();
+            new_overburdenpressDataPtr->exchange();
 
             // now place new holders into multilevel arrays
-            m_old_head[lev] = new_oldDataPtr;
-            m_head[lev] = new_headDataPtr;
-
+            m_old_head[lev]      = new_oldheadDataPtr;
+            m_head[lev]          = new_headDataPtr;
+            m_old_gapheight[lev] = new_oldgapheightDataPtr;
+            m_gapheight[lev]     = new_gapheightDataPtr;
+            m_Re[lev]            = new_ReDataPtr;
+            m_iceheight[lev]     = new_iceheightDataPtr;
+            m_bedelevation[lev]  = new_bedelevationDataPtr;
+            m_overburdenpress[lev] = new_overburdenpressDataPtr;
         } // end loop over currently defined levels
 
         // now ensure that any remaining levels are null pointers
         // (in case of de-refinement)
         for (int lev = new_finest_level + 1; lev < m_old_head.size(); lev++)
         {
-            if (m_old_head[lev] != NULL)
-            {
+            if (m_old_head[lev] != NULL) {
                 delete m_old_head[lev];
                 m_old_head[lev] = NULL;
             }
-
-            if (m_head[lev] != NULL)
-            {
+            if (m_head[lev] != NULL) {
                 delete m_head[lev];
                 m_head[lev] = NULL;
+            }
+            if (m_gradhead[lev] != NULL) {
+                delete m_gradhead[lev];
+                m_gradhead[lev] = NULL;
+            }
+            if (m_gradhead_ec[lev] != NULL) {
+                delete m_gradhead_ec[lev];
+                m_gradhead_ec[lev] = NULL;
+            }
+            if (m_old_gapheight[lev] != NULL) {
+                delete m_old_gapheight[lev];
+                m_old_gapheight[lev] = NULL;
+            }
+            if (m_gapheight[lev] != NULL) {
+                delete m_gapheight[lev];
+                m_gapheight[lev] = NULL;
+            }
+            if (m_Pw[lev] != NULL) {
+                delete m_Pw[lev];
+                m_Pw[lev] = NULL;
+            }
+            if (m_qw[lev] != NULL) {
+                delete m_qw[lev];
+                m_qw[lev] = NULL;
+            }
+            if (m_Re[lev] != NULL) {
+                delete m_Re[lev];
+                m_Re[lev] = NULL;
+            }
+            if (m_meltRate[lev] != NULL) {
+                delete m_meltRate[lev];
+                m_meltRate[lev] = NULL;
+            }
+            if (m_iceheight[lev] != NULL) {
+                delete m_iceheight[lev];
+                m_iceheight[lev] = NULL;
+            }
+            if (m_bedelevation[lev] != NULL) {
+                delete m_bedelevation[lev];
+                m_bedelevation[lev] = NULL;
+            }
+            if (m_overburdenpress[lev] != NULL) {
+                delete m_overburdenpress[lev];
+                m_overburdenpress[lev] = NULL;
             }
 
             DisjointBoxLayout emptyDBL;
@@ -2314,15 +2459,12 @@ AmrHydro::regrid()
         m_finest_level = new_finest_level;
 
         // set up counter of number of cells
-        for (int lev = 0; lev <= m_max_level; lev++)
-        {
+        for (int lev = 0; lev <= m_max_level; lev++) {
             m_num_cells[lev] = 0;
-            if (lev <= m_finest_level)
-            {
+            if (lev <= m_finest_level) {
                 const DisjointBoxLayout& levelGrids = m_amrGrids[lev];
                 LayoutIterator lit = levelGrids.layoutIterator();
-                for (lit.begin(); lit.ok(); ++lit)
-                {
+                for (lit.begin(); lit.ok(); ++lit) {
                     const Box& thisBox = levelGrids.get(lit());
                     m_num_cells[lev] += thisBox.numPts();
                 }
@@ -2332,28 +2474,22 @@ AmrHydro::regrid()
         // finally, set up covered_level flags
         m_covered_level.resize(m_max_level + 1, 0);
         // note that finest level can't be covered.
-        for (int lev = m_finest_level - 1; lev >= 0; lev--)
-        {
+        for (int lev = m_finest_level - 1; lev >= 0; lev--) {
             // if the next finer level is covered, then this one is too.
-            if (m_covered_level[lev + 1] == 1)
-            {
+            if (m_covered_level[lev + 1] == 1) {
                 m_covered_level[lev] = 1;
-            }
-            else
-            {
+            } else {
                 // see if the grids finer than this level completely cover it
                 IntVectSet fineUncovered(m_amrDomains[lev + 1].domainBox());
                 const DisjointBoxLayout& fineGrids = m_amrGrids[lev + 1];
 
                 LayoutIterator lit = fineGrids.layoutIterator();
-                for (lit.begin(); lit.ok(); ++lit)
-                {
+                for (lit.begin(); lit.ok(); ++lit) {
                     const Box& thisBox = fineGrids.get(lit());
                     fineUncovered.minus_box(thisBox);
                 }
 
-                if (fineUncovered.isEmpty())
-                {
+                if (fineUncovered.isEmpty()) {
                     m_covered_level[lev] = 1;
                 }
             }
@@ -2371,7 +2507,6 @@ AmrHydro::tagCells(Vector<IntVectSet>& a_tags)
 
     int top_level = a_tags.size();
     top_level = min(m_tag_cap, min(top_level - 1, m_finest_level));
-    pout() << "Top level ?? " << top_level<< endl;
     // loop over levels
     for (int lev = 0; lev <= top_level; lev++) {
         IntVectSet& levelTags = a_tags[lev];
@@ -2524,12 +2659,10 @@ AmrHydro::initGrids(int a_finest_level) {
         // see which it is by seeing if the finest-level
         // tags are empty
         if (tagVect[m_max_level - 1].isEmpty()) {
-            pout() << " Am I here, opt 1" << endl;
             int top_level = m_finest_level;
             int old_top_level = top_level;
             new_finest_level = meshrefine.regrid(newBoxes, tagVect, baseLevel, top_level, oldBoxes);
-            pout() << " new_finest_level : " << new_finest_level << endl;
-            //pout() << " newBoxes[levs].size()" << newBoxes[0].size() << " " << newBoxes[1].size() << endl;
+            pout() << " new_finest_level (1) : " << new_finest_level << endl;
 
             if (new_finest_level > top_level) top_level++;
             oldBoxes = newBoxes;
@@ -2539,7 +2672,6 @@ AmrHydro::initGrids(int a_finest_level) {
                 moreLevels = true;
             }
         } else {
-            pout() << " Or here, opt 2" << endl;
             // for now, define old_grids as just domains
             oldBoxes.resize(m_max_level + 1);
             for (int lev = 1; lev <= m_max_level; lev++) {
@@ -2548,6 +2680,7 @@ AmrHydro::initGrids(int a_finest_level) {
 
             int top_level = m_max_level - 1;
             new_finest_level = meshrefine.regrid(newBoxes, tagVect, baseLevel, top_level, oldBoxes);
+            pout() << " new_finest_level (2) : " << new_finest_level << endl;
         }
 
         numLevels = Min(new_finest_level, m_max_level) + 1;
@@ -2555,9 +2688,7 @@ AmrHydro::initGrids(int a_finest_level) {
 
         // now loop through levels and define
         for (int lev = baseLevel + 1; lev <= new_finest_level; ++lev) {
-            pout() << "Am I looping through the levels to refine ? " << lev << endl;
             int numGridsNew = newBoxes[lev].size();
-            pout() << "numGridsNew is " << numGridsNew << endl;
             Vector<int> procIDs(numGridsNew);
             LoadBalance(procIDs, newBoxes[lev]);
             const DisjointBoxLayout newDBL(newBoxes[lev], procIDs, m_amrDomains[lev]);
@@ -2580,7 +2711,13 @@ AmrHydro::initGrids(int a_finest_level) {
             initData(m_head);
         }
     } // end while more levels to do
+
+    for (int lev = m_finest_level+1; lev <= m_max_level; lev++) {
+        DisjointBoxLayout emptyDBL;
+        m_amrGrids[lev] = emptyDBL;
+    }
 }
+
 
 void
 AmrHydro::setupFixedGrids(const std::string& a_gridFile)
@@ -2689,16 +2826,16 @@ AmrHydro::levelSetup(int a_level, const DisjointBoxLayout& a_grids)
     m_old_head[a_level]->define(a_grids, nPhiComp, HeadGhostVect);
     m_old_gapheight[a_level]->define(a_grids, nPhiComp, HeadGhostVect);
 
-    m_head[a_level] = new LevelData<FArrayBox>(a_grids, nPhiComp, HeadGhostVect);
-    m_gradhead[a_level] = new LevelData<FArrayBox>(a_grids, SpaceDim*nPhiComp, HeadGhostVect);
-    m_gradhead_ec[a_level] = new LevelData<FluxBox>(a_grids, nPhiComp, IntVect::Zero);
-    m_gapheight[a_level] = new LevelData<FArrayBox>(a_grids, nPhiComp, HeadGhostVect);
-    m_Pw[a_level] = new LevelData<FArrayBox>(a_grids, nPhiComp, HeadGhostVect);
-    m_qw[a_level] = new LevelData<FArrayBox>(a_grids, SpaceDim*nPhiComp, HeadGhostVect);
-    m_Re[a_level] = new LevelData<FArrayBox>(a_grids, nPhiComp, HeadGhostVect);
-    m_meltRate[a_level] = new LevelData<FArrayBox>(a_grids, nPhiComp, HeadGhostVect);
-    m_iceheight[a_level] = new LevelData<FArrayBox>(a_grids, nPhiComp, HeadGhostVect);
-    m_bedelevation[a_level] = new LevelData<FArrayBox>(a_grids, nPhiComp, HeadGhostVect);
+    m_head[a_level]         = new LevelData<FArrayBox>(a_grids, nPhiComp, HeadGhostVect);
+    m_gradhead[a_level]     = new LevelData<FArrayBox>(a_grids, SpaceDim*nPhiComp, HeadGhostVect);
+    m_gradhead_ec[a_level]  = new LevelData<FluxBox>(a_grids, nPhiComp, IntVect::Zero);
+    m_gapheight[a_level]    = new LevelData<FArrayBox>(a_grids, nPhiComp, HeadGhostVect);
+    m_Pw[a_level]           = new LevelData<FArrayBox>(a_grids, nPhiComp, HeadGhostVect);
+    m_qw[a_level]           = new LevelData<FArrayBox>(a_grids, SpaceDim*nPhiComp, HeadGhostVect);
+    m_Re[a_level]           = new LevelData<FArrayBox>(a_grids, nPhiComp, HeadGhostVect);
+    m_meltRate[a_level]     = new LevelData<FArrayBox>(a_grids, nPhiComp, HeadGhostVect);
+    m_iceheight[a_level]    = new LevelData<FArrayBox>(a_grids, nPhiComp, HeadGhostVect);
+    m_bedelevation[a_level]    = new LevelData<FArrayBox>(a_grids, nPhiComp, HeadGhostVect);
     m_overburdenpress[a_level] = new LevelData<FArrayBox>(a_grids, nPhiComp, HeadGhostVect);
 
 }
