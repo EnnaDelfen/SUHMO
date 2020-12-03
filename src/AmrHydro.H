@@ -245,6 +245,9 @@ protected:
     /// initialize data on hierarchy
     void initData(Vector<LevelData<FArrayBox>*>& a_initialVelocity);
 
+    /// initialize the BC of fixed data ( ice height, Pi and zBed)
+    void BCDataRegrid();
+
     /// compute timestep
     Real computeDt();
 

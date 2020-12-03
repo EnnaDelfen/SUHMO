@@ -352,6 +352,8 @@ mixBCValues(FArrayBox& a_state,
   }
 }
 
+
+/* AmrHydro class functions */
 void
 AmrHydro::SolveForHead(
                       const Vector<DisjointBoxLayout>&               a_grids,
@@ -819,6 +821,8 @@ AmrHydro::initialize()
             m_bedelevation[lev] = new LevelData<FArrayBox>;
             m_overburdenpress[lev] = new LevelData<FArrayBox>;
         }
+
+
 
         int finest_level = -1;
         if (usePredefinedGrids) {
@@ -1355,7 +1359,6 @@ AmrHydro::timeStep(Real a_dt)
     pout() <<"   ...Copy current into old & take care of ghost cells and BCs "<< endl;
 
     for (int lev = 0; lev <= m_finest_level; lev++) {
-        pout() << "Debug: level "<< lev << endl;
         LevelData<FArrayBox>& oldH       = *m_old_head[lev];
         LevelData<FArrayBox>& currentH   = *m_head[lev];
 
@@ -1914,7 +1917,7 @@ AmrHydro::timeStep(Real a_dt)
         }
      
         /* custom plt here -- debug print */
-        if (m_PrintCustom) {
+        if ((m_PrintCustom) && (m_cur_step == 75)) {
             int nStuffToPlot = 17;
             Vector<std::string> vectName;
             vectName.resize(nStuffToPlot);
@@ -2249,7 +2252,9 @@ AmrHydro::regrid()
             m_amrDomains[0], m_refinement_ratios, m_fill_ratio, m_block_factor, m_nesting_radius, m_max_box_size);
 
         new_finest_level = meshrefine.regrid(new_grids, tagVect, m_regrid_lbase, top_level, old_grids);
-        pout() << " New finest level is " << new_finest_level << endl;
+        if (m_verbosity > 3) {
+            pout() << " New finest level is " << new_finest_level << endl;
+        }
 
         // test to see if grids have changed
         bool gridsSame = true;
@@ -2282,6 +2287,23 @@ AmrHydro::regrid()
             const DisjointBoxLayout oldDBL = m_amrGrids[lev];
 
             m_amrGrids[lev] = newDBL;
+             
+            if (m_old_head[lev] == NULL) {
+                m_old_head[lev]      = new LevelData<FArrayBox>;
+                m_head[lev]          =  new LevelData<FArrayBox>;
+                m_old_gapheight[lev] = new LevelData<FArrayBox>;
+                m_gapheight[lev]     = new LevelData<FArrayBox>;
+                m_Re[lev]              = new LevelData<FArrayBox>;
+                m_iceheight[lev]       = new LevelData<FArrayBox>;
+                m_bedelevation[lev]    = new LevelData<FArrayBox>;
+                m_overburdenpress[lev] = new LevelData<FArrayBox>;
+                
+                m_gradhead[lev]      = new LevelData<FArrayBox>;
+                m_gradhead_ec[lev]   = new LevelData<FluxBox>;
+                m_Pw[lev]            = new LevelData<FArrayBox>;
+                m_qw[lev]            = new LevelData<FArrayBox>;
+                m_meltRate[lev]      = new LevelData<FArrayBox>;
+            }
 
             // HEAD
             LevelData<FArrayBox>* old_oldheadDataPtr  = m_old_head[lev];
@@ -2314,10 +2336,28 @@ AmrHydro::regrid()
             LevelData<FArrayBox>* new_overburdenpressDataPtr    =
                 new LevelData<FArrayBox>(newDBL, m_overburdenpress[0]->nComp(), m_overburdenpress[0]->ghostVect());
 
+            // Other vars: grad / Pw / Qw / mR
+            LevelData<FArrayBox>* old_gradheadDataPtr = m_gradhead[lev];
+            LevelData<FArrayBox>* new_gradheadDataPtr = 
+                new LevelData<FArrayBox>(newDBL, m_gradhead[0]->nComp(), m_gradhead[0]->ghostVect());
+            //LevelData<FluxBox>* old_gradhead_ecDataPtr = m_gradhead_ec[lev];
+            LevelData<FluxBox>* new_gradhead_ecDataPtr =
+                new LevelData<FluxBox>(newDBL, m_gradhead_ec[0]->nComp(), IntVect::Zero);
+            LevelData<FArrayBox>* old_PwDataPtr = m_Pw[lev];
+            LevelData<FArrayBox>* new_PwDataPtr =
+                new LevelData<FArrayBox>(newDBL, m_Pw[0]->nComp(), m_Pw[0]->ghostVect());
+            LevelData<FArrayBox>* old_qwDataPtr = m_qw[lev];
+            LevelData<FArrayBox>* new_qwDataPtr = 
+                new LevelData<FArrayBox>(newDBL, m_qw[0]->nComp(), m_qw[0]->ghostVect());
+            LevelData<FArrayBox>* old_meltRateDataPtr = m_meltRate[lev];
+            LevelData<FArrayBox>* new_meltRateDataPtr =
+                new LevelData<FArrayBox>(newDBL, m_meltRate[0]->nComp(), m_meltRate[0]->ghostVect());
+
             // first fill with interpolated data from coarser level
             {
                 // may eventually want to do post-regrid smoothing on this!
                 FineInterp interpolator(newDBL, 1, m_refinement_ratios[lev - 1], m_amrDomains[lev]);
+                FineInterp interpolatorGrad(newDBL, SpaceDim, m_refinement_ratios[lev - 1], m_amrDomains[lev]);
 
                 // HEAD
                 interpolator.interpToFine(*new_oldheadDataPtr, *m_old_head[lev - 1]);
@@ -2333,11 +2373,17 @@ AmrHydro::regrid()
                 interpolator.interpToFine(*new_bedelevationDataPtr, *m_bedelevation[lev - 1]);
                 // Pi
                 interpolator.interpToFine(*new_overburdenpressDataPtr, *m_overburdenpress[lev - 1]);
+                // Other vars: grad / Pw / Qw / mR
+                interpolatorGrad.interpToFine(*new_gradheadDataPtr, *m_gradhead[lev - 1]);
+                interpolator.interpToFine(*new_PwDataPtr, *m_Pw[lev - 1]);
+                interpolatorGrad.interpToFine(*new_qwDataPtr, *m_qw[lev - 1]);
+                interpolator.interpToFine(*new_meltRateDataPtr, *m_meltRate[lev - 1]); 
             }
 
             // now potentially copy old-grid data on this level into new holder
             if (old_oldheadDataPtr!= NULL) {
                 if (oldDBL.isClosed()) {
+                    pout() << "Am I getting in here ?? " << endl;
                     // HEAD
                     old_oldheadDataPtr->copyTo(*new_oldheadDataPtr);
                     old_headDataPtr->copyTo(*new_headDataPtr);
@@ -2352,6 +2398,12 @@ AmrHydro::regrid()
                     old_bedelevationDataPtr->copyTo(*new_bedelevationDataPtr);
                     // Pi
                     old_overburdenpressDataPtr->copyTo(*new_overburdenpressDataPtr);
+                    // 
+                    // Other vars: grad / Pw / Qw / mR
+                    old_gradheadDataPtr->copyTo(*new_gradheadDataPtr);  
+                    old_PwDataPtr->copyTo(*new_PwDataPtr); 
+                    old_qwDataPtr->copyTo(*new_qwDataPtr);
+                    old_meltRateDataPtr->copyTo(*new_meltRateDataPtr);
                 }
                 // can now delete old data
                 delete old_oldheadDataPtr;
@@ -2362,16 +2414,12 @@ AmrHydro::regrid()
                 delete old_iceheightDataPtr;
                 delete old_bedelevationDataPtr;
                 delete old_overburdenpressDataPtr;
-            } else {
-                // or build new storage
-                IntVect HeadGhostVect = m_num_head_ghost * IntVect::Unit;
-                m_gradhead[lev]       = new LevelData<FArrayBox>(m_amrGrids[lev], SpaceDim*1, HeadGhostVect);
-                m_gradhead_ec[lev]    = new LevelData<FluxBox>(m_amrGrids[lev], 1, IntVect::Zero);
-
-                m_Pw[lev]             = new LevelData<FArrayBox>(m_amrGrids[lev], 1, HeadGhostVect);
-                m_qw[lev]             = new LevelData<FArrayBox>(m_amrGrids[lev], SpaceDim*1, HeadGhostVect);
-                m_meltRate[lev]       = new LevelData<FArrayBox>(m_amrGrids[lev], 1, HeadGhostVect);
-            }
+                //
+                delete old_gradheadDataPtr;
+                delete old_PwDataPtr;
+                delete old_qwDataPtr;
+                delete old_meltRateDataPtr;
+            } 
 
             // exchange is necessary to fill periodic ghost cells
             // which aren't filled by the copyTo from oldLevelH
@@ -2383,6 +2431,11 @@ AmrHydro::regrid()
             new_iceheightDataPtr->exchange();
             new_bedelevationDataPtr->exchange();
             new_overburdenpressDataPtr->exchange();
+            //
+            new_gradheadDataPtr->exchange();
+            new_PwDataPtr->exchange();
+            new_qwDataPtr->exchange();
+            new_meltRateDataPtr->exchange();
 
             // now place new holders into multilevel arrays
             m_old_head[lev]      = new_oldheadDataPtr;
@@ -2393,7 +2446,17 @@ AmrHydro::regrid()
             m_iceheight[lev]     = new_iceheightDataPtr;
             m_bedelevation[lev]  = new_bedelevationDataPtr;
             m_overburdenpress[lev] = new_overburdenpressDataPtr;
+            // 
+            m_gradhead[lev]     = new_gradheadDataPtr;
+            m_gradhead_ec[lev]  = new_gradhead_ecDataPtr;
+            m_Pw[lev]       = new_PwDataPtr;
+            m_qw[lev]       = new_qwDataPtr;
+            m_meltRate[lev] = new_meltRateDataPtr;
         } // end loop over currently defined levels
+
+        // BC
+        BCDataRegrid();
+
 
         // now ensure that any remaining levels are null pointers
         // (in case of de-refinement)
@@ -2812,6 +2875,11 @@ AmrHydro::setupFixedGrids(const std::string& a_gridFile)
     m_finest_level = gridvect.size() - 1;
 
     initData(m_head);
+
+    for (int lev = m_finest_level+1; lev <= m_max_level; lev++) {
+        DisjointBoxLayout emptyDBL;
+        m_amrGrids[lev] = emptyDBL;
+    }
 }
 
 void
@@ -2910,6 +2978,31 @@ AmrHydro::initData(Vector<LevelData<FArrayBox>*>& a_head)
     //}
 
 }
+
+
+void
+AmrHydro::BCDataRegrid()
+{
+    if (m_verbosity > 3) {
+        pout() << "AmrHydro::BCDataRegrid" << endl;
+    }
+
+    for (int lev = 0; lev <= m_finest_level; lev++) {
+        pout()<< "  .. init lev " << lev << endl;
+        LevelData<FArrayBox>& levelIceHeight = *m_iceheight[lev];
+        LevelData<FArrayBox>& levelzBed      = *m_bedelevation[lev];
+        LevelData<FArrayBox>& levelPi        = *m_overburdenpress[lev];
+
+        RealVect levelDx = m_amrDx[lev] * RealVect::Unit;
+        m_IBCPtr->BCData(levelDx, m_amrGrids[lev], 
+                         *m_suhmoParm,       
+                         levelzBed, levelPi,
+                         levelIceHeight); //, levelgradzBed);
+
+    }
+}
+
+
 
 // compute timestep
 Real
