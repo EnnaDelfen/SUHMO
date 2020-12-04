@@ -2490,6 +2490,9 @@ AmrHydro::regrid()
                 FineInterp interpolator(newDBL, 1, m_refinement_ratios[lev - 1], m_amrDomains[lev]);
                 FineInterp interpolatorGrad(newDBL, SpaceDim, m_refinement_ratios[lev - 1], m_amrDomains[lev]);
 
+                interpolator.m_boundary_limit_type     = 1;
+                interpolatorGrad.m_boundary_limit_type = 1;
+
                 // HEAD
                 interpolator.interpToFine(*new_oldheadDataPtr, *m_old_head[lev - 1]);
                 interpolator.interpToFine(*new_headDataPtr, *m_head[lev - 1]);
