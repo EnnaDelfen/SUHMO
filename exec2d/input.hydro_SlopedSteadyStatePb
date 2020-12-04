@@ -2,7 +2,7 @@
 main.domain_size=1000.00 1000.00 # physical dimensions of domain
 main.problem_type=basic
 main.maxTime=6000000.0
-main.maxStep= 240 # 240 heures = 10 jours
+main.maxStep= 76 # 240 heures = 10 jours
 
 # bc - 0 = diri / 1 = neum
 bc.lo_bc = 0 0
@@ -40,13 +40,13 @@ suhmo.moulin_flux = 4.0 # vol flux
 
 # class AmrHydro.cpp
 # misc
-AmrHydro.PrintCustom=false
+AmrHydro.PrintCustom=true
 AmrHydro.verbosity=5
 # mesh and refinement
 AmrHydro.num_cells=32 32  # number of cells on coarsest domain
 AmrHydro.max_level=1
 AmrHydro.ref_ratios=2 2 2
-AmrHydro.block_factor=2
+AmrHydro.block_factor=4
 AmrHydro.max_box_size=128
 AmrHydro.max_base_grid_size=128
 AmrHydro.regrid_lbase=0  # coarsest level that you regrid
@@ -69,7 +69,7 @@ AmrHydro.fixed_dt=3600.0 # 1 h dt
 AmrHydro.offsetTime=0.0
 # Typically -1 for never, 0 for last step only, or integer interval (number of steps)
 # Plot and output
-AmrHydro.plot_interval=10
+AmrHydro.plot_interval=5
 AmrHydro.plot_time_interval=0.0 # If we want to plot at a given time interval (rather than number of steps)
 AmrHydro.plot_prefix = plot
 AmrHydro.write_gradPhi=false

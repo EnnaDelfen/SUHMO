@@ -353,6 +353,43 @@ mixBCValues(FArrayBox& a_state,
 }
 
 
+/* This function forces the ghost cells on the domain boundaries of a_state to be 0 -- no linear interpolation */ 
+void NullBCFill(FArrayBox& a_state,
+            const Box& a_valid,
+            const ProblemDomain& a_domain,
+            Real a_dx)
+{
+  // If box is outside of domain bounds ?
+  if(!a_domain.domainBox().contains(a_state.box())) {
+      for(int dir=0; dir<CH_SPACEDIM; ++dir) {
+          // don't do anything if periodic -- should be perio in y dir 1
+          if (!a_domain.isPeriodic(dir)) {
+
+              Box ghostBoxLo = adjCellBox(a_valid, dir, Side::Lo, 1);
+              Box ghostBoxHi = adjCellBox(a_valid, dir, Side::Hi, 1);
+
+              if ((!a_domain.domainBox().contains(ghostBoxLo)) && (a_state.box().contains(ghostBoxLo)) ) {
+                  ghostBoxLo &= a_state.box();
+                  for (BoxIterator bit(ghostBoxLo); bit.ok(); ++bit) {
+                      IntVect ivTo = bit();
+                      a_state(ivTo, 0) = 0.0;
+                  }
+              } // End ghostBoxLo in dir
+
+              if ((!a_domain.domainBox().contains(ghostBoxHi)) && (a_state.box().contains(ghostBoxHi)) ) {
+                  ghostBoxHi &= a_state.box();
+                  for (BoxIterator bit(ghostBoxHi); bit.ok(); ++bit) {
+                      IntVect ivTo = bit();
+                      a_state(ivTo, 0) = 0.0;
+                  }
+              } // End ghostBoxHi in dir
+
+          } // end if is not periodic in ith direction
+      } // end dir loop
+  }
+}
+
+
 /* AmrHydro class functions */
 void
 AmrHydro::SolveForHead(
@@ -1373,6 +1410,7 @@ AmrHydro::timeStep(Real a_dt)
                               m_amrDomains[lev]);
             qcfi.coarseFineInterp(*m_head[lev], *m_head[lev-1]);
             qcfi.coarseFineInterp(*m_gapheight[lev], *m_gapheight[lev-1]);
+            qcfi.coarseFineInterp(*m_Re[lev], *m_Re[lev-1]);
         }
 
         // fill perio boundaries
@@ -1417,6 +1455,19 @@ AmrHydro::timeStep(Real a_dt)
             oldH[dit].copy(currentH[dit], 0, 0, 1);
             oldB[dit].copy(currentB[dit], 0, 0, 1);
         }
+        if (lev > 0 && (m_cur_step == 75)) {
+           if (m_verbosity > 3) {
+               pout() << " Checking data in new grid after regrid in operations " << endl;
+           }
+           for (dit.begin(); dit.ok(); ++dit) {
+               BoxIterator bit(currentH[dit].box()); 
+               for (bit.begin(); bit.ok(); ++bit) {
+                   IntVect iv = bit(); 
+                   pout() << iv << " h: " << currentH[dit](iv,0) 
+                                << ",b: " << currentB[dit](iv,0) << endl;
+               }
+           }
+        }
     } // there. We should start with consistent b and h, GC BC and all ...
 
 
@@ -1451,6 +1502,7 @@ AmrHydro::timeStep(Real a_dt)
                                   m_amrDomains[lev]);
                 qcfi.coarseFineInterp(*m_head[lev], *m_head[lev-1]);
                 qcfi.coarseFineInterp(*m_gapheight[lev], *m_gapheight[lev-1]);
+                qcfi.coarseFineInterp(*m_Re[lev], *m_Re[lev-1]);
             }
 
             // fill perio boundaries
@@ -1490,11 +1542,26 @@ AmrHydro::timeStep(Real a_dt)
                 FArrayBox& currH    = levelcurrentH[dit];
                 FArrayBox& zbed     = levelzBed[dit];
 
+                const Box& validBox = levelGrids.get(dit);
+
                 BoxIterator bit(Pw.box());
                 for (bit.begin(); bit.ok(); ++bit) {
                     IntVect iv = bit();
                     Pw(iv,0) = (currH(iv,0) - zbed(iv,0)) * m_suhmoParm->m_rho_w * m_suhmoParm->m_gravity;
                 }
+                NullBCFill(levelPw[dit], validBox, m_amrDomains[lev], m_amrDx[lev][0]);
+            }
+            if (lev > 0 && (m_cur_step == 75)) {
+               if (m_verbosity > 3) {
+                   pout() << " Checking Pw after regrid in operations " << endl;
+               }
+               for (dit.begin(); dit.ok(); ++dit) {
+                   BoxIterator bit(levelPw[dit].box()); 
+                   for (bit.begin(); bit.ok(); ++bit) {
+                       IntVect iv = bit(); 
+                       pout() << iv << " Pw: " << levelPw[dit](iv,0) << endl;
+                   }
+               }
             }
         } // end loop on levs
 
@@ -1569,6 +1636,23 @@ AmrHydro::timeStep(Real a_dt)
                                      crsePsiPtr, finePsiPtr,
                                      dx, nRefCrse, nRefFine,
                                      m_amrDomains[lev]);
+
+            FluxBox& gPw_ec = levelgradPw_ec[dit];
+            FluxBox& gH_ec = levelgradH_ec[dit];
+            if (lev > 0 && (m_cur_step == 75)) {
+               if (m_verbosity > 3) {
+                   pout() << " Checking GradPw after regrid in operations " << endl;
+               }
+               FArrayBox& gradPwFab = gPw_ec[0];
+               FArrayBox& gradHFab = gH_ec[0];
+
+               BoxIterator bitEC(gradPwFab.box()); // can use gridBox? 
+               for (bitEC.begin(); bitEC.ok(); ++bitEC) {
+                   IntVect iv = bitEC();
+                    pout() << iv << " gradPw_xFace: " << gradPwFab(iv,0) << endl;
+                    pout() << iv << " gradH_xFace: " << gradHFab(iv,0) << endl;
+               }
+            }
         } // end loop levels
 
 
@@ -1917,7 +2001,7 @@ AmrHydro::timeStep(Real a_dt)
         }
      
         /* custom plt here -- debug print */
-        if ((m_PrintCustom) && (m_cur_step == 75)) {
+        if ((m_PrintCustom) && ((m_cur_step == 75) || (m_cur_step == 100))) {
             int nStuffToPlot = 17;
             Vector<std::string> vectName;
             vectName.resize(nStuffToPlot);
@@ -2253,6 +2337,7 @@ AmrHydro::regrid()
 
         new_finest_level = meshrefine.regrid(new_grids, tagVect, m_regrid_lbase, top_level, old_grids);
         if (m_verbosity > 3) {
+            pout() << " Old finest level was " << m_finest_level << endl;
             pout() << " New finest level is " << new_finest_level << endl;
         }
 
@@ -2281,6 +2366,10 @@ AmrHydro::regrid()
             int numGridsNew = new_grids[lev].size();
             Vector<int> procIDs(numGridsNew);
             LoadBalance(procIDs, new_grids[lev]);
+            if (m_verbosity > 3) {
+                pout() << " Re-defining data on level " << lev << 
+                          ". numGrids: " << numGridsNew << endl;
+            }
 
             const DisjointBoxLayout newDBL(new_grids[lev], procIDs, m_amrDomains[lev]);
 
@@ -2353,7 +2442,49 @@ AmrHydro::regrid()
             LevelData<FArrayBox>* new_meltRateDataPtr =
                 new LevelData<FArrayBox>(newDBL, m_meltRate[0]->nComp(), m_meltRate[0]->ghostVect());
 
-            // first fill with interpolated data from coarser level
+            //call initData to take care of BC and initialize the levels... 
+            initDataRegrid(lev,
+                           *new_headDataPtr,
+                           *new_gapheightDataPtr,
+                           *new_PwDataPtr,
+                           *new_qwDataPtr,
+                           *new_ReDataPtr,
+                           *new_meltRateDataPtr,
+                           *new_bedelevationDataPtr,
+                           *new_overburdenpressDataPtr,
+                           *new_iceheightDataPtr);
+            //BCDataRegrid(lev, *new_bedelevationDataPtr, *new_overburdenpressDataPtr,*new_iceheightDataPtr);
+
+            if (m_verbosity > 3) {
+                pout() << " Checking data after initDataRegrid " << endl;
+            }
+            LevelData<FArrayBox>& head  = *new_headDataPtr;
+            LevelData<FArrayBox>& gH    = *new_gapheightDataPtr;
+            LevelData<FArrayBox>& Pw    = *new_PwDataPtr;
+            LevelData<FArrayBox>& qw    = *new_qwDataPtr;
+            LevelData<FArrayBox>& Re    = *new_ReDataPtr;
+            LevelData<FArrayBox>& melt  = *new_meltRateDataPtr;
+            LevelData<FArrayBox>& zB    = *new_bedelevationDataPtr;
+            LevelData<FArrayBox>& overP = *new_overburdenpressDataPtr;
+            LevelData<FArrayBox>& iceH  = *new_iceheightDataPtr;
+            DataIterator dit = newDBL.dataIterator();
+            for (dit.begin(); dit.ok(); ++dit) {
+                BoxIterator bit(head[dit].box()); 
+                for (bit.begin(); bit.ok(); ++bit) {
+                    IntVect iv = bit(); 
+                    pout() << iv << " h: " << head[dit](iv,0) 
+                                 << ",b: " << gH[dit](iv,0)           
+                                 << ",Pw: " << Pw[dit](iv,0)           
+                                 << ",qw: " << qw[dit](iv,0)           
+                                 << ",Re: " << Re[dit](iv,0)           
+                                 << ",mdot: " << melt[dit](iv,0)           
+                                 << ",zB: " << zB[dit](iv,0)           
+                                 << ",oP: " << overP[dit](iv,0)           
+                                 << ",iceH: " << iceH[dit](iv,0) << endl;
+                }
+            }
+
+            // Fill with interpolated data from coarser level
             {
                 // may eventually want to do post-regrid smoothing on this!
                 FineInterp interpolator(newDBL, 1, m_refinement_ratios[lev - 1], m_amrDomains[lev]);
@@ -2367,12 +2498,14 @@ AmrHydro::regrid()
                 interpolator.interpToFine(*new_gapheightDataPtr, *m_gapheight[lev - 1]);
                 // Re
                 interpolator.interpToFine(*new_ReDataPtr, *m_Re[lev - 1]);
+                // BCDataRegrid
                 // Ice Height
-                interpolator.interpToFine(*new_iceheightDataPtr, *m_iceheight[lev - 1]);
+                //interpolator.interpToFine(*new_iceheightDataPtr, *m_iceheight[lev - 1]);
                 // Bed elevation
-                interpolator.interpToFine(*new_bedelevationDataPtr, *m_bedelevation[lev - 1]);
+                //interpolator.interpToFine(*new_bedelevationDataPtr, *m_bedelevation[lev - 1]);
                 // Pi
-                interpolator.interpToFine(*new_overburdenpressDataPtr, *m_overburdenpress[lev - 1]);
+                //interpolator.interpToFine(*new_overburdenpressDataPtr, *m_overburdenpress[lev - 1]);
+                // BCDataRegrid
                 // Other vars: grad / Pw / Qw / mR
                 interpolatorGrad.interpToFine(*new_gradheadDataPtr, *m_gradhead[lev - 1]);
                 interpolator.interpToFine(*new_PwDataPtr, *m_Pw[lev - 1]);
@@ -2380,10 +2513,29 @@ AmrHydro::regrid()
                 interpolator.interpToFine(*new_meltRateDataPtr, *m_meltRate[lev - 1]); 
             }
 
+            if (m_verbosity > 3) {
+                pout() << " Checking data after interpToFine " << endl;
+            }
+            for (dit.begin(); dit.ok(); ++dit) {
+                BoxIterator bit(head[dit].box()); 
+                for (bit.begin(); bit.ok(); ++bit) {
+                    IntVect iv = bit(); 
+                    pout() << iv << " h: " << head[dit](iv,0) 
+                                 << ",b: " << gH[dit](iv,0)           
+                                 << ",Pw: " << Pw[dit](iv,0)           
+                                 << ",qw: " << qw[dit](iv,0)           
+                                 << ",Re: " << Re[dit](iv,0)           
+                                 << ",mdot: " << melt[dit](iv,0)           
+                                 << ",zB: " << zB[dit](iv,0)           
+                                 << ",oP: " << overP[dit](iv,0)           
+                                 << ",iceH: " << iceH[dit](iv,0) << endl;
+                }
+            }
+
             // now potentially copy old-grid data on this level into new holder
             if (old_oldheadDataPtr!= NULL) {
                 if (oldDBL.isClosed()) {
-                    pout() << "Am I getting in here ?? " << endl;
+                    pout() << "Doing the copyTo... " << endl;
                     // HEAD
                     old_oldheadDataPtr->copyTo(*new_oldheadDataPtr);
                     old_headDataPtr->copyTo(*new_headDataPtr);
@@ -2393,11 +2545,11 @@ AmrHydro::regrid()
                     // Re
                     old_ReDataPtr->copyTo(*new_ReDataPtr);
                     // Ice Height
-                    old_iceheightDataPtr->copyTo(*new_iceheightDataPtr);
+                    //old_iceheightDataPtr->copyTo(*new_iceheightDataPtr);
                     // Bed elevation
-                    old_bedelevationDataPtr->copyTo(*new_bedelevationDataPtr);
+                    //old_bedelevationDataPtr->copyTo(*new_bedelevationDataPtr);
                     // Pi
-                    old_overburdenpressDataPtr->copyTo(*new_overburdenpressDataPtr);
+                    //old_overburdenpressDataPtr->copyTo(*new_overburdenpressDataPtr);
                     // 
                     // Other vars: grad / Pw / Qw / mR
                     old_gradheadDataPtr->copyTo(*new_gradheadDataPtr);  
@@ -2420,6 +2572,24 @@ AmrHydro::regrid()
                 delete old_qwDataPtr;
                 delete old_meltRateDataPtr;
             } 
+            if (m_verbosity > 3) {
+                pout() << " Checking data after copyTo Old->New " << endl;
+            }
+            for (dit.begin(); dit.ok(); ++dit) {
+                BoxIterator bit(head[dit].box()); 
+                for (bit.begin(); bit.ok(); ++bit) {
+                    IntVect iv = bit(); 
+                    pout() << iv << " h: " << head[dit](iv,0) 
+                                 << ",b: " << gH[dit](iv,0)           
+                                 << ",Pw: " << Pw[dit](iv,0)           
+                                 << ",qw: " << qw[dit](iv,0)           
+                                 << ",Re: " << Re[dit](iv,0)           
+                                 << ",mdot: " << melt[dit](iv,0)           
+                                 << ",zB: " << zB[dit](iv,0)           
+                                 << ",oP: " << overP[dit](iv,0)           
+                                 << ",iceH: " << iceH[dit](iv,0) << endl;
+                }
+            }
 
             // exchange is necessary to fill periodic ghost cells
             // which aren't filled by the copyTo from oldLevelH
@@ -2453,10 +2623,6 @@ AmrHydro::regrid()
             m_qw[lev]       = new_qwDataPtr;
             m_meltRate[lev] = new_meltRateDataPtr;
         } // end loop over currently defined levels
-
-        // BC
-        BCDataRegrid();
-
 
         // now ensure that any remaining levels are null pointers
         // (in case of de-refinement)
@@ -2981,25 +3147,54 @@ AmrHydro::initData(Vector<LevelData<FArrayBox>*>& a_head)
 
 
 void
-AmrHydro::BCDataRegrid()
+AmrHydro::initDataRegrid(int a_level,
+                         LevelData<FArrayBox>& a_levhead,
+                         LevelData<FArrayBox>& a_levgapheight,
+                         LevelData<FArrayBox>& a_levPw,
+                         LevelData<FArrayBox>& a_levqw,
+                         LevelData<FArrayBox>& a_levRe,
+                         LevelData<FArrayBox>& a_levmR,
+                         LevelData<FArrayBox>& a_levzBed,
+                         LevelData<FArrayBox>& a_levPi,
+                         LevelData<FArrayBox>& a_levIceHeight)
+{
+    if (m_verbosity > 3) {
+        pout() << "AmrHydro::initDataRegrid" << endl;
+    }
+
+    pout()<< "  .. init data regrid lev " << a_level << endl;
+
+    RealVect levelDx = m_amrDx[a_level] * RealVect::Unit;
+    //m_IBCPtr->define(m_amrDomains[a_level], levelDx[0]);
+    m_IBCPtr->initializeData(levelDx, 
+                             *m_suhmoParm,       
+                             a_levhead, a_levgapheight, 
+                             a_levPw, a_levqw,
+                             a_levRe, a_levmR,
+                             a_levzBed, a_levPi,
+                             a_levIceHeight);
+}
+
+
+void
+AmrHydro::BCDataRegrid(int a_level,
+                       LevelData<FArrayBox>& a_levzBed,
+                       LevelData<FArrayBox>& a_levPi,
+                       LevelData<FArrayBox>& a_levIceHeight)
 {
     if (m_verbosity > 3) {
         pout() << "AmrHydro::BCDataRegrid" << endl;
     }
 
-    for (int lev = 0; lev <= m_finest_level; lev++) {
-        pout()<< "  .. init lev " << lev << endl;
-        LevelData<FArrayBox>& levelIceHeight = *m_iceheight[lev];
-        LevelData<FArrayBox>& levelzBed      = *m_bedelevation[lev];
-        LevelData<FArrayBox>& levelPi        = *m_overburdenpress[lev];
+    pout()<< "  .. BC data regrid lev " << a_level << endl;
 
-        RealVect levelDx = m_amrDx[lev] * RealVect::Unit;
-        m_IBCPtr->BCData(levelDx, m_amrGrids[lev], 
-                         *m_suhmoParm,       
-                         levelzBed, levelPi,
-                         levelIceHeight); //, levelgradzBed);
-
-    }
+    RealVect levelDx = m_amrDx[a_level] * RealVect::Unit;
+    //m_IBCPtr->define(m_amrDomains[a_level], levelDx[0]);
+    m_IBCPtr->BCData(levelDx, m_amrGrids[a_level],
+                      m_amrDomains[a_level],  
+                      *m_suhmoParm,       
+                      a_levzBed, a_levPi,
+                      a_levIceHeight);
 }
 
 

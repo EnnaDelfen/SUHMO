@@ -246,7 +246,21 @@ protected:
     void initData(Vector<LevelData<FArrayBox>*>& a_initialVelocity);
 
     /// initialize the BC of fixed data ( ice height, Pi and zBed)
-    void BCDataRegrid();
+    void initDataRegrid(int a_level,
+                        LevelData<FArrayBox>& a_levhead,
+                        LevelData<FArrayBox>& a_levgapheight,
+                        LevelData<FArrayBox>& a_levPw,
+                        LevelData<FArrayBox>& a_levqw,
+                        LevelData<FArrayBox>& a_levRe,
+                        LevelData<FArrayBox>& a_levmR,
+                        LevelData<FArrayBox>& a_levzBed,
+                        LevelData<FArrayBox>& a_levPi,
+                        LevelData<FArrayBox>& a_levIceHeight);
+
+    void BCDataRegrid(int a_level,
+                      LevelData<FArrayBox>& a_levzBed,
+                      LevelData<FArrayBox>& a_levPi,
+                      LevelData<FArrayBox>& a_levIceHeight);
 
     /// compute timestep
     Real computeDt();
