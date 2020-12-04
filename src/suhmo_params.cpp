@@ -56,6 +56,11 @@ void suhmo_params::readInputs()
     m_moulin_position.resize(SpaceDim,0.0);
     ppParams.getarr("moulin_position", m_moulin_position, 0, SpaceDim);
     ppParams.get("moulin_flux", m_moulin_flux);
+
+    // need to include verbose
+    ParmParse ppAmr("AmrHydro");
+    ppAmr.query("verbosity", m_verbosity);
+
 }
 
 #include "NamespaceFooter.H"

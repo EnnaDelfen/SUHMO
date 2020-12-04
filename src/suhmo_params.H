@@ -50,7 +50,8 @@ public:
     // Moulin
     std::vector<Real> m_moulin_position;    // m.s-1 Sliding velocity
     Real m_moulin_flux;    // m3.s-1 
-    
+    // verbosity level
+    int m_verbosity;
 };
 
 #include "NamespaceFooter.H"
