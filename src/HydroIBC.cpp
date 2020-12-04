@@ -75,7 +75,9 @@ HydroIBC::initializeData(RealVect& a_dx,
                          LevelData<FArrayBox>& a_iceHeight)
 {
     
-    pout() << "HydroIBC::initializeData" << endl;
+    if (Params.m_verbosity > 3) {
+        pout() << "HydroIBC::initializeData" << endl;
+    }
 
     IntVect regionLo = m_domain.domainBox().bigEnd();
     IntVect regionHi = m_domain.domainBox().bigEnd();
@@ -140,7 +142,9 @@ HydroIBC::initializeData(RealVect& a_dx,
         } // end loop over cells
     }     // end loop over boxes
 
-    pout() << "(Done with HydroIBC::initializeData)" << endl;
+    if (Params.m_verbosity > 3) {
+        pout() << "(Done with HydroIBC::initializeData)" << endl;
+    }
 }
 
 
@@ -156,7 +160,9 @@ HydroIBC::BCData(RealVect& a_dx,
                  LevelData<FArrayBox>& a_iceHeight)
 {
     
-    pout() << "HydroIBC::BCData" << endl;
+    if (Params.m_verbosity > 3) {
+        pout() << "HydroIBC::BCData" << endl;
+    }
 
     DataIterator dit = a_zbed.dataIterator();
     for (dit.begin(); dit.ok(); ++dit) {
@@ -174,7 +180,6 @@ HydroIBC::BCData(RealVect& a_dx,
             Box ghostBoxLo = adjCellBox(validBox, dir, Side::Lo, 1);
             Box ghostBoxHi = adjCellBox(validBox, dir, Side::Hi, 1);
 
-            //if ((!a_domain.domainBox().contains(ghostBoxLo)) && (thiszbed.box().contains(ghostBoxLo)) ) {
                 pout() << "LoDir " << dir << " Am I EVER getting in there ?? " << endl;
                 for (BoxIterator bit(ghostBoxLo); bit.ok(); ++bit) {
                     IntVect iv = bit();
@@ -186,8 +191,7 @@ HydroIBC::BCData(RealVect& a_dx,
                     // Ice overburden pressure : rho_i * g * H
                     thispi(iv, 0)        = Params.m_rho_i * Params.m_gravity * thisiceHeight(iv, 0);
                 }
-            //} // Lo
-            //if ((!a_domain.domainBox().contains(ghostBoxHi)) && (thiszbed.box().contains(ghostBoxHi)) ) {
+
                 pout() << "HiDir " << dir << " Am I EVER getting in there ?? " << endl;
                 for (BoxIterator bit(ghostBoxHi); bit.ok(); ++bit) {
                     IntVect iv = bit();
@@ -200,12 +204,13 @@ HydroIBC::BCData(RealVect& a_dx,
                     thispi(iv, 0)        = Params.m_rho_i * Params.m_gravity * thisiceHeight(iv, 0);
                 }
 
-            //} // Hi
-
         } // end loop over dirs
 
     } // end loop over data it
-    pout() << "(Done with HydroIBC::BCData)" << endl;
+
+    if (Params.m_verbosity > 3) {
+        pout() << "(Done with HydroIBC::BCData)" << endl;
+    }
 }
 
 

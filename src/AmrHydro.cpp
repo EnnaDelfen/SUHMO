@@ -1455,19 +1455,18 @@ AmrHydro::timeStep(Real a_dt)
             oldH[dit].copy(currentH[dit], 0, 0, 1);
             oldB[dit].copy(currentB[dit], 0, 0, 1);
         }
-        if (lev > 0 && (m_cur_step == 75)) {
-           if (m_verbosity > 3) {
-               pout() << " Checking data in new grid after regrid in operations " << endl;
-           }
-           for (dit.begin(); dit.ok(); ++dit) {
-               BoxIterator bit(currentH[dit].box()); 
-               for (bit.begin(); bit.ok(); ++bit) {
-                   IntVect iv = bit(); 
-                   pout() << iv << " h: " << currentH[dit](iv,0) 
-                                << ",b: " << currentB[dit](iv,0) << endl;
-               }
-           }
-        }
+        // Keep DEBUG for now
+        //if (lev > 0 && (m_cur_step == 75)) {
+        //   pout() << " Checking data in new grid after regrid in operations " << endl;
+        //   for (dit.begin(); dit.ok(); ++dit) {
+        //       BoxIterator bit(currentH[dit].box()); 
+        //       for (bit.begin(); bit.ok(); ++bit) {
+        //           IntVect iv = bit(); 
+        //           pout() << iv << " h: " << currentH[dit](iv,0) 
+        //                        << ",b: " << currentB[dit](iv,0) << endl;
+        //       }
+        //   }
+        //}
     } // there. We should start with consistent b and h, GC BC and all ...
 
 
@@ -1551,18 +1550,17 @@ AmrHydro::timeStep(Real a_dt)
                 }
                 NullBCFill(levelPw[dit], validBox, m_amrDomains[lev], m_amrDx[lev][0]);
             }
-            if (lev > 0 && (m_cur_step == 75)) {
-               if (m_verbosity > 3) {
-                   pout() << " Checking Pw after regrid in operations " << endl;
-               }
-               for (dit.begin(); dit.ok(); ++dit) {
-                   BoxIterator bit(levelPw[dit].box()); 
-                   for (bit.begin(); bit.ok(); ++bit) {
-                       IntVect iv = bit(); 
-                       pout() << iv << " Pw: " << levelPw[dit](iv,0) << endl;
-                   }
-               }
-            }
+            // Keep DEBUG for now
+            //if (lev > 0 && (m_cur_step == 75)) {
+            //   pout() << " Checking Pw after regrid in operations " << endl;
+            //   for (dit.begin(); dit.ok(); ++dit) {
+            //       BoxIterator bit(levelPw[dit].box()); 
+            //       for (bit.begin(); bit.ok(); ++bit) {
+            //           IntVect iv = bit(); 
+            //           pout() << iv << " Pw: " << levelPw[dit](iv,0) << endl;
+            //       }
+            //   }
+            //}
         } // end loop on levs
 
         //         Compute grad(h) and grad(Pw)
@@ -1637,22 +1635,21 @@ AmrHydro::timeStep(Real a_dt)
                                      dx, nRefCrse, nRefFine,
                                      m_amrDomains[lev]);
 
-            FluxBox& gPw_ec = levelgradPw_ec[dit];
-            FluxBox& gH_ec = levelgradH_ec[dit];
-            if (lev > 0 && (m_cur_step == 75)) {
-               if (m_verbosity > 3) {
-                   pout() << " Checking GradPw after regrid in operations " << endl;
-               }
-               FArrayBox& gradPwFab = gPw_ec[0];
-               FArrayBox& gradHFab = gH_ec[0];
+            // Keep DEBUG for now
+            //FluxBox& gPw_ec = levelgradPw_ec[dit];
+            //FluxBox& gH_ec = levelgradH_ec[dit];
+            //if (lev > 0 && (m_cur_step == 75)) {
+            //   pout() << " Checking GradPw after regrid in operations " << endl;
+            //   FArrayBox& gradPwFab = gPw_ec[0];
+            //   FArrayBox& gradHFab = gH_ec[0];
 
-               BoxIterator bitEC(gradPwFab.box()); // can use gridBox? 
-               for (bitEC.begin(); bitEC.ok(); ++bitEC) {
-                   IntVect iv = bitEC();
-                    pout() << iv << " gradPw_xFace: " << gradPwFab(iv,0) << endl;
-                    pout() << iv << " gradH_xFace: " << gradHFab(iv,0) << endl;
-               }
-            }
+            //   BoxIterator bitEC(gradPwFab.box()); // can use gridBox? 
+            //   for (bitEC.begin(); bitEC.ok(); ++bitEC) {
+            //       IntVect iv = bitEC();
+            //        pout() << iv << " gradPw_xFace: " << gradPwFab(iv,0) << endl;
+            //        pout() << iv << " gradH_xFace: " << gradHFab(iv,0) << endl;
+            //   }
+            //}
         } // end loop levels
 
 
@@ -1895,7 +1892,6 @@ AmrHydro::timeStep(Real a_dt)
         //     Form RHS for b -- using b of current Picard iteration
         pout() <<"   ...Solve for b ! "<< endl;
         //int gh_method = 0; // 0: backward Euler, 1:...
-        //for (int lev = m_finest_level; lev >= 0; lev--) {
         for (int lev = 0; lev <= m_finest_level; lev++) {
             LevelData<FArrayBox>& levelB     = *m_gapheight[lev];    
 
@@ -2001,7 +1997,7 @@ AmrHydro::timeStep(Real a_dt)
         }
      
         /* custom plt here -- debug print */
-        if ((m_PrintCustom) && ((m_cur_step == 75) || (m_cur_step == 100))) {
+        if (m_PrintCustom) {
             int nStuffToPlot = 17;
             Vector<std::string> vectName;
             vectName.resize(nStuffToPlot);
@@ -2172,41 +2168,6 @@ AmrHydro::timeStep(Real a_dt)
             pout() << "Time = " << m_time << "  level " << lev << " cells advanced = " << m_num_cells[lev] << endl;
         }
     }
-
-    // debug print
-    //if (m_PrintCustom) {
-    //    Vector<std::string> vectName;
-    //    vectName.resize(3);
-    //    vectName[0]="head";
-    //    vectName[1]="gapHeight";
-    //    vectName[2]="bedelevation";
-    //    Vector<Vector<LevelData<FArrayBox>*>> stuffToPlot;
-    //    stuffToPlot.resize(3);
-    //    stuffToPlot[0].resize(m_max_level + 1, NULL);
-    //    stuffToPlot[1].resize(m_max_level + 1, NULL);
-    //    stuffToPlot[2].resize(m_max_level + 1, NULL);
-    //    stuffToPlot[0][0]  = new LevelData<FArrayBox>(m_amrGrids[0], 1, m_num_head_ghost * IntVect::Unit);
-    //    stuffToPlot[1][0]  = new LevelData<FArrayBox>(m_amrGrids[0], 1, m_num_head_ghost * IntVect::Unit);
-    //    stuffToPlot[2][0]  = new LevelData<FArrayBox>(m_amrGrids[0], 1, m_num_head_ghost * IntVect::Unit);
-    //    for (int lev = 0; lev <= m_finest_level; lev++)
-    //    {
-    //        LevelData<FArrayBox>& levelHead      = *m_head[lev];
-    //        LevelData<FArrayBox>& levelHeadSTP   = *stuffToPlot[0][lev];
-    //        LevelData<FArrayBox>& levelGap       = *m_gapheight[lev];    
-    //        LevelData<FArrayBox>& levelGapSTP    = *stuffToPlot[1][lev];
-    //        LevelData<FArrayBox>& levelzBed      = *m_bedelevation[lev];
-    //        LevelData<FArrayBox>& levelZbSTP     = *stuffToPlot[2][lev];
-    //        // Put h into h_lag
-    //        DataIterator dit = levelHead.dataIterator();
-    //        for (dit.begin(); dit.ok(); ++dit) {
-    //            levelHeadSTP[dit].copy(levelHead[dit], 0, 0, 1);
-    //            levelGapSTP[dit].copy(levelGap[dit], 0, 0, 1);
-    //            levelZbSTP[dit].copy(levelzBed[dit], 0, 0, 1);
-    //        }
-    //    } // loop on levs
-    //    writePltCustom(3, vectName, stuffToPlot, "final_");
-    //}
-
 
 }
 
@@ -2455,9 +2416,6 @@ AmrHydro::regrid()
                            *new_iceheightDataPtr);
             //BCDataRegrid(lev, *new_bedelevationDataPtr, *new_overburdenpressDataPtr,*new_iceheightDataPtr);
 
-            if (m_verbosity > 3) {
-                pout() << " Checking data after initDataRegrid " << endl;
-            }
             LevelData<FArrayBox>& head  = *new_headDataPtr;
             LevelData<FArrayBox>& gH    = *new_gapheightDataPtr;
             LevelData<FArrayBox>& Pw    = *new_PwDataPtr;
@@ -2467,22 +2425,30 @@ AmrHydro::regrid()
             LevelData<FArrayBox>& zB    = *new_bedelevationDataPtr;
             LevelData<FArrayBox>& overP = *new_overburdenpressDataPtr;
             LevelData<FArrayBox>& iceH  = *new_iceheightDataPtr;
+
             DataIterator dit = newDBL.dataIterator();
-            for (dit.begin(); dit.ok(); ++dit) {
-                BoxIterator bit(head[dit].box()); 
-                for (bit.begin(); bit.ok(); ++bit) {
-                    IntVect iv = bit(); 
-                    pout() << iv << " h: " << head[dit](iv,0) 
-                                 << ",b: " << gH[dit](iv,0)           
-                                 << ",Pw: " << Pw[dit](iv,0)           
-                                 << ",qw: " << qw[dit](iv,0)           
-                                 << ",Re: " << Re[dit](iv,0)           
-                                 << ",mdot: " << melt[dit](iv,0)           
-                                 << ",zB: " << zB[dit](iv,0)           
-                                 << ",oP: " << overP[dit](iv,0)           
-                                 << ",iceH: " << iceH[dit](iv,0) << endl;
+
+            if (m_verbosity > 4) {
+
+                pout() << " Checking data after initDataRegrid " << endl;
+
+                for (dit.begin(); dit.ok(); ++dit) {
+                    BoxIterator bit(head[dit].box()); 
+                    for (bit.begin(); bit.ok(); ++bit) {
+                        IntVect iv = bit(); 
+                        pout() << iv << " h: " << head[dit](iv,0) 
+                                     << ",b: " << gH[dit](iv,0)           
+                                     << ",Pw: " << Pw[dit](iv,0)           
+                                     << ",qw: " << qw[dit](iv,0)           
+                                     << ",Re: " << Re[dit](iv,0)           
+                                     << ",mdot: " << melt[dit](iv,0)           
+                                     << ",zB: " << zB[dit](iv,0)           
+                                     << ",oP: " << overP[dit](iv,0)           
+                                     << ",iceH: " << iceH[dit](iv,0) << endl;
+                    }
                 }
-            }
+
+            } // End verbosity
 
             // Fill with interpolated data from coarser level
             {
@@ -2516,24 +2482,27 @@ AmrHydro::regrid()
                 interpolator.interpToFine(*new_meltRateDataPtr, *m_meltRate[lev - 1]); 
             }
 
-            if (m_verbosity > 3) {
+            if (m_verbosity > 4) {
+
                 pout() << " Checking data after interpToFine " << endl;
-            }
-            for (dit.begin(); dit.ok(); ++dit) {
-                BoxIterator bit(head[dit].box()); 
-                for (bit.begin(); bit.ok(); ++bit) {
-                    IntVect iv = bit(); 
-                    pout() << iv << " h: " << head[dit](iv,0) 
-                                 << ",b: " << gH[dit](iv,0)           
-                                 << ",Pw: " << Pw[dit](iv,0)           
-                                 << ",qw: " << qw[dit](iv,0)           
-                                 << ",Re: " << Re[dit](iv,0)           
-                                 << ",mdot: " << melt[dit](iv,0)           
-                                 << ",zB: " << zB[dit](iv,0)           
-                                 << ",oP: " << overP[dit](iv,0)           
-                                 << ",iceH: " << iceH[dit](iv,0) << endl;
+
+                for (dit.begin(); dit.ok(); ++dit) {
+                    BoxIterator bit(head[dit].box()); 
+                    for (bit.begin(); bit.ok(); ++bit) {
+                        IntVect iv = bit(); 
+                        pout() << iv << " h: " << head[dit](iv,0) 
+                                     << ",b: " << gH[dit](iv,0)           
+                                     << ",Pw: " << Pw[dit](iv,0)           
+                                     << ",qw: " << qw[dit](iv,0)           
+                                     << ",Re: " << Re[dit](iv,0)           
+                                     << ",mdot: " << melt[dit](iv,0)           
+                                     << ",zB: " << zB[dit](iv,0)           
+                                     << ",oP: " << overP[dit](iv,0)           
+                                     << ",iceH: " << iceH[dit](iv,0) << endl;
+                    }
                 }
-            }
+
+            } // End verbosity
 
             // now potentially copy old-grid data on this level into new holder
             if (old_oldheadDataPtr!= NULL) {
@@ -2575,24 +2544,28 @@ AmrHydro::regrid()
                 delete old_qwDataPtr;
                 delete old_meltRateDataPtr;
             } 
-            if (m_verbosity > 3) {
+
+            if (m_verbosity > 4) {
+
                 pout() << " Checking data after copyTo Old->New " << endl;
-            }
-            for (dit.begin(); dit.ok(); ++dit) {
-                BoxIterator bit(head[dit].box()); 
-                for (bit.begin(); bit.ok(); ++bit) {
-                    IntVect iv = bit(); 
-                    pout() << iv << " h: " << head[dit](iv,0) 
-                                 << ",b: " << gH[dit](iv,0)           
-                                 << ",Pw: " << Pw[dit](iv,0)           
-                                 << ",qw: " << qw[dit](iv,0)           
-                                 << ",Re: " << Re[dit](iv,0)           
-                                 << ",mdot: " << melt[dit](iv,0)           
-                                 << ",zB: " << zB[dit](iv,0)           
-                                 << ",oP: " << overP[dit](iv,0)           
-                                 << ",iceH: " << iceH[dit](iv,0) << endl;
+
+                for (dit.begin(); dit.ok(); ++dit) {
+                    BoxIterator bit(head[dit].box()); 
+                    for (bit.begin(); bit.ok(); ++bit) {
+                        IntVect iv = bit(); 
+                        pout() << iv << " h: " << head[dit](iv,0) 
+                                     << ",b: " << gH[dit](iv,0)           
+                                     << ",Pw: " << Pw[dit](iv,0)           
+                                     << ",qw: " << qw[dit](iv,0)           
+                                     << ",Re: " << Re[dit](iv,0)           
+                                     << ",mdot: " << melt[dit](iv,0)           
+                                     << ",zB: " << zB[dit](iv,0)           
+                                     << ",oP: " << overP[dit](iv,0)           
+                                     << ",iceH: " << iceH[dit](iv,0) << endl;
+                    }
                 }
-            }
+
+            } // End verbosity
 
             // exchange is necessary to fill periodic ghost cells
             // which aren't filled by the copyTo from oldLevelH
@@ -3163,12 +3136,12 @@ AmrHydro::initDataRegrid(int a_level,
 {
     if (m_verbosity > 3) {
         pout() << "AmrHydro::initDataRegrid" << endl;
+        pout()<<  "  .. lev " << a_level << endl;
+
     }
 
-    pout()<< "  .. init data regrid lev " << a_level << endl;
 
     RealVect levelDx = m_amrDx[a_level] * RealVect::Unit;
-    //m_IBCPtr->define(m_amrDomains[a_level], levelDx[0]);
     m_IBCPtr->initializeData(levelDx, 
                              *m_suhmoParm,       
                              a_levhead, a_levgapheight, 
@@ -3187,19 +3160,17 @@ AmrHydro::BCDataRegrid(int a_level,
 {
     if (m_verbosity > 3) {
         pout() << "AmrHydro::BCDataRegrid" << endl;
+        pout()<<  "  .. lev " << a_level << endl;
     }
 
-    pout()<< "  .. BC data regrid lev " << a_level << endl;
 
     RealVect levelDx = m_amrDx[a_level] * RealVect::Unit;
-    //m_IBCPtr->define(m_amrDomains[a_level], levelDx[0]);
     m_IBCPtr->BCData(levelDx, m_amrGrids[a_level],
                       m_amrDomains[a_level],  
                       *m_suhmoParm,       
                       a_levzBed, a_levPi,
                       a_levIceHeight);
 }
-
 
 
 // compute timestep
