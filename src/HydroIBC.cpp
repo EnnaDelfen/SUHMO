@@ -149,6 +149,7 @@ HydroIBC::initializeData(RealVect& a_dx,
 void
 HydroIBC::BCData(RealVect& a_dx,
                  DisjointBoxLayout& a_grids,
+                 const ProblemDomain& a_domain,
                  suhmo_params Params,     
                  LevelData<FArrayBox>& a_zbed,
                  LevelData<FArrayBox>& a_Pi,
@@ -157,9 +158,6 @@ HydroIBC::BCData(RealVect& a_dx,
     
     pout() << "HydroIBC::BCData" << endl;
 
-    IntVect regionLo = m_domain.domainBox().bigEnd();
-    IntVect regionHi = m_domain.domainBox().bigEnd();
-
     DataIterator dit = a_zbed.dataIterator();
     for (dit.begin(); dit.ok(); ++dit) {
         FArrayBox& thiszbed      = a_zbed[dit];
@@ -167,47 +165,44 @@ HydroIBC::BCData(RealVect& a_dx,
         FArrayBox& thisiceHeight = a_iceHeight[dit];
 
         const Box& validBox = a_grids.get(dit);
+        pout() << " domainbox: " << a_domain.domainBox().smallEnd() << "," << a_domain.domainBox().bigEnd() << endl;
+        pout() << " validbox: " << validBox.smallEnd() << "," << validBox.bigEnd() << endl;
+        pout() << " zBedbox: " << thiszbed.box().smallEnd() << "," << thiszbed.box().bigEnd() << endl;
 
-        if(!m_domain.domainBox().contains(thiszbed.box())) {
+        for(int dir=0; dir<CH_SPACEDIM; ++dir) {
 
-            for(int dir=0; dir<CH_SPACEDIM; ++dir) {
+            Box ghostBoxLo = adjCellBox(validBox, dir, Side::Lo, 1);
+            Box ghostBoxHi = adjCellBox(validBox, dir, Side::Hi, 1);
 
-                if (!m_domain.isPeriodic(dir)) {
+            //if ((!a_domain.domainBox().contains(ghostBoxLo)) && (thiszbed.box().contains(ghostBoxLo)) ) {
+                pout() << "LoDir " << dir << " Am I EVER getting in there ?? " << endl;
+                for (BoxIterator bit(ghostBoxLo); bit.ok(); ++bit) {
+                    IntVect iv = bit();
+                    Real x_loc = (iv[0]+0.5)*a_dx[0];
+                    // bed topography
+                    thiszbed(iv, 0)      = Params.m_slope*x_loc;
+                    // Ice height (should be ice only, so surface - (bed + gap))
+                    thisiceHeight(iv, 0) = Params.m_H;
+                    // Ice overburden pressure : rho_i * g * H
+                    thispi(iv, 0)        = Params.m_rho_i * Params.m_gravity * thisiceHeight(iv, 0);
+                }
+            //} // Lo
+            //if ((!a_domain.domainBox().contains(ghostBoxHi)) && (thiszbed.box().contains(ghostBoxHi)) ) {
+                pout() << "HiDir " << dir << " Am I EVER getting in there ?? " << endl;
+                for (BoxIterator bit(ghostBoxHi); bit.ok(); ++bit) {
+                    IntVect iv = bit();
+                    Real x_loc = (iv[0]+0.5)*a_dx[0];
+                    // bed topography
+                    thiszbed(iv, 0)      = Params.m_slope*x_loc;
+                    // Ice height (should be ice only, so surface - (bed + gap))
+                    thisiceHeight(iv, 0) = Params.m_H;
+                    // Ice overburden pressure : rho_i * g * H
+                    thispi(iv, 0)        = Params.m_rho_i * Params.m_gravity * thisiceHeight(iv, 0);
+                }
 
-                    Box ghostBoxLo = adjCellBox(validBox, dir, Side::Lo, 1);
-                    Box ghostBoxHi = adjCellBox(validBox, dir, Side::Hi, 1);
+            //} // Hi
 
-                    if ((!m_domain.domainBox().contains(ghostBoxLo)) && (thiszbed.box().contains(ghostBoxLo)) ) {
-                        for (BoxIterator bit(ghostBoxLo); bit.ok(); ++bit) {
-                            IntVect iv = bit();
-                            Real x_loc = (iv[0]+0.5)*a_dx[0];
-                            // bed topography
-                            thiszbed(iv, 0)      = Params.m_slope*x_loc;
-                            // Ice height (should be ice only, so surface - (bed + gap))
-                            thisiceHeight(iv, 0) = Params.m_H;
-                            // Ice overburden pressure : rho_i * g * H
-                            thispi(iv, 0)        = Params.m_rho_i * Params.m_gravity * thisiceHeight(iv, 0);
-                        }
-                    } // Lo
-                    if ((!m_domain.domainBox().contains(ghostBoxHi)) && (thiszbed.box().contains(ghostBoxHi)) ) {
-                        for (BoxIterator bit(ghostBoxHi); bit.ok(); ++bit) {
-                            IntVect iv = bit();
-                            Real x_loc = (iv[0]+0.5)*a_dx[0];
-                            // bed topography
-                            thiszbed(iv, 0)      = Params.m_slope*x_loc;
-                            // Ice height (should be ice only, so surface - (bed + gap))
-                            thisiceHeight(iv, 0) = Params.m_H;
-                            // Ice overburden pressure : rho_i * g * H
-                            thispi(iv, 0)        = Params.m_rho_i * Params.m_gravity * thisiceHeight(iv, 0);
-                        }
-
-                    } // Hi
-
-                } // end if perio
-
-            } // end loop over dirs
-
-        } 
+        } // end loop over dirs
 
     } // end loop over data it
     pout() << "(Done with HydroIBC::BCData)" << endl;
