@@ -921,7 +921,7 @@ AmrHydro::initialize()
     m_num_cells.resize(m_max_level + 1, 0);
     for (int lev = 0; lev <= m_finest_level; lev++) {
         const DisjointBoxLayout& levelGrids = m_amrGrids[lev];
-        if (m_verbosity > 4) {
+        if (m_verbosity > 3) {
             // write out initial grids
             pout() << "    Level " << lev << " grids: " << levelGrids << endl;
         }
@@ -1146,61 +1146,67 @@ AmrHydro::Calc_moulin_source_term (LevelData<FArrayBox>& levelMoulinSrc)
            // hi face
            Real x_hi = (iv[0]+1)*m_amrDx[curr_level][0];
            Real y_hi = (iv[1]+1)*m_amrDx[curr_level][1];
-           if ( (m_suhmoParm->m_moulin_position[0] <= x_hi) && (m_suhmoParm->m_moulin_position[0] > x_lo) ) {
-               if ( (m_suhmoParm->m_moulin_position[1] <= y_hi) && (m_suhmoParm->m_moulin_position[1] > y_lo) ) {
-                    moulinSrc(iv,0) = m_suhmoParm->m_moulin_flux / 
-                             ( m_amrDx[curr_level][0] * m_amrDx[curr_level][1]);  // m3s-1 / m2
-                    // Y line
-                    //     o
-                    //     o
-                    // - - X - - 
-                    //     o
-                    //     o
-                    //int coord_TL[3];
-                    //coord_TL[0] = iv[0]; 
-                    //coord_TL[1] = iv[1] + 1; 
-                    //coord_TL[2] = 0;
-                    //IntVect iv_TL(coord_TL);
-                    //moulinSrc(iv_TL,0) = m_suhmoParm->m_moulin_flux / 
-                    //             (5.0 * m_amrDx[curr_level][0] * m_amrDx[curr_level][1]);  // m3s-1 / m2
-                    //coord_TL[1] = iv[1] - 1; 
-                    //IntVect iv_TL2(coord_TL);
-                    //moulinSrc(iv_TL2,0) = m_suhmoParm->m_moulin_flux / 
-                    //             (5.0 * m_amrDx[curr_level][0] * m_amrDx[curr_level][1]);  // m3s-1 / m2
-                    //coord_TL[1] = iv[1] - 2; 
-                    //IntVect iv_TL3(coord_TL);
-                    //moulinSrc(iv_TL3,0) = m_suhmoParm->m_moulin_flux / 
-                    //             (9.0 * m_amrDx[curr_level][0] * m_amrDx[curr_level][1]);  // m3s-1 / m2
-                    //coord_TL[1] = iv[1] + 2; 
-                    //IntVect iv_TL4(coord_TL);
-                    //moulinSrc(iv_TL4,0) = m_suhmoParm->m_moulin_flux / 
-                    //             (9.0 * m_amrDx[curr_level][0] * m_amrDx[curr_level][1]);  // m3s-1 / m2
-                    // X line
-                    //     I
-                    //     I
-                    // o o X o o 
-                    //     I
-                    //     I
-                    //int coord_TR[3];
-                    //coord_TR[0] = iv[0] + 1; 
-                    //coord_TR[1] = iv[1]; 
-                    //coord_TR[2] = 0;
-                    //IntVect iv_TR(coord_TR);
-                    //moulinSrc(iv_TR,0) = m_suhmoParm->m_moulin_flux / 
-                    //             (3.0 * m_amrDx[curr_level][0] * m_amrDx[curr_level][1]);  // m3s-1 / m2
-                    //coord_TR[0] = iv[0] - 1; 
-                    //IntVect iv_TR2(coord_TR);
-                    //moulinSrc(iv_TR2,0) = m_suhmoParm->m_moulin_flux / 
-                    //             (3.0 * m_amrDx[curr_level][0] * m_amrDx[curr_level][1]);  // m3s-1 / m2
-                    //coord_TR[0] = iv[0] - 2; 
-                    //IntVect iv_TR3(coord_TR);
-                    //moulinSrc(iv_TR3,0) = m_suhmoParm->m_moulin_flux / 
-                    //             (9.0 * m_amrDx[curr_level][0] * m_amrDx[curr_level][1]);  // m3s-1 / m2
-                    //coord_TR[0] = iv[0] + 2; 
-                    //IntVect iv_TR4(coord_TR);
-                    //moulinSrc(iv_TR4,0) = m_suhmoParm->m_moulin_flux / 
-                    //             (9.0 * m_amrDx[curr_level][0] * m_amrDx[curr_level][1]);  // m3s-1 / m2
-                    //pout() << "level is: " << curr_level << ", IV: " << iv << endl; 
+
+           // Loop over all moulins
+           for (int m = 0; m<m_suhmoParm->m_n_moulins; m++) {
+               if ( (m_suhmoParm->m_moulin_position[m*m_suhmoParm->m_n_moulins + 0] <= x_hi) 
+                     && (m_suhmoParm->m_moulin_position[m*m_suhmoParm->m_n_moulins + 0] > x_lo) ) {
+                   if ( (m_suhmoParm->m_moulin_position[m*m_suhmoParm->m_n_moulins + 1] <= y_hi) 
+                         && (m_suhmoParm->m_moulin_position[m*m_suhmoParm->m_n_moulins + 1] > y_lo) ) {
+                        moulinSrc(iv,0) = m_suhmoParm->m_moulin_flux[m] / 
+                                 ( m_amrDx[curr_level][0] * m_amrDx[curr_level][1]);  // m3s-1 / m2
+                        // Y line
+                        //     o
+                        //     o
+                        // - - X - - 
+                        //     o
+                        //     o
+                        //int coord_TL[3];
+                        //coord_TL[0] = iv[0]; 
+                        //coord_TL[1] = iv[1] + 1; 
+                        //coord_TL[2] = 0;
+                        //IntVect iv_TL(coord_TL);
+                        //moulinSrc(iv_TL,0) = m_suhmoParm->m_moulin_flux / 
+                        //             (5.0 * m_amrDx[curr_level][0] * m_amrDx[curr_level][1]);  // m3s-1 / m2
+                        //coord_TL[1] = iv[1] - 1; 
+                        //IntVect iv_TL2(coord_TL);
+                        //moulinSrc(iv_TL2,0) = m_suhmoParm->m_moulin_flux / 
+                        //             (5.0 * m_amrDx[curr_level][0] * m_amrDx[curr_level][1]);  // m3s-1 / m2
+                        //coord_TL[1] = iv[1] - 2; 
+                        //IntVect iv_TL3(coord_TL);
+                        //moulinSrc(iv_TL3,0) = m_suhmoParm->m_moulin_flux / 
+                        //             (9.0 * m_amrDx[curr_level][0] * m_amrDx[curr_level][1]);  // m3s-1 / m2
+                        //coord_TL[1] = iv[1] + 2; 
+                        //IntVect iv_TL4(coord_TL);
+                        //moulinSrc(iv_TL4,0) = m_suhmoParm->m_moulin_flux / 
+                        //             (9.0 * m_amrDx[curr_level][0] * m_amrDx[curr_level][1]);  // m3s-1 / m2
+                        // X line
+                        //     I
+                        //     I
+                        // o o X o o 
+                        //     I
+                        //     I
+                        //int coord_TR[3];
+                        //coord_TR[0] = iv[0] + 1; 
+                        //coord_TR[1] = iv[1]; 
+                        //coord_TR[2] = 0;
+                        //IntVect iv_TR(coord_TR);
+                        //moulinSrc(iv_TR,0) = m_suhmoParm->m_moulin_flux / 
+                        //             (3.0 * m_amrDx[curr_level][0] * m_amrDx[curr_level][1]);  // m3s-1 / m2
+                        //coord_TR[0] = iv[0] - 1; 
+                        //IntVect iv_TR2(coord_TR);
+                        //moulinSrc(iv_TR2,0) = m_suhmoParm->m_moulin_flux / 
+                        //             (3.0 * m_amrDx[curr_level][0] * m_amrDx[curr_level][1]);  // m3s-1 / m2
+                        //coord_TR[0] = iv[0] - 2; 
+                        //IntVect iv_TR3(coord_TR);
+                        //moulinSrc(iv_TR3,0) = m_suhmoParm->m_moulin_flux / 
+                        //             (9.0 * m_amrDx[curr_level][0] * m_amrDx[curr_level][1]);  // m3s-1 / m2
+                        //coord_TR[0] = iv[0] + 2; 
+                        //IntVect iv_TR4(coord_TR);
+                        //moulinSrc(iv_TR4,0) = m_suhmoParm->m_moulin_flux / 
+                        //             (9.0 * m_amrDx[curr_level][0] * m_amrDx[curr_level][1]);  // m3s-1 / m2
+                        //pout() << "level is: " << curr_level << ", IV: " << iv << endl; 
+                   }
                }
            }
        }
@@ -2258,7 +2264,7 @@ AmrHydro::regrid()
 {
     CH_TIME("AmrHydro::regrid");
 
-    if (m_verbosity > 3) {
+    if (m_verbosity > 2) {
         pout() << "AmrHydro::regrid" << endl;
     }
 
@@ -2507,7 +2513,6 @@ AmrHydro::regrid()
             // now potentially copy old-grid data on this level into new holder
             if (old_oldheadDataPtr!= NULL) {
                 if (oldDBL.isClosed()) {
-                    pout() << "Doing the copyTo... " << endl;
                     // HEAD
                     old_oldheadDataPtr->copyTo(*new_oldheadDataPtr);
                     old_headDataPtr->copyTo(*new_headDataPtr);
@@ -2801,9 +2806,8 @@ AmrHydro::tagCellsInit(Vector<IntVectSet>& a_tags)
 void
 AmrHydro::initGrids(int a_finest_level) {
 
-    if (m_verbosity > 3) {
+    if (m_verbosity > 2) {
         pout() << "AmrHydro::initGrids" << endl;
-        pout() << "m_max_level " << m_max_level << endl;
     }
 
     m_finest_level = 0;
@@ -2816,7 +2820,7 @@ AmrHydro::initGrids(int a_finest_level) {
 
     DisjointBoxLayout baseGrids(baseBoxes, procAssign, m_amrDomains[0]);
 
-    if (m_verbosity > 3) {
+    if (m_verbosity > 2) {
         long long numCells0 = baseGrids.numCells();
         pout() << "    Level 0: " << numCells0 << " cells: " << baseGrids << endl;
     }
@@ -2856,7 +2860,6 @@ AmrHydro::initGrids(int a_finest_level) {
         // which is still coarser than maxLevel)
         moreLevels = false;
         tagCellsInit(tagVect);
-        pout() << " Is tagVect empty ? " << m_finest_level << " " <<tagVect[m_finest_level].isEmpty() <<endl;
 
         // two possibilities -- need to generate grids
         // level-by-level, or we are refining all the
@@ -2867,7 +2870,6 @@ AmrHydro::initGrids(int a_finest_level) {
             int top_level = m_finest_level;
             int old_top_level = top_level;
             new_finest_level = meshrefine.regrid(newBoxes, tagVect, baseLevel, top_level, oldBoxes);
-            pout() << " new_finest_level (1) : " << new_finest_level << endl;
 
             if (new_finest_level > top_level) top_level++;
             oldBoxes = newBoxes;
@@ -2885,11 +2887,12 @@ AmrHydro::initGrids(int a_finest_level) {
 
             int top_level = m_max_level - 1;
             new_finest_level = meshrefine.regrid(newBoxes, tagVect, baseLevel, top_level, oldBoxes);
-            pout() << " new_finest_level (2) : " << new_finest_level << endl;
         }
 
         numLevels = Min(new_finest_level, m_max_level) + 1;
-        pout() << "numLevels " << numLevels << endl;
+        if (m_verbosity > 3) {
+            pout() << "numLevels " << numLevels << endl;
+        }
 
         // now loop through levels and define
         for (int lev = baseLevel + 1; lev <= new_finest_level; ++lev) {
@@ -2927,7 +2930,7 @@ AmrHydro::initGrids(int a_finest_level) {
 void
 AmrHydro::setupFixedGrids(const std::string& a_gridFile)
 {
-    if (m_verbosity > 3) {
+    if (m_verbosity > 2) {
         pout() << "AmrHydro::setupFixedGrids" << endl;
     }
     Vector<Vector<Box> > gridvect;
@@ -2957,7 +2960,7 @@ AmrHydro::setupFixedGrids(const std::string& a_gridFile)
         domainSplit(m_amrDomains[0], gridvect[0], m_max_base_grid_size, m_block_factor);
 
         // some printing
-        if (m_verbosity >= 3) {
+        if (m_verbosity > 2) {
             pout() << "level 0: ";
             for (int n = 0; n < gridvect[0].size(); n++) {
                 pout() << gridvect[0][n] << endl;
@@ -3924,7 +3927,7 @@ AmrHydro::readCheckpointFile(HDF5Handle& a_handle)
 void
 AmrHydro::restart(string& a_restart_file)
 {
-    if (m_verbosity > 3) {
+    if (m_verbosity > 2) {
         pout() << "AmrHydro::restart" << endl;
     }
 
