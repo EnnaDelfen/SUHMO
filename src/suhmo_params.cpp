@@ -25,7 +25,7 @@ void suhmo_params::setDefaults()
     m_gapInit = 0.0;
     m_ReInit = 0.0;
     // Moulin
-    m_moulin_flux = 0.0;
+    m_n_moulins = 0;
 }
 
 void suhmo_params::readInputs()
@@ -53,9 +53,12 @@ void suhmo_params::readInputs()
     ppParams.get("slope", m_slope);
     ppParams.get("GapInit", m_gapInit);
     ppParams.get("ReInit", m_ReInit);
-    m_moulin_position.resize(SpaceDim,0.0);
-    ppParams.getarr("moulin_position", m_moulin_position, 0, SpaceDim);
-    ppParams.get("moulin_flux", m_moulin_flux);
+    // MOULINS
+    ppParams.get("n_moulins", m_n_moulins);
+    m_moulin_position.resize(m_n_moulins*SpaceDim,0.0);
+    ppParams.getarr("moulin_position", m_moulin_position, 0, m_n_moulins*SpaceDim);
+    m_moulin_flux.resize(m_n_moulins,0.0);
+    ppParams.getarr("moulin_flux", m_moulin_flux, 0, m_n_moulins);
 
     // need to include verbose
     ParmParse ppAmr("AmrHydro");

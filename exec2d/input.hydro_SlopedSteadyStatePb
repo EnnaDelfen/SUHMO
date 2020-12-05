@@ -2,7 +2,7 @@
 main.domain_size=1000.00 1000.00 # physical dimensions of domain
 main.problem_type=basic
 main.maxTime=6000000.0
-main.maxStep= 76 # 240 heures = 10 jours
+main.maxStep= 300 # 240 heures = 10 jours
 
 # bc - 0 = diri / 1 = neum
 bc.lo_bc = 0 0
@@ -35,13 +35,14 @@ suhmo.slope   = 0.02
 suhmo.GapInit = 0.01
 suhmo.ReInit  = 1000.0
 
+suhmo.n_moulins=1
 suhmo.moulin_position = 400. 500.  # CELL pos for now
 suhmo.moulin_flux = 4.0 # vol flux
 
 # class AmrHydro.cpp
 # misc
-AmrHydro.PrintCustom=true
-AmrHydro.verbosity=5
+AmrHydro.PrintCustom=false
+AmrHydro.verbosity=3
 # mesh and refinement
 AmrHydro.num_cells=32 32  # number of cells on coarsest domain
 AmrHydro.max_level=1
@@ -50,7 +51,7 @@ AmrHydro.block_factor=4
 AmrHydro.max_box_size=128
 AmrHydro.max_base_grid_size=128
 AmrHydro.regrid_lbase=0  # coarsest level that you regrid
-AmrHydro.regrid_interval=25
+AmrHydro.regrid_interval=5
 AmrHydro.domainLoIndex=0 0 # 2D
 AmrHydro.is_periodic=0 1   # 2D
 AmrHydro.tagCap=1  # not sure yet
