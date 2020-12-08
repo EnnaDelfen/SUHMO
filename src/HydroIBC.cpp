@@ -42,7 +42,6 @@ HydroIBC::~HydroIBC()
 void
 HydroIBC::define(const ProblemDomain& a_domain, const Real& a_dx)
 {
-    pout() << "HydroIBC::define" << endl;
     PhysIBC::define(a_domain, a_dx);
 }
 

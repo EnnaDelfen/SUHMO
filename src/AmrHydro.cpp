@@ -428,7 +428,11 @@ AmrHydro::SolveForHead(
     bool homogeneousBC = false;  
     solver.define(&poissonOp, homogeneousBC); 
     solver.m_normType = 0;
-    solver.m_verbosity = 4;
+    if (m_verbosity > 3) {
+        solver.m_verbosity = 4;
+    } else {
+        solver.m_verbosity = 1;
+    }
     //solver.m_eps = 1.0e-6;
     solver.m_reps = 1.0e-10;
     solver.setConvergenceMetrics(1.0, 1.0e-10);
@@ -1219,7 +1223,9 @@ AmrHydro::Calc_moulin_source_term (LevelData<FArrayBox>& levelMoulinSrc)
            IntVect iv = bit();
            integ_moulin += moulinSrc(iv,0) * m_amrDx[curr_level][0] * m_amrDx[curr_level][1]; 
        }
-       pout() << "level is: " << curr_level << ", Integral of moulin vol. rate: " << integ_moulin << endl; 
+       if (m_verbosity > 3) {
+           pout() << "level is: " << curr_level << ", Integral of moulin vol. rate: " << integ_moulin << endl; 
+       } 
    }
 }
 
@@ -1328,8 +1334,8 @@ AmrHydro::timeStep(Real a_dt)
 {
     CH_TIME("AmrHydro::timestep");
 
-    if (m_verbosity >= 2) {
-        pout() << "\n\n\n-- Timestep " << m_cur_step << " Advancing solution from time " << m_time << " ( " << time()
+    if (m_verbosity > 2) {
+        pout() << "\n\n-- Timestep " << m_cur_step << " Advancing solution from time " << m_time << " ( " << time()
                << ")"
                   " with dt = "
                << a_dt << endl;
@@ -1399,7 +1405,9 @@ AmrHydro::timeStep(Real a_dt)
     Vector<RefCountedPtr<LevelData<FluxBox> > > bCoef(m_finest_level + 1);
 
     //     Take care of GC/BC etc.
-    pout() <<"   ...Copy current into old & take care of ghost cells and BCs "<< endl;
+    if (m_verbosity > 3) {
+        pout() <<"   ...Copy current into old & take care of ghost cells and BCs "<< endl;
+    }
 
     for (int lev = 0; lev <= m_finest_level; lev++) {
         LevelData<FArrayBox>& oldH       = *m_old_head[lev];
@@ -1477,13 +1485,17 @@ AmrHydro::timeStep(Real a_dt)
 
 
     /* II LOOP: h and b calc */
-    pout() <<"   ...Solve for h (update b too) ! "<< endl;
+    if (m_verbosity > 3) {
+        pout() <<"   ...Solve for h (update b too) ! "<< endl;
+    }
     bool converged_h = false;
     int ite_idx = 0;
     while (!converged_h) { 
-        pout() <<"   ------------------------------------- "<< endl;
-        pout() <<"     Iteration "<< ite_idx << endl;
-        pout() <<"   ------------------------------------- "<< endl;
+        if (m_verbosity > 3) {
+            pout() <<"   ------------------------------------- "<< endl;
+            pout() <<"     Iteration "<< ite_idx << endl;
+            pout() <<"   ------------------------------------- "<< endl;
+        }
         // Solve for h using lagged (iteration lagged) qtities
         //         Fill perio GC and BC of h and b
         //         Put h into h_lag (GC too) and b into b_lag
@@ -1532,7 +1544,9 @@ AmrHydro::timeStep(Real a_dt)
 
 
         //         Update water pressure Pw=f(h)
-        pout() <<"        Update water pressure "<< endl;
+        if (m_verbosity > 3) {
+            pout() <<"        Update water pressure "<< endl;
+        }
         for (int lev = 0; lev <= m_finest_level; lev++) {
             LevelData<FArrayBox>& levelcurrentH = *m_head[lev];
 
@@ -1570,7 +1584,9 @@ AmrHydro::timeStep(Real a_dt)
         } // end loop on levs
 
         //         Compute grad(h) and grad(Pw)
-        pout() <<"        Compute grad(h) and grad(Pw) "<< endl;
+        if (m_verbosity > 3) {
+            pout() <<"        Compute grad(h) and grad(Pw) "<< endl;
+        }
         for (int lev = 0; lev <= m_finest_level; lev++) {
             LevelData<FArrayBox>& levelcurrentH = *m_head[lev];
             LevelData<FArrayBox>& levelgradH    = *m_gradhead[lev];
@@ -1662,12 +1678,16 @@ AmrHydro::timeStep(Real a_dt)
         //     IV INNER LOOP: Re/Qw !! (fixed nb of iter for now)
         //             Update VECTOR Qw = f(Re, grad(h))
         //             Update Re = f(Qw)
-        pout() <<"        Re/Qw dependency "<< endl;
+        if (m_verbosity > 3) {
+            pout() <<"        Re/Qw dependency "<< endl;
+        }
         int max_ite_Re = 10; 
         Real max_Re_diff = 0.0;
         for (int it = 0; it <= max_ite_Re; it++) {
-            //pout() << "           ------------------------" << endl;
-            //pout() << "           ite " << it << endl;
+            if (m_verbosity > 5) {
+                pout() << "           ------------------------" << endl;
+                pout() << "           ite " << it << endl;
+            }
         
             max_Re_diff = -10000;
 
@@ -1761,12 +1781,16 @@ AmrHydro::timeStep(Real a_dt)
                 ExtrapGhostCells( levelRe, m_amrDomains[0]);
             } // end loop on levs
 
-            //pout() << "           ------------------------" << endl;
+            if (m_verbosity > 5) {
+                pout() << "           ------------------------" << endl;
+            }
         } // end Qw/Re ites
 
 
         //         Update melting rate = f(Qw, grad(h), grad(Pw))
-        pout() <<"        Update melting rate "<< endl;
+        if (m_verbosity > 3) {
+            pout() <<"        Update melting rate "<< endl;
+        }
         for (int lev = 0; lev <= m_finest_level; lev++) {
 
             LevelData<FArrayBox>& levelmR       = *m_meltRate[lev];
@@ -1885,7 +1909,9 @@ AmrHydro::timeStep(Real a_dt)
         } // loop on levs
 
         // Solve for h using updated qtites
-        pout() <<"        Poisson solve for h "<< endl;
+        if (m_verbosity > 3) {
+            pout() <<"        Poisson solve for h "<< endl;
+        }
         SolveForHead(m_amrGrids_curr, aCoef, bCoef,
                      m_amrDomains_curr, m_refinement_ratios, coarsestDx,
                      a_head_curr, RHS_h);
@@ -1896,7 +1922,9 @@ AmrHydro::timeStep(Real a_dt)
 
         /* TRY TO SOLVE FOR B IN THE LOOP */
         //     Form RHS for b -- using b of current Picard iteration
-        pout() <<"   ...Solve for b ! "<< endl;
+        if (m_verbosity > 3) {
+            pout() <<"   ...Solve for b ! "<< endl;
+         }
         //int gh_method = 0; // 0: backward Euler, 1:...
         for (int lev = 0; lev <= m_finest_level; lev++) {
             LevelData<FArrayBox>& levelB     = *m_gapheight[lev];    
@@ -1920,7 +1948,9 @@ AmrHydro::timeStep(Real a_dt)
         }  // loop on levs
 
         //     Solve for b using Forward Euler simple scheme -- use OLD b here
-        pout() <<"        Update gap height with expl Euler scheme"<< endl;
+        if (m_verbosity > 3) {
+            pout() <<"        Update gap height with expl Euler scheme"<< endl;
+        }
         //for (int lev = m_finest_level; lev >= 0; lev--)
         for (int lev = 0; lev <= m_finest_level; lev++) {
             LevelData<FArrayBox>& leveloldB  = *m_old_gapheight[lev];    
@@ -1948,7 +1978,9 @@ AmrHydro::timeStep(Real a_dt)
         
 
         /* Averaging down and fill in ghost cells */
-        pout() <<"   ...Average down "<< endl;
+        if (m_verbosity > 3) {
+            pout() <<"   ...Average down "<< endl;
+        }
         for (int lev = m_finest_level; lev > 0; lev--) {
             CoarseAverage averager(m_amrGrids[lev], 1, m_refinement_ratios[lev - 1]);
             averager.averageToCoarse(*m_head[lev - 1], *m_head[lev]);
@@ -1968,9 +2000,10 @@ AmrHydro::timeStep(Real a_dt)
         /* CONVERGENCE TESTS with LAGGED quantities */
         Real maxHead = computeMax(m_head, m_refinement_ratios, Interval(0,0), 0);
         Real maxb    = computeMax(m_gapheight, m_refinement_ratios, Interval(0,0), 0);
-        pout() <<"        Check for convergence of h,b (max are "<< maxHead<<" "<< maxb <<")"<<endl;
-        for (int lev = 0; lev <= m_finest_level; lev++)
-        {
+        if (m_verbosity > 3) {
+            pout() <<"        Check for convergence of h,b (max are "<< maxHead<<" "<< maxb <<")"<<endl;
+        }
+        for (int lev = 0; lev <= m_finest_level; lev++) {
             LevelData<FArrayBox>& levelnewH_lag  = *a_head_lagged[lev];
             LevelData<FArrayBox>& levelcurrentH  = *m_head[lev];
             LevelData<FArrayBox>& levelnewB_lag  = *a_gapheight_lagged[lev];
@@ -1990,14 +2023,21 @@ AmrHydro::timeStep(Real a_dt)
         //Real max_res = computeNorm(a_head_lagged, m_refinement_ratios , coarsestDx, Interval(0,0), 0, 0);
         Real max_resH = computeMax(a_head_lagged, m_refinement_ratios, Interval(0,0), 0);
         Real max_resB = computeMax(a_gapheight_lagged, m_refinement_ratios, Interval(0,0), 0);
-        pout() <<ite_idx<< "         x(h,b) "<<max_resH<<" "<<max_resB<<endl;
+        if (m_verbosity > 3) {
+            pout() <<ite_idx<< "         x(h,b) "<<max_resH<<" "<<max_resB<<endl;
+        }
 
         if (ite_idx > 500) {
-            pout() <<"        does not converge."<< endl;
+            pout() <<"        does not converge (Picard iterations > 500)."<< endl;
+            if (m_verbosity > 0) {
+                pout() <<ite_idx<< "         x(h,b) "<<max_resH<<" "<<max_resB<<endl;
+            }
             MayDay::Error("Abort");
         } else {
             if ((max_resH < 1.0e-6) && (max_resB < 1.0e-6)) {
-                pout() <<"        converged."<< endl;
+                if (m_verbosity > 0) {
+                    pout() <<"        converged( it = "<< ite_idx << ", x(h,b) = " <<max_resH<<" "<<max_resB<< ")."<< endl;
+                }
                 converged_h = true;
             }
         }
@@ -2121,37 +2161,39 @@ AmrHydro::timeStep(Real a_dt)
         } // end customPlt
 
         ite_idx++;
-        pout() << endl;
+        if (m_verbosity > 3) {
+            pout() << endl;
+        }
     } // end while h solve
 
 
-     /* Temporal probe ... very ugly */
-    for (int lev = m_finest_level; lev >= 0; lev--) {
-        LevelData<FArrayBox>& levelQw       = *m_qw[lev]; 
+    /* Temporal probe ... very ugly */
+    //for (int lev = m_finest_level; lev >= 0; lev--) {
+    //    LevelData<FArrayBox>& levelQw       = *m_qw[lev]; 
 
-        DisjointBoxLayout& levelGrids    = m_amrGrids[lev];
-        DataIterator dit = levelGrids.dataIterator();
-        
-        for (dit.begin(); dit.ok(); ++dit) {
-            BoxIterator bit(levelQw[dit].box()); 
-            for (bit.begin(); bit.ok(); ++bit) {
-                IntVect iv = bit(); 
-                if (iv == IntVect::Zero) {
-                    pout() << iv << " ** TimeStep " << m_cur_step << " Time " << m_time 
-                           <<" Temporal Qw " << levelQw[dit](iv,0) << " **"<< endl;
-                }
-            }
-        }
-    }  // loop on levs
+    //    DisjointBoxLayout& levelGrids    = m_amrGrids[lev];
+    //    DataIterator dit = levelGrids.dataIterator();
+    //    
+    //    for (dit.begin(); dit.ok(); ++dit) {
+    //        BoxIterator bit(levelQw[dit].box()); 
+    //        for (bit.begin(); bit.ok(); ++bit) {
+    //            IntVect iv = bit(); 
+    //            if (iv == IntVect::Zero) {
+    //                pout() << iv << " ** TimeStep " << m_cur_step << " Time " << m_time 
+    //                       <<" Temporal Qw " << levelQw[dit](iv,0) << " **"<< endl;
+    //            }
+    //        }
+    //    }
+    //}  // loop on levs
 
     // finally, update to new time and increment current step
     m_dt = a_dt;
     m_time += a_dt;
     m_cur_step += 1;
 
-// write diagnostic info, like sum of ice
+    // write diagnostic info
     if (m_verbosity > 0) {
-        pout() << "VERBOSE: AmrHydro::timestep " << m_cur_step << " --     end time = "
+        pout() << "VERBOSE: AmrHydro::timestep " << m_cur_step - 1 << " --     end time = "
                //<< setiosflags(ios::fixed) << setprecision(6) << setw(12)
                << m_time << " ( " << time() << " )"
                //<< " (" << m_time/m_seconds_per_year << " yr)"
@@ -2173,6 +2215,7 @@ AmrHydro::timeStep(Real a_dt)
         for (int lev = 0; lev < m_num_cells.size(); lev++) {
             pout() << "Time = " << m_time << "  level " << lev << " cells advanced = " << m_num_cells[lev] << endl;
         }
+        pout() << endl;
     }
 
 }
@@ -3061,7 +3104,9 @@ AmrHydro::initData(Vector<LevelData<FArrayBox>*>& a_head)
     }
 
     for (int lev = 0; lev <= m_finest_level; lev++) {
-        pout()<< "  .. init lev " << lev << endl;
+        if (m_verbosity > 3) {
+            pout()<< "  .. init lev " << lev << endl;
+        }
         LevelData<FArrayBox>& levelHead      = *m_head[lev];
         LevelData<FArrayBox>& levelGapHeight = *m_gapheight[lev];
         LevelData<FArrayBox>& levelPw        = *m_Pw[lev];
