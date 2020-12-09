@@ -2,7 +2,7 @@
 main.domain_size=1000.00 1000.00 # physical dimensions of domain
 main.problem_type=basic
 main.maxTime=6000000.0
-main.maxStep= 300 # 240 heures = 10 jours
+main.maxStep= 80 # 240 heures = 10 jours
 
 # bc - 0 = diri / 1 = neum
 bc.lo_bc = 0 0
@@ -36,12 +36,12 @@ suhmo.GapInit = 0.01
 suhmo.ReInit  = 1000.0
 
 suhmo.n_moulins=1
-suhmo.moulin_position = 400. 500.  # CELL pos for now
+suhmo.moulin_position = 400. 700.  # CELL pos for now
 suhmo.moulin_flux = 4.0 # vol flux
 
 # class AmrHydro.cpp
 # misc
-AmrHydro.PrintCustom=false
+AmrHydro.PrintCustom=true
 AmrHydro.verbosity=3
 # mesh and refinement
 AmrHydro.num_cells=32 32  # number of cells on coarsest domain

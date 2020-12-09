@@ -1470,17 +1470,17 @@ AmrHydro::timeStep(Real a_dt)
             oldB[dit].copy(currentB[dit], 0, 0, 1);
         }
         // Keep DEBUG for now
-        //if (lev > 0 && (m_cur_step == 75)) {
-        //   pout() << " Checking data in new grid after regrid in operations " << endl;
-        //   for (dit.begin(); dit.ok(); ++dit) {
-        //       BoxIterator bit(currentH[dit].box()); 
-        //       for (bit.begin(); bit.ok(); ++bit) {
-        //           IntVect iv = bit(); 
-        //           pout() << iv << " h: " << currentH[dit](iv,0) 
-        //                        << ",b: " << currentB[dit](iv,0) << endl;
-        //       }
-        //   }
-        //}
+        if (lev > 0 && (m_cur_step == 75)) {
+           pout() << " Checking data in new grid after regrid in operations " << endl;
+           for (dit.begin(); dit.ok(); ++dit) {
+               BoxIterator bit(currentH[dit].box()); 
+               for (bit.begin(); bit.ok(); ++bit) {
+                   IntVect iv = bit(); 
+                   pout() << iv << " h: " << currentH[dit](iv,0) 
+                                << ",b: " << currentB[dit](iv,0) << endl;
+               }
+           }
+        }
     } // there. We should start with consistent b and h, GC BC and all ...
 
 
@@ -1571,16 +1571,16 @@ AmrHydro::timeStep(Real a_dt)
                 NullBCFill(levelPw[dit], validBox, m_amrDomains[lev], m_amrDx[lev][0]);
             }
             // Keep DEBUG for now
-            //if (lev > 0 && (m_cur_step == 75)) {
-            //   pout() << " Checking Pw after regrid in operations " << endl;
-            //   for (dit.begin(); dit.ok(); ++dit) {
-            //       BoxIterator bit(levelPw[dit].box()); 
-            //       for (bit.begin(); bit.ok(); ++bit) {
-            //           IntVect iv = bit(); 
-            //           pout() << iv << " Pw: " << levelPw[dit](iv,0) << endl;
-            //       }
-            //   }
-            //}
+            if (lev > 0 && (m_cur_step == 75)) {
+               pout() << " Checking Pw after regrid in operations " << endl;
+               for (dit.begin(); dit.ok(); ++dit) {
+                   BoxIterator bit(levelPw[dit].box()); 
+                   for (bit.begin(); bit.ok(); ++bit) {
+                       IntVect iv = bit(); 
+                       pout() << iv << " Pw: " << levelPw[dit](iv,0) << endl;
+                   }
+               }
+            }
         } // end loop on levs
 
         //         Compute grad(h) and grad(Pw)
@@ -1658,20 +1658,20 @@ AmrHydro::timeStep(Real a_dt)
                                      m_amrDomains[lev]);
 
             // Keep DEBUG for now
-            //FluxBox& gPw_ec = levelgradPw_ec[dit];
-            //FluxBox& gH_ec = levelgradH_ec[dit];
-            //if (lev > 0 && (m_cur_step == 75)) {
-            //   pout() << " Checking GradPw after regrid in operations " << endl;
-            //   FArrayBox& gradPwFab = gPw_ec[0];
-            //   FArrayBox& gradHFab = gH_ec[0];
+            FluxBox& gPw_ec = levelgradPw_ec[dit];
+            FluxBox& gH_ec = levelgradH_ec[dit];
+            if (lev > 0 && (m_cur_step == 75)) {
+               pout() << " Checking GradPw after regrid in operations " << endl;
+               FArrayBox& gradPwFab = gPw_ec[0];
+               FArrayBox& gradHFab = gH_ec[0];
 
-            //   BoxIterator bitEC(gradPwFab.box()); // can use gridBox? 
-            //   for (bitEC.begin(); bitEC.ok(); ++bitEC) {
-            //       IntVect iv = bitEC();
-            //        pout() << iv << " gradPw_xFace: " << gradPwFab(iv,0) << endl;
-            //        pout() << iv << " gradH_xFace: " << gradHFab(iv,0) << endl;
-            //   }
-            //}
+               BoxIterator bitEC(gradPwFab.box()); // can use gridBox? 
+               for (bitEC.begin(); bitEC.ok(); ++bitEC) {
+                   IntVect iv = bitEC();
+                    pout() << iv << " gradPw_xFace: " << gradPwFab(iv,0) << endl;
+                    pout() << iv << " gradH_xFace: " << gradHFab(iv,0) << endl;
+               }
+            }
         } // end loop levels
 
 
@@ -2043,7 +2043,7 @@ AmrHydro::timeStep(Real a_dt)
         }
      
         /* custom plt here -- debug print */
-        if (m_PrintCustom) {
+        if (m_PrintCustom && (m_cur_step == 75)) {
             int nStuffToPlot = 17;
             Vector<std::string> vectName;
             vectName.resize(nStuffToPlot);
