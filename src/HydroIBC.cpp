@@ -179,7 +179,6 @@ HydroIBC::BCData(RealVect& a_dx,
             Box ghostBoxLo = adjCellBox(validBox, dir, Side::Lo, 1);
             Box ghostBoxHi = adjCellBox(validBox, dir, Side::Hi, 1);
 
-                pout() << "LoDir " << dir << " Am I EVER getting in there ?? " << endl;
                 for (BoxIterator bit(ghostBoxLo); bit.ok(); ++bit) {
                     IntVect iv = bit();
                     Real x_loc = (iv[0]+0.5)*a_dx[0];
@@ -191,7 +190,6 @@ HydroIBC::BCData(RealVect& a_dx,
                     thispi(iv, 0)        = Params.m_rho_i * Params.m_gravity * thisiceHeight(iv, 0);
                 }
 
-                pout() << "HiDir " << dir << " Am I EVER getting in there ?? " << endl;
                 for (BoxIterator bit(ghostBoxHi); bit.ok(); ++bit) {
                     IntVect iv = bit();
                     Real x_loc = (iv[0]+0.5)*a_dx[0];

@@ -233,13 +233,14 @@ void BCFill(FArrayBox& a_state,
                       for (BoxIterator bit(ghostBoxLo); bit.ok(); ++bit) {
                           IntVect ivTo = bit();
                           IntVect ivClose = ivTo -   isign*BASISV(dir);
-                          //IntVect ivFar   = ivTo - 2*isign*BASISV(dir);
+                          IntVect ivFar   = ivTo - 2*isign*BASISV(dir);
+                          //pout() << "iv ivclose ivFar" << ivTo << " " << ivClose << " " << ivFar <<endl;
                           Real nearVal = a_state(ivClose, 0);
-                          //Real farVal  = a_state(ivFar,   0);
+                          Real farVal  = a_state(ivFar,   0);
                           Real inhomogVal = DirichletValue(dir, Side::Lo);
                           // linear or quad
-                          Real ghostVal =  2.0 * inhomogVal - nearVal;
-                          //Real ghostVal =  (8.0 / 3.0) * inhomogVal + (1.0 / 3.0) * farVal - 2.0 * nearVal;
+                          //Real ghostVal =  2.0 * inhomogVal - nearVal;
+                          Real ghostVal =  (8.0 / 3.0) * inhomogVal + (1.0 / 3.0) * farVal - 2.0 * nearVal;
                           a_state(ivTo, 0) = ghostVal;
                       }
                   } else if (GlobalBCRS::s_bcLo[dir] == 1) {
@@ -264,13 +265,13 @@ void BCFill(FArrayBox& a_state,
                       for (BoxIterator bit(ghostBoxHi); bit.ok(); ++bit) {
                           IntVect ivTo = bit();
                           IntVect ivClose = ivTo -   isign*BASISV(dir);
-                          //IntVect ivFar   = ivTo - 2*isign*BASISV(dir);
+                          IntVect ivFar   = ivTo - 2*isign*BASISV(dir);
                           Real nearVal = a_state(ivClose, 0);
-                          //Real farVal  = a_state(ivFar,   0);
+                          Real farVal  = a_state(ivFar,   0);
                           Real inhomogVal = DirichletValue(dir, Side::Hi);
                           // linear or quad
-                          Real ghostVal =  2.0 * inhomogVal - nearVal;
-                          //Real ghostVal =  (8.0 / 3.0) * inhomogVal + (1.0 / 3.0) * farVal - 2.0 * nearVal;
+                          //Real ghostVal =  2.0 * inhomogVal - nearVal;
+                          Real ghostVal =  (8.0 / 3.0) * inhomogVal + (1.0 / 3.0) * farVal - 2.0 * nearVal;
                           a_state(ivTo, 0) = ghostVal;
                       }
                   } else if (GlobalBCRS::s_bcHi[dir] == 1) {
@@ -1568,10 +1569,11 @@ AmrHydro::timeStep(Real a_dt)
                     IntVect iv = bit();
                     Pw(iv,0) = (currH(iv,0) - zbed(iv,0)) * m_suhmoParm->m_rho_w * m_suhmoParm->m_gravity;
                 }
-                NullBCFill(levelPw[dit], validBox, m_amrDomains[lev], m_amrDx[lev][0]);
+                //NullBCFill(levelPw[dit], validBox, m_amrDomains[lev], m_amrDx[lev][0]);
             }
             // Keep DEBUG for now
             if (lev > 0 && (m_cur_step == 75)) {
+               pout() << " ITERATION NUMBER " << ite_idx << endl;
                pout() << " Checking Pw after regrid in operations " << endl;
                for (dit.begin(); dit.ok(); ++dit) {
                    BoxIterator bit(levelPw[dit].box()); 
@@ -1669,6 +1671,11 @@ AmrHydro::timeStep(Real a_dt)
                for (bitEC.begin(); bitEC.ok(); ++bitEC) {
                    IntVect iv = bitEC();
                     pout() << iv << " gradPw_xFace: " << gradPwFab(iv,0) << endl;
+               }
+
+               pout() << " Checking GradH after regrid in operations " << endl;
+               for (bitEC.begin(); bitEC.ok(); ++bitEC) {
+                   IntVect iv = bitEC();
                     pout() << iv << " gradH_xFace: " << gradHFab(iv,0) << endl;
                }
             }
