@@ -1523,6 +1523,7 @@ AmrHydro::timeStep(Real a_dt)
                 qcfi.coarseFineInterp(*m_Re[lev], *m_Re[lev-1]);
             }
 
+
             // fill perio boundaries
             levelcurH.exchange();
             levelcurB.exchange();
