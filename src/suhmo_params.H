@@ -48,9 +48,11 @@ public:
     Real m_gapInit;       // subglacial init gap height 
     Real m_ReInit;        // Initial Reynolds number 
     // Moulin
-    std::vector<int> m_moulin_position;    // m.s-1 Sliding velocity
-    Real m_moulin_flux;    // m3.s-1 
-    
+    int m_n_moulins;
+    std::vector<Real> m_moulin_position; // spaceDim per moulin
+    std::vector<Real> m_moulin_flux;     // m3.s-1 per moulin 
+    // verbosity level
+    int m_verbosity;
 };
 
 #include "NamespaceFooter.H"

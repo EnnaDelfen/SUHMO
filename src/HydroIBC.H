@@ -111,6 +111,15 @@ public:
                                 LevelData<FArrayBox>& a_iceHeight);
 
 
+    virtual void BCData(RealVect& a_dx,
+                        DisjointBoxLayout& a_grids,
+                        const ProblemDomain& a_domain,
+                        suhmo_params Params,     
+                        LevelData<FArrayBox>& a_zbed,
+                        LevelData<FArrayBox>& a_Pi,
+                        LevelData<FArrayBox>& a_iceHeight);
+
+
     /// Set boundary fluxes
     /**
      */
