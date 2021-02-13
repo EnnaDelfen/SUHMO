@@ -1276,6 +1276,58 @@ AmrHydro::CalcRHS_head(int curr_level,
 }
 
 void
+AmrHydro::CalcRHS_gapHeight_semiExpl(LevelData<FArrayBox>& levelRHS_b, 
+                                     LevelData<FArrayBox>& levelDENOM_b, 
+                                     LevelData<FArrayBox>& levelPi, 
+                                     LevelData<FArrayBox>& levelPw, 
+                                     LevelData<FArrayBox>& levelmR, 
+                                     LevelData<FArrayBox>& levelB,
+                                     Real a_dt,
+                                     LevelData<FArrayBox>& levelRHS_b_A)
+{
+
+   DataIterator dit = levelRHS_b.dataIterator();
+   for (dit.begin(); dit.ok(); ++dit) {
+
+       FArrayBox& B       = levelB[dit];
+       FArrayBox& RHS     = levelRHS_b[dit];
+       FArrayBox& DENOM   = levelDENOM_b[dit];
+
+       FArrayBox& RHS_A   = levelRHS_b_A[dit];
+
+       FArrayBox& Pressi  = levelPi[dit];
+       FArrayBox& Pw      = levelPw[dit];
+       FArrayBox& meltR   = levelmR[dit];
+
+       // initialize RHS for h
+       RHS.setVal(0.0);
+       DENOM.setVal(0.0);
+       RHS_A.setVal(0.0);
+
+       // first term
+       RHS.copy(meltR, 0, 0, 1);
+       RHS *= 1.0 / m_suhmoParm->m_rho_i;
+
+       // third term ...
+       Real ub_norm = std::sqrt(  m_suhmoParm->m_ub[0]*m_suhmoParm->m_ub[0] 
+                                + m_suhmoParm->m_ub[1]*m_suhmoParm->m_ub[1]) / m_suhmoParm->m_lr;
+       BoxIterator bit(RHS.box()); // can use gridBox? 
+       for (bit.begin(); bit.ok(); ++bit) {
+           IntVect iv = bit();
+           if ( B(iv,0) < m_suhmoParm->m_br) {
+               RHS(iv,0) += ub_norm * (m_suhmoParm->m_br - B(iv,0));
+           }
+           RHS(iv,0) = B(iv,0) + RHS(iv,0) * a_dt;
+           // second term ... assume  n = 3 !!
+           Real PimPw = (Pressi(iv,0) - Pw(iv,0));
+           Real AbsPimPw = std::abs(PimPw);
+           DENOM(iv,0) = 1.0 + a_dt * m_suhmoParm->m_A * std::pow(AbsPimPw, 2) * PimPw;
+           RHS_A(iv,0) = 1.0 + a_dt * m_suhmoParm->m_A * std::pow(AbsPimPw, 2) * PimPw;
+       }
+   }
+}  
+
+void
 AmrHydro::CalcRHS_gapHeight(LevelData<FArrayBox>& levelRHS_b, 
                        LevelData<FArrayBox>& levelPi, 
                        LevelData<FArrayBox>& levelPw, 
@@ -1376,6 +1428,7 @@ AmrHydro::timeStep(Real a_dt)
     Vector<LevelData<FArrayBox>*> a_head_curr;
     Vector<LevelData<FArrayBox>*> moulin_source_term;
     Vector<LevelData<FArrayBox>*> RHS_b;
+    Vector<LevelData<FArrayBox>*> DENOM_b;
     Vector<LevelData<FArrayBox>*> a_ReQwIter;
     // DEBUG 
     Vector<LevelData<FArrayBox>*> RHS_b_A;
@@ -1387,6 +1440,7 @@ AmrHydro::timeStep(Real a_dt)
     RHS_h.resize(m_finest_level + 1, NULL);
     moulin_source_term.resize(m_finest_level + 1, NULL);
     RHS_b.resize(m_finest_level + 1, NULL);
+    DENOM_b.resize(m_finest_level + 1, NULL);
     a_ReQwIter.resize(m_finest_level + 1, NULL);
     // DEBUG
     RHS_b_A.resize(m_finest_level + 1, NULL);
@@ -1436,6 +1490,7 @@ AmrHydro::timeStep(Real a_dt)
         RHS_h[lev]              = new LevelData<FArrayBox>(m_amrGrids[lev], 1, IntVect::Zero);
         moulin_source_term[lev] = new LevelData<FArrayBox>(m_amrGrids[lev], 1, IntVect::Zero);
         RHS_b[lev]              = new LevelData<FArrayBox>(m_amrGrids[lev], 1, IntVect::Zero);
+        DENOM_b[lev]              = new LevelData<FArrayBox>(m_amrGrids[lev], 1, IntVect::Zero);
         // Head and B lagged for iterations
         a_head_lagged[lev]      = new LevelData<FArrayBox>(m_amrGrids[lev], 1, HeadGhostVect);
         a_head_curr[lev]        = new LevelData<FArrayBox>(m_amrGrids[lev], 1, HeadGhostVect);
@@ -1471,7 +1526,7 @@ AmrHydro::timeStep(Real a_dt)
             oldB[dit].copy(currentB[dit], 0, 0, 1);
         }
         // Keep DEBUG for now
-        if (lev > 0 && (m_cur_step == 75)) {
+        if (lev > 0 && (m_cur_step == 200)) {
            pout() << " Checking data in new grid after regrid in operations " << endl;
            for (dit.begin(); dit.ok(); ++dit) {
                BoxIterator bit(currentH[dit].box()); 
@@ -1573,7 +1628,7 @@ AmrHydro::timeStep(Real a_dt)
                 //NullBCFill(levelPw[dit], validBox, m_amrDomains[lev], m_amrDx[lev][0]);
             }
             // Keep DEBUG for now
-            if (lev > 0 && (m_cur_step == 75)) {
+            if (lev > 0 && (m_cur_step == 200)) {
                pout() << " ITERATION NUMBER " << ite_idx << endl;
                pout() << " Checking Pw after regrid in operations " << endl;
                for (dit.begin(); dit.ok(); ++dit) {
@@ -1663,7 +1718,7 @@ AmrHydro::timeStep(Real a_dt)
             // Keep DEBUG for now
             FluxBox& gPw_ec = levelgradPw_ec[dit];
             FluxBox& gH_ec = levelgradH_ec[dit];
-            if (lev > 0 && (m_cur_step == 75)) {
+            if (lev > 0 && (m_cur_step == 200)) {
                pout() << " Checking GradPw after regrid in operations " << endl;
                FArrayBox& gradPwFab = gPw_ec[0];
                FArrayBox& gradHFab = gH_ec[0];
@@ -1942,6 +1997,7 @@ AmrHydro::timeStep(Real a_dt)
             LevelData<FArrayBox>& levelPi    = *m_overburdenpress[lev];
 
             LevelData<FArrayBox>& levelRHS_b = *RHS_b[lev];
+            LevelData<FArrayBox>& levelDENOM_b = *DENOM_b[lev];
 
             // DEBUG
             LevelData<FArrayBox>& levelRHS_b_A = *RHS_b_A[lev];
@@ -1953,6 +2009,10 @@ AmrHydro::timeStep(Real a_dt)
                               levelPw, levelmR, 
                               levelB, 
                               levelRHS_b_A, levelRHS_b_B, levelRHS_b_C);
+            //CalcRHS_gapHeight_semiExpl(levelRHS_b, levelDENOM_b, 
+            //                           levelPi, levelPw, levelmR, 
+            //                           levelB, a_dt, 
+            //                           levelRHS_b_A);    
         }  // loop on levs
 
         //     Solve for b using Forward Euler simple scheme -- use OLD b here
@@ -1964,7 +2024,8 @@ AmrHydro::timeStep(Real a_dt)
             LevelData<FArrayBox>& leveloldB  = *m_old_gapheight[lev];    
             LevelData<FArrayBox>& levelnewB  = *m_gapheight[lev];    
 
-            LevelData<FArrayBox>& levelRHS_b = *RHS_b[lev];
+            LevelData<FArrayBox>& levelRHS_b   = *RHS_b[lev];
+            LevelData<FArrayBox>& levelDENOM_b = *DENOM_b[lev];
 
             // 2. b : update gap height
             DisjointBoxLayout& levelGrids    = m_amrGrids[lev];
@@ -1974,12 +2035,14 @@ AmrHydro::timeStep(Real a_dt)
                 FArrayBox& oldB    = leveloldB[dit];
                 FArrayBox& newB    = levelnewB[dit];
                 FArrayBox& RHS     = levelRHS_b[dit];
+                FArrayBox& DENOM   = levelDENOM_b[dit];
 
                 // DO NOT TOUCH GHOST CELLS
                 BoxIterator bit(RHS.box()); 
                 for (bit.begin(); bit.ok(); ++bit) {
                     IntVect iv = bit(); 
                     newB(iv,0) = RHS(iv,0) * a_dt + oldB(iv,0);
+                    //newB(iv,0) = RHS(iv,0) / DENOM(iv,0);
                 }
             }
         }  // loop on levs
@@ -2051,7 +2114,7 @@ AmrHydro::timeStep(Real a_dt)
         }
      
         /* custom plt here -- debug print */
-        if (m_PrintCustom && (m_cur_step == 75)) {
+        if (m_PrintCustom && (m_cur_step == 200)) {
             int nStuffToPlot = 17;
             Vector<std::string> vectName;
             vectName.resize(nStuffToPlot);

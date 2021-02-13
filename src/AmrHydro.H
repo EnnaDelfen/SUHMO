@@ -105,6 +105,15 @@ public:
                        LevelData<FArrayBox>& levelRHS_b_B,
                        LevelData<FArrayBox>& levelRHS_b_C);
 
+    void CalcRHS_gapHeight_semiExpl(LevelData<FArrayBox>& levelRHS_b, 
+                       LevelData<FArrayBox>& levelDENOM_b, 
+                       LevelData<FArrayBox>& levelPi, 
+                       LevelData<FArrayBox>& levelPw, 
+                       LevelData<FArrayBox>& levelmR, 
+                       LevelData<FArrayBox>& levelB,
+                       Real a_dt,
+                       LevelData<FArrayBox>& levelRHS_b_A);
+
     void SolveForHead(
                       const Vector<DisjointBoxLayout>&               a_grids,
                       Vector<RefCountedPtr<LevelData<FArrayBox> > >& a_aCoef,
