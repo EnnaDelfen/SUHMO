@@ -1471,6 +1471,8 @@ AmrHydro::timeStep(Real a_dt)
         LevelData<FArrayBox>& oldB       = *m_old_gapheight[lev];
         LevelData<FArrayBox>& currentB   = *m_gapheight[lev];
 
+        LevelData<FArrayBox>& currentRe  = *m_Re[lev];
+
         // handle ghost cells on the coarse-fine interface
         if (lev > 0) {
             QuadCFInterp qcfi(m_amrGrids[lev], &m_amrGrids[lev-1],
@@ -1485,11 +1487,12 @@ AmrHydro::timeStep(Real a_dt)
         // fill perio boundaries
         currentH.exchange();
         currentB.exchange();
+        currentRe.exchange();
 
         // Head and b RHS
-        RHS_h[lev]              = new LevelData<FArrayBox>(m_amrGrids[lev], 1, IntVect::Zero);
-        moulin_source_term[lev] = new LevelData<FArrayBox>(m_amrGrids[lev], 1, IntVect::Zero);
-        RHS_b[lev]              = new LevelData<FArrayBox>(m_amrGrids[lev], 1, IntVect::Zero);
+        RHS_h[lev]                = new LevelData<FArrayBox>(m_amrGrids[lev], 1, IntVect::Zero);
+        moulin_source_term[lev]   = new LevelData<FArrayBox>(m_amrGrids[lev], 1, IntVect::Zero);
+        RHS_b[lev]                = new LevelData<FArrayBox>(m_amrGrids[lev], 1, IntVect::Zero);
         DENOM_b[lev]              = new LevelData<FArrayBox>(m_amrGrids[lev], 1, IntVect::Zero);
         // Head and B lagged for iterations
         a_head_lagged[lev]      = new LevelData<FArrayBox>(m_amrGrids[lev], 1, HeadGhostVect);
@@ -1525,6 +1528,8 @@ AmrHydro::timeStep(Real a_dt)
             oldH[dit].copy(currentH[dit], 0, 0, 1);
             oldB[dit].copy(currentB[dit], 0, 0, 1);
         }
+        ExtrapGhostCells( currentRe, m_amrDomains[lev]);
+
         // Keep DEBUG for now
         if (lev > 0 && (m_cur_step == 200)) {
            pout() << " Checking data in new grid after regrid in operations " << endl;
@@ -1562,7 +1567,9 @@ AmrHydro::timeStep(Real a_dt)
 
             LevelData<FArrayBox>& levelcurB      = *m_gapheight[lev];
             LevelData<FArrayBox>& levelnewB_lag  = *a_gapheight_lagged[lev];
-            LevelData<FluxBox>& levelnewB_ec     = *a_GapHeight_ec[lev];
+            LevelData<FluxBox>&   levelnewB_ec   = *a_GapHeight_ec[lev];
+
+            LevelData<FArrayBox>& levelcurRe     = *m_Re[lev];
 
             // Get the valid boxes
             const DisjointBoxLayout& levelGrids = m_amrGrids[lev];
@@ -1582,6 +1589,7 @@ AmrHydro::timeStep(Real a_dt)
             // fill perio boundaries
             levelcurH.exchange();
             levelcurB.exchange();
+            levelcurRe.exchange();
 
             // Fill BC and put h into h_lag
             DataIterator dit = levelnewH_lag.dataIterator();
@@ -1594,6 +1602,7 @@ AmrHydro::timeStep(Real a_dt)
                 levelnewH_lag[dit].copy(levelcurH[dit], 0, 0, 1); // should copy ghost cells too !
                 levelnewB_lag[dit].copy(levelcurB[dit], 0, 0, 1); // should copy ghost cells too !
             }
+            ExtrapGhostCells( levelcurRe, m_amrDomains[lev]);
 
             // Interpolate b to edges
             CellToEdge(levelcurB, levelnewB_ec);
@@ -1688,7 +1697,7 @@ AmrHydro::timeStep(Real a_dt)
             }
             // Need to fill the ghost cells of gradH -- extrapolate on the no perio boundaries   
             levelgradH.exchange();
-            ExtrapGhostCells( levelgradH, m_amrDomains[0]);
+            ExtrapGhostCells( levelgradH, m_amrDomains[lev]);
 
             // EC version
             Gradient::compGradientMAC(levelgradH_ec, levelcurrentH,
@@ -1726,13 +1735,13 @@ AmrHydro::timeStep(Real a_dt)
                BoxIterator bitEC(gradPwFab.box()); // can use gridBox? 
                for (bitEC.begin(); bitEC.ok(); ++bitEC) {
                    IntVect iv = bitEC();
-                    pout() << iv << " gradPw_xFace: " << gradPwFab(iv,0) << endl;
+                   pout() << iv << " gradPw_xFace: " << gradPwFab(iv,0) << endl;
                }
 
                pout() << " Checking GradH after regrid in operations " << endl;
                for (bitEC.begin(); bitEC.ok(); ++bitEC) {
                    IntVect iv = bitEC();
-                    pout() << iv << " gradH_xFace: " << gradHFab(iv,0) << endl;
+                   pout() << iv << " gradH_xFace: " << gradHFab(iv,0) << endl;
                }
             }
         } // end loop levels
@@ -1744,7 +1753,7 @@ AmrHydro::timeStep(Real a_dt)
         if (m_verbosity > 3) {
             pout() <<"        Re/Qw dependency "<< endl;
         }
-        int max_ite_Re = 10; 
+        int max_ite_Re = 50; 
         Real max_Re_diff = 0.0;
         for (int it = 0; it <= max_ite_Re; it++) {
             if (m_verbosity > 5) {
@@ -1809,7 +1818,7 @@ AmrHydro::timeStep(Real a_dt)
                 }
                 // Need to fill the ghost cells -- extrapolate on perio boundaries   
                 levelQw.exchange();
-                ExtrapGhostCells( levelQw, m_amrDomains[0]);
+                ExtrapGhostCells( levelQw, m_amrDomains[lev]);
 
                 //Get Re at CC
                 for (dit.begin(); dit.ok(); ++dit) {
@@ -1841,7 +1850,9 @@ AmrHydro::timeStep(Real a_dt)
                 }
                 // Need to fill the ghost cells of Re -- extrapolate on perio boundaries   
                 levelRe.exchange();
-                ExtrapGhostCells( levelRe, m_amrDomains[0]);
+                ExtrapGhostCells( levelRe, m_amrDomains[lev]);
+
+                CellToEdge(levelRe, levelRe_ec);
             } // end loop on levs
 
             if (m_verbosity > 5) {
@@ -1895,16 +1906,16 @@ AmrHydro::timeStep(Real a_dt)
                 } // loop over dir
             }
             EdgeToCell(leveltmp_ec, leveltmp_cc);
-            //leveltmp_cc.exchange();
-            //ExtrapGhostCells( leveltmp_cc, m_amrDomains[0]);
-            //// handle ghost cells on the coarse-fine interface
+            // handle ghost cells on the coarse-fine interface
             //if (lev > 0) {
             //    QuadCFInterp qcfi(m_amrGrids[lev], &m_amrGrids[lev-1],
             //                      m_amrDx[lev][0], m_refinement_ratios[lev-1],  
-            //                      1,  // num comps
+            //                      2,  // num comps
             //                      m_amrDomains[lev]);
             //    qcfi.coarseFineInterp(leveltmp_ec[lev], leveltmp_ec[lev-1]);
             //}
+            //leveltmp_cc.exchange();
+            //ExtrapGhostCells( leveltmp_cc, m_amrDomains[lev]);
 
             for (dit.begin(); dit.ok(); ++dit) {
                 // CC
@@ -1927,7 +1938,7 @@ AmrHydro::timeStep(Real a_dt)
             }
             // Need to fill the ghost cells of melting rate -- extrapolate on perio boundaries   
             levelmR.exchange();
-            ExtrapGhostCells( levelmR, m_amrDomains[0]);
+            ExtrapGhostCells( levelmR, m_amrDomains[lev]);
         }// loop on levs
 
 
@@ -1985,67 +1996,67 @@ AmrHydro::timeStep(Real a_dt)
 
         /* TRY TO SOLVE FOR B IN THE LOOP */
         //     Form RHS for b -- using b of current Picard iteration
-        if (m_verbosity > 3) {
-            pout() <<"   ...Solve for b ! "<< endl;
-         }
+        //if (m_verbosity > 3) {
+        //    pout() <<"   ...Solve for b ! "<< endl;
+        //} 
         //int gh_method = 0; // 0: backward Euler, 1:...
-        for (int lev = 0; lev <= m_finest_level; lev++) {
-            LevelData<FArrayBox>& levelB     = *m_gapheight[lev];    
+        //for (int lev = 0; lev <= m_finest_level; lev++) {
+        //    LevelData<FArrayBox>& levelB     = *m_gapheight[lev];    
 
-            LevelData<FArrayBox>& levelmR    = *m_meltRate[lev];
-            LevelData<FArrayBox>& levelPw    = *m_Pw[lev];
-            LevelData<FArrayBox>& levelPi    = *m_overburdenpress[lev];
+        //    LevelData<FArrayBox>& levelmR    = *m_meltRate[lev];
+        //    LevelData<FArrayBox>& levelPw    = *m_Pw[lev];
+        //    LevelData<FArrayBox>& levelPi    = *m_overburdenpress[lev];
 
-            LevelData<FArrayBox>& levelRHS_b = *RHS_b[lev];
-            LevelData<FArrayBox>& levelDENOM_b = *DENOM_b[lev];
+        //    LevelData<FArrayBox>& levelRHS_b = *RHS_b[lev];
+        //    LevelData<FArrayBox>& levelDENOM_b = *DENOM_b[lev];
 
-            // DEBUG
-            LevelData<FArrayBox>& levelRHS_b_A = *RHS_b_A[lev];
-            LevelData<FArrayBox>& levelRHS_b_B = *RHS_b_B[lev];
-            LevelData<FArrayBox>& levelRHS_b_C = *RHS_b_C[lev];
+        //    // DEBUG
+        //    LevelData<FArrayBox>& levelRHS_b_A = *RHS_b_A[lev];
+        //    LevelData<FArrayBox>& levelRHS_b_B = *RHS_b_B[lev];
+        //    LevelData<FArrayBox>& levelRHS_b_C = *RHS_b_C[lev];
 
-            // 2. a : Get the RHS of gh eqs:
-            CalcRHS_gapHeight(levelRHS_b, levelPi, 
-                              levelPw, levelmR, 
-                              levelB, 
-                              levelRHS_b_A, levelRHS_b_B, levelRHS_b_C);
-            //CalcRHS_gapHeight_semiExpl(levelRHS_b, levelDENOM_b, 
-            //                           levelPi, levelPw, levelmR, 
-            //                           levelB, a_dt, 
-            //                           levelRHS_b_A);    
-        }  // loop on levs
+        //    // 2. a : Get the RHS of gh eqs:
+        //    CalcRHS_gapHeight(levelRHS_b, levelPi, 
+        //                      levelPw, levelmR, 
+        //                      levelB, 
+        //                      levelRHS_b_A, levelRHS_b_B, levelRHS_b_C);
+        //    //CalcRHS_gapHeight_semiExpl(levelRHS_b, levelDENOM_b, 
+        //    //                           levelPi, levelPw, levelmR, 
+        //    //                           levelB, a_dt, 
+        //    //                           levelRHS_b_A);    
+        //}  // loop on levs
 
         //     Solve for b using Forward Euler simple scheme -- use OLD b here
-        if (m_verbosity > 3) {
-            pout() <<"        Update gap height with expl Euler scheme"<< endl;
-        }
+        //if (m_verbosity > 3) {
+        //    pout() <<"        Update gap height with expl Euler scheme"<< endl;
+        //}
         //for (int lev = m_finest_level; lev >= 0; lev--)
-        for (int lev = 0; lev <= m_finest_level; lev++) {
-            LevelData<FArrayBox>& leveloldB  = *m_old_gapheight[lev];    
-            LevelData<FArrayBox>& levelnewB  = *m_gapheight[lev];    
+        //for (int lev = 0; lev <= m_finest_level; lev++) {
+        //    LevelData<FArrayBox>& leveloldB  = *m_old_gapheight[lev];    
+        //    LevelData<FArrayBox>& levelnewB  = *m_gapheight[lev];    
 
-            LevelData<FArrayBox>& levelRHS_b   = *RHS_b[lev];
-            LevelData<FArrayBox>& levelDENOM_b = *DENOM_b[lev];
+        //    LevelData<FArrayBox>& levelRHS_b   = *RHS_b[lev];
+        //    LevelData<FArrayBox>& levelDENOM_b = *DENOM_b[lev];
 
-            // 2. b : update gap height
-            DisjointBoxLayout& levelGrids    = m_amrGrids[lev];
-            DataIterator dit = levelGrids.dataIterator();
-            for (dit.begin(); dit.ok(); ++dit) {
+        //    // 2. b : update gap height
+        //    DisjointBoxLayout& levelGrids    = m_amrGrids[lev];
+        //    DataIterator dit = levelGrids.dataIterator();
+        //    for (dit.begin(); dit.ok(); ++dit) {
  
-                FArrayBox& oldB    = leveloldB[dit];
-                FArrayBox& newB    = levelnewB[dit];
-                FArrayBox& RHS     = levelRHS_b[dit];
-                FArrayBox& DENOM   = levelDENOM_b[dit];
+        //        FArrayBox& oldB    = leveloldB[dit];
+        //        FArrayBox& newB    = levelnewB[dit];
+        //        FArrayBox& RHS     = levelRHS_b[dit];
+        //        FArrayBox& DENOM   = levelDENOM_b[dit];
 
-                // DO NOT TOUCH GHOST CELLS
-                BoxIterator bit(RHS.box()); 
-                for (bit.begin(); bit.ok(); ++bit) {
-                    IntVect iv = bit(); 
-                    newB(iv,0) = RHS(iv,0) * a_dt + oldB(iv,0);
-                    //newB(iv,0) = RHS(iv,0) / DENOM(iv,0);
-                }
-            }
-        }  // loop on levs
+        //        // DO NOT TOUCH GHOST CELLS
+        //        BoxIterator bit(RHS.box()); 
+        //        for (bit.begin(); bit.ok(); ++bit) {
+        //            IntVect iv = bit(); 
+        //            newB(iv,0) = RHS(iv,0) * a_dt + oldB(iv,0);
+        //            //newB(iv,0) = RHS(iv,0) / DENOM(iv,0);
+        //        }
+        //    }
+        //}  // loop on levs
         
 
         /* Averaging down and fill in ghost cells */
@@ -2055,7 +2066,7 @@ AmrHydro::timeStep(Real a_dt)
         for (int lev = m_finest_level; lev > 0; lev--) {
             CoarseAverage averager(m_amrGrids[lev], 1, m_refinement_ratios[lev - 1]);
             averager.averageToCoarse(*m_head[lev - 1], *m_head[lev]);
-            averager.averageToCoarse(*m_gapheight[lev - 1], *m_gapheight[lev]);
+            //averager.averageToCoarse(*m_gapheight[lev - 1], *m_gapheight[lev]);
         }
         // handle ghost cells on the coarse-fine interface
         for (int lev = 1; lev <= m_finest_level; lev++) {
@@ -2064,9 +2075,8 @@ AmrHydro::timeStep(Real a_dt)
                               1,  // num comps
                               m_amrDomains[lev]);
             qcfi.coarseFineInterp(*m_head[lev], *m_head[lev-1]);
-            qcfi.coarseFineInterp(*m_gapheight[lev], *m_gapheight[lev-1]);
+            //qcfi.coarseFineInterp(*m_gapheight[lev], *m_gapheight[lev-1]);
         }
-
 
         /* CONVERGENCE TESTS with LAGGED quantities */
         Real maxHead = computeMax(m_head, m_refinement_ratios, Interval(0,0), 0);
@@ -2105,7 +2115,8 @@ AmrHydro::timeStep(Real a_dt)
             }
             MayDay::Error("Abort");
         } else {
-            if ((max_resH < 1.0e-6) && (max_resB < 1.0e-6)) {
+            //if ((max_resH < 1.0e-6) && (max_resB < 1.0e-6)) {
+            if (max_resH < 1.0e-6){
                 if (m_verbosity > 0) {
                     pout() <<"        converged( it = "<< ite_idx << ", x(h,b) = " <<max_resH<<" "<<max_resB<< ")."<< endl;
                 }
@@ -2237,6 +2248,75 @@ AmrHydro::timeStep(Real a_dt)
         }
     } // end while h solve
 
+
+   /* SOLVE FOR B OUTSIDE THE LOOP */
+   //     Form RHS for b -- using oldb
+   if (m_verbosity > 3) {
+       pout() <<"   ...Solve for b ! "<< endl;
+       pout() <<"        Update gap height with expl Euler scheme"<< endl;
+    }
+    //int gh_method = 0; // 0: backward Euler, 1:...
+    for (int lev = 0; lev <= m_finest_level; lev++) {
+        LevelData<FArrayBox>& levelB     = *m_gapheight[lev];    
+
+        LevelData<FArrayBox>& levelmR    = *m_meltRate[lev];
+        LevelData<FArrayBox>& levelPw    = *m_Pw[lev];
+        LevelData<FArrayBox>& levelPi    = *m_overburdenpress[lev];
+
+        LevelData<FArrayBox>& levelRHS_b = *RHS_b[lev];
+
+        // DEBUG
+        LevelData<FArrayBox>& levelRHS_b_A = *RHS_b_A[lev];
+        LevelData<FArrayBox>& levelRHS_b_B = *RHS_b_B[lev];
+        LevelData<FArrayBox>& levelRHS_b_C = *RHS_b_C[lev];
+
+        // 2. a : Get the RHS of gh eqs:
+        CalcRHS_gapHeight(levelRHS_b, levelPi, 
+                          levelPw, levelmR, 
+                          levelB, 
+                          levelRHS_b_A, levelRHS_b_B, levelRHS_b_C);
+    //}  // loop on levs
+    ////     Solve for b using Forward Euler simple scheme -- use OLD b here
+    //for (int lev = 0; lev <= m_finest_level; lev++) {
+        LevelData<FArrayBox>& leveloldB  = *m_old_gapheight[lev];    
+        //LevelData<FArrayBox>& levelnewB  = *m_gapheight[lev];    
+
+        //LevelData<FArrayBox>& levelRHS_b   = *RHS_b[lev];
+
+        // 2. b : update gap height
+        DisjointBoxLayout& levelGrids    = m_amrGrids[lev];
+        DataIterator dit = levelGrids.dataIterator();
+        for (dit.begin(); dit.ok(); ++dit) {
+ 
+            FArrayBox& oldB    = leveloldB[dit];
+            FArrayBox& newB    = levelB[dit];
+            FArrayBox& RHS     = levelRHS_b[dit];
+
+            // DO NOT TOUCH GHOST CELLS
+            BoxIterator bit(RHS.box()); 
+            for (bit.begin(); bit.ok(); ++bit) {
+                IntVect iv = bit(); 
+                newB(iv,0) = RHS(iv,0) * a_dt + oldB(iv,0);
+            }
+        }
+    }  // loop on levs
+
+    /* Averaging down and fill in ghost cells */
+    if (m_verbosity > 3) {
+        pout() <<"   ...Average down "<< endl;
+    }
+    for (int lev = m_finest_level; lev > 0; lev--) {
+        CoarseAverage averager(m_amrGrids[lev], 1, m_refinement_ratios[lev - 1]);
+        averager.averageToCoarse(*m_gapheight[lev - 1], *m_gapheight[lev]);
+    }
+    // handle ghost cells on the coarse-fine interface
+    for (int lev = 1; lev <= m_finest_level; lev++) {
+        QuadCFInterp qcfi(m_amrGrids[lev], &m_amrGrids[lev-1],
+                          m_amrDx[lev][0], m_refinement_ratios[lev-1],  
+                          1,  // num comps
+                          m_amrDomains[lev]);
+        qcfi.coarseFineInterp(*m_gapheight[lev], *m_gapheight[lev-1]);
+    }
 
     /* Temporal probe ... very ugly */
     //for (int lev = m_finest_level; lev >= 0; lev--) {
@@ -2459,10 +2539,10 @@ AmrHydro::regrid()
             m_amrGrids[lev] = newDBL;
              
             if (m_old_head[lev] == NULL) {
-                m_old_head[lev]      = new LevelData<FArrayBox>;
-                m_head[lev]          =  new LevelData<FArrayBox>;
-                m_old_gapheight[lev] = new LevelData<FArrayBox>;
-                m_gapheight[lev]     = new LevelData<FArrayBox>;
+                m_old_head[lev]        = new LevelData<FArrayBox>;
+                m_head[lev]            = new LevelData<FArrayBox>;
+                m_old_gapheight[lev]   = new LevelData<FArrayBox>;
+                m_gapheight[lev]       = new LevelData<FArrayBox>;
                 m_Re[lev]              = new LevelData<FArrayBox>;
                 m_iceheight[lev]       = new LevelData<FArrayBox>;
                 m_bedelevation[lev]    = new LevelData<FArrayBox>;
@@ -2491,7 +2571,7 @@ AmrHydro::regrid()
                 new LevelData<FArrayBox>(newDBL, m_gapheight[0]->nComp(), m_gapheight[0]->ghostVect());
             // Re
             LevelData<FArrayBox>* old_ReDataPtr = m_Re[lev];
-            LevelData<FArrayBox>* new_ReDataPtr    =
+            LevelData<FArrayBox>* new_ReDataPtr =
                 new LevelData<FArrayBox>(newDBL, m_Re[0]->nComp(), m_Re[0]->ghostVect());
             // Ice Height
             LevelData<FArrayBox>* old_iceheightDataPtr = m_iceheight[lev];
