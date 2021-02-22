@@ -1010,7 +1010,7 @@ AmrHydro::run(Real a_max_time, int a_max_step)
 #endif
             }
 
-            if ((m_cur_step != 0) && (m_cur_step % m_regrid_interval == 0)) {
+            if ( (m_cur_step != 0) && (m_cur_step != m_restart_step) && (m_cur_step % m_regrid_interval == 0)) {
                 regrid();
             }
 
@@ -1154,10 +1154,10 @@ AmrHydro::Calc_moulin_source_term (LevelData<FArrayBox>& levelMoulinSrc)
 
            // Loop over all moulins
            for (int m = 0; m<m_suhmoParm->m_n_moulins; m++) {
-               if ( (m_suhmoParm->m_moulin_position[m*m_suhmoParm->m_n_moulins + 0] <= x_hi) 
-                     && (m_suhmoParm->m_moulin_position[m*m_suhmoParm->m_n_moulins + 0] > x_lo) ) {
-                   if ( (m_suhmoParm->m_moulin_position[m*m_suhmoParm->m_n_moulins + 1] <= y_hi) 
-                         && (m_suhmoParm->m_moulin_position[m*m_suhmoParm->m_n_moulins + 1] > y_lo) ) {
+               if ( (m_suhmoParm->m_moulin_position[m*2 + 0] <= x_hi) 
+                     && (m_suhmoParm->m_moulin_position[m*2 + 0] > x_lo) ) {
+                   if ( (m_suhmoParm->m_moulin_position[m*2 + 1] <= y_hi) 
+                         && (m_suhmoParm->m_moulin_position[m*2 + 1] > y_lo) ) {
                         moulinSrc(iv,0) = m_suhmoParm->m_moulin_flux[m] / 
                                  ( m_amrDx[curr_level][0] * m_amrDx[curr_level][1]);  // m3s-1 / m2
                         // Y line
@@ -1531,7 +1531,7 @@ AmrHydro::timeStep(Real a_dt)
         ExtrapGhostCells( currentRe, m_amrDomains[lev]);
 
         // Keep DEBUG for now
-        if (lev > 0 && (m_cur_step == 200)) {
+        if (lev > 0 && (m_cur_step == 406)) {
            pout() << " Checking data in new grid after regrid in operations " << endl;
            for (dit.begin(); dit.ok(); ++dit) {
                BoxIterator bit(currentH[dit].box()); 
@@ -1637,7 +1637,7 @@ AmrHydro::timeStep(Real a_dt)
                 //NullBCFill(levelPw[dit], validBox, m_amrDomains[lev], m_amrDx[lev][0]);
             }
             // Keep DEBUG for now
-            if (lev > 0 && (m_cur_step == 200)) {
+            if (lev > 0 && (m_cur_step == 406)) {
                pout() << " ITERATION NUMBER " << ite_idx << endl;
                pout() << " Checking Pw after regrid in operations " << endl;
                for (dit.begin(); dit.ok(); ++dit) {
@@ -1727,7 +1727,7 @@ AmrHydro::timeStep(Real a_dt)
             // Keep DEBUG for now
             FluxBox& gPw_ec = levelgradPw_ec[dit];
             FluxBox& gH_ec = levelgradH_ec[dit];
-            if (lev > 0 && (m_cur_step == 200)) {
+            if (lev > 0 && (m_cur_step == 406)) {
                pout() << " Checking GradPw after regrid in operations " << endl;
                FArrayBox& gradPwFab = gPw_ec[0];
                FArrayBox& gradHFab = gH_ec[0];
@@ -2125,7 +2125,7 @@ AmrHydro::timeStep(Real a_dt)
         }
      
         /* custom plt here -- debug print */
-        if (m_PrintCustom && (m_cur_step == 200)) {
+        if (m_PrintCustom && (m_cur_step == 406)) {
             int nStuffToPlot = 17;
             Vector<std::string> vectName;
             vectName.resize(nStuffToPlot);
@@ -2628,7 +2628,7 @@ AmrHydro::regrid()
 
             DataIterator dit = newDBL.dataIterator();
 
-            if (m_verbosity > 4) {
+            if (m_verbosity > 20) {
 
                 pout() << " Checking data after initDataRegrid " << endl;
 
@@ -2682,7 +2682,7 @@ AmrHydro::regrid()
                 interpolator.interpToFine(*new_meltRateDataPtr, *m_meltRate[lev - 1]); 
             }
 
-            if (m_verbosity > 4) {
+            if (m_verbosity > 20) {
 
                 pout() << " Checking data after interpToFine " << endl;
 
@@ -2744,7 +2744,7 @@ AmrHydro::regrid()
                 delete old_meltRateDataPtr;
             } 
 
-            if (m_verbosity > 4) {
+            if (m_verbosity > 20) {
 
                 pout() << " Checking data after copyTo Old->New " << endl;
 
