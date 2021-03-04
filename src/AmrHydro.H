@@ -76,6 +76,15 @@ public:
     /* compute one timestep */
     void timeStep(Real a_dt);
 
+    void NonLinear_level(LevelData<FArrayBox>&        a_NL, 
+                         LevelData<FArrayBox>&        a_dNL,
+                         const LevelData<FArrayBox>&  a_u);
+
+    void NonLinear(Vector<LevelData<FArrayBox>* >        a_NL,
+                   Vector<LevelData<FArrayBox>* >        a_dNL, 
+                   const Vector<LevelData<FArrayBox>* >  a_u,
+                   int a_finestLevel);
+ 
     void aCoeff_bCoeff(LevelData<FArrayBox>&  levelacoef, 
                        LevelData<FluxBox>&  levelbcoef, 
                        LevelData<FluxBox>&  levelRe, 

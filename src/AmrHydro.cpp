@@ -404,13 +404,16 @@ AmrHydro::SolveForHead_nl(const Vector<DisjointBoxLayout>&               a_grids
                           Vector<LevelData<FArrayBox>*>& a_RHS)
 {
     VCAMRNonLinearPoissonOpFactory poissonOpF_head;
+    NL_level functTmp = &AmrHydro::NonLinear_level;
     poissonOpF_head.define(a_domains[0],
                            a_grids,
                            refRatio,
                            coarsestDx,
                            &mixBCValues,
                            0.0, a_aCoef,
-                           - 1.0, a_bCoef);
+                           - 1.0, a_bCoef,
+                          this, functTmp);
+
     AMRLevelOpFactory<LevelData<FArrayBox> >& opFactoryPtr = (AMRLevelOpFactory<LevelData<FArrayBox> >& ) poissonOpF_head;
 
     AMRMultiGrid<LevelData<FArrayBox> > *amrSolver;
@@ -1122,6 +1125,74 @@ AmrHydro::run(Real a_max_time, int a_max_step)
         pout() << "AmrHydro::run finished" << endl;
     }
 }
+
+/* Needed routines for timeStep */
+void AmrHydro::NonLinear_level(LevelData<FArrayBox>&        a_NL, 
+                               LevelData<FArrayBox>&        a_dNL,
+                               const LevelData<FArrayBox>&  a_u)
+{
+
+  DataIterator levelDit = a_NL.dataIterator();
+  for (levelDit.begin(); levelDit.ok(); ++levelDit) {
+
+      FArrayBox& thisNL          = a_NL[levelDit];
+      FArrayBox& thisdNL         = a_dNL[levelDit];
+      const FArrayBox& thisU     = a_u[levelDit];
+
+      BoxIterator bit(thisNL.box());
+      for (bit.begin(); bit.ok(); ++bit) {
+          IntVect iv = bit();
+          thisNL(iv, 0)  = 0.0; //m_suhmoParm->m_A * B(iv,0) * 
+                             //std::pow( (Pi(iv,0) - m_suhmoParm->m_rho_w * m_suhmoParm->m_G *
+                             //(thisU(iv,0) - Zb(iv,0))), 3);
+          thisdNL(iv, 0) = 0.0; //- 3.0 * m_suhmoParm->m_A * B(iv,0) * m_suhmoParm->m_rho_w *m_suhmoParm->m_G * thisU(iv,0) *
+                             //( std::pow( (Pi(iv,0) - m_suhmoParm->m_rho_w * m_suhmoParm->m_G * 
+                             //(thisU(iv,0) - Zb(iv,0))), 2);
+      }
+  } // end loop over grids on this level
+}
+
+void AmrHydro::NonLinear(Vector<LevelData<FArrayBox>* >        a_NL,
+                         Vector<LevelData<FArrayBox>* >        a_dNL, 
+                         const Vector<LevelData<FArrayBox>* >  a_u,
+                         int a_finestLevel)
+{
+
+  for (int lev=0; lev<=a_finestLevel; lev++) {
+
+    LevelData<FArrayBox>& levelNL   = *(a_NL[lev]);
+    LevelData<FArrayBox>& leveldNL  = *(a_dNL[lev]);
+    LevelData<FArrayBox>& levelU    = *(a_u[lev]);
+
+    LevelData<FArrayBox>& levelB     = *m_gapheight[lev];
+    LevelData<FArrayBox>& levelPi    = *m_overburdenpress[lev];
+    LevelData<FArrayBox>& levelZb    = *m_bedelevation[lev];
+
+    DataIterator levelDit = levelNL.dataIterator();
+    for (levelDit.begin(); levelDit.ok(); ++levelDit) {
+
+        FArrayBox& thisNL    = levelNL[levelDit];
+        FArrayBox& thisdNL   = leveldNL[levelDit];
+        FArrayBox& thisU     = levelU[levelDit];
+
+        FArrayBox& B         = levelB[levelDit];
+        FArrayBox& Pressi    = levelPi[levelDit];
+        FArrayBox& Zb        = levelZb[levelDit];
+
+        BoxIterator bit(thisNL.box());
+        for (bit.begin(); bit.ok(); ++bit) {
+            IntVect iv = bit();
+            thisNL(iv, 0)  = m_suhmoParm->m_A * B(iv,0) * 
+                             std::pow( (Pressi(iv,0) - m_suhmoParm->m_rho_w * m_suhmoParm->m_G *
+                             (thisU(iv,0) - Zb(iv,0))), 3);
+            thisdNL(iv, 0) = - 3.0 * m_suhmoParm->m_A * B(iv,0) * m_suhmoParm->m_rho_w *m_suhmoParm->m_G * thisU(iv,0) *
+                             ( std::pow( (Pressi(iv,0) - m_suhmoParm->m_rho_w * m_suhmoParm->m_G * 
+                             (thisU(iv,0) - Zb(iv,0))), 2));
+        }
+    } // end loop over grids on this level
+  } // end loop over levels
+}
+
 
 void
 AmrHydro::aCoeff_bCoeff(LevelData<FArrayBox>&  levelacoef, 

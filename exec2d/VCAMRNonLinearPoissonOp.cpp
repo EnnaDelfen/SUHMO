@@ -44,7 +44,7 @@ void VCAMRNonLinearPoissonOp::residualI(LevelData<FArrayBox>&   a_lhs,
 
   LevelData<FArrayBox>  a_nlfunc(dbl, 1, IntVect::Zero);
   LevelData<FArrayBox>  a_nlDfunc(dbl, 1, IntVect::Zero);
-  setNL_Level(a_nlfunc, a_nlDfunc, a_phi);
+  MEMBER_FUNC_PTR(*m_amrHydro, m_nllevel)(a_nlfunc, a_nlDfunc, a_phi);
 
   DataIterator dit = phi.dataIterator();
   {
@@ -189,7 +189,7 @@ void VCAMRNonLinearPoissonOp::applyOpNoBoundary(LevelData<FArrayBox>&       a_lh
 
   LevelData<FArrayBox>  a_nlfunc(dbl, 1, IntVect::Zero);
   LevelData<FArrayBox>  a_nlDfunc(dbl, 1, IntVect::Zero);
-  setNL_Level(a_nlfunc, a_nlDfunc, a_phi);
+  MEMBER_FUNC_PTR(*m_amrHydro, m_nllevel)(a_nlfunc, a_nlDfunc, a_phi);
 
   DataIterator dit = phi.dataIterator();
   phi.exchange(phi.interval(), m_exchangeCopier);
@@ -267,7 +267,7 @@ void VCAMRNonLinearPoissonOp::restrictResidual(LevelData<FArrayBox>&     a_resCo
 
   LevelData<FArrayBox>  a_nlfunc(dblFine, 1, IntVect::Zero);
   LevelData<FArrayBox>  a_nlDfunc(dblFine, 1, IntVect::Zero);
-  setNL_Level(a_nlfunc, a_nlDfunc, a_phiFine);
+  MEMBER_FUNC_PTR(*m_amrHydro, m_nllevel)(a_nlfunc, a_nlDfunc, a_phiFine);
 
   for (DataIterator dit = a_phiFine.dataIterator(); dit.ok(); ++dit)
     {
@@ -513,7 +513,7 @@ void VCAMRNonLinearPoissonOp::levelGSRB(LevelData<FArrayBox>&       a_phi,
 
   LevelData<FArrayBox>  a_nlfunc(dbl, 1, IntVect::Zero);
   LevelData<FArrayBox>  a_nlDfunc(dbl, 1, IntVect::Zero);
-  setNL_Level(a_nlfunc, a_nlDfunc, a_phi);
+  MEMBER_FUNC_PTR(*m_amrHydro, m_nllevel)(a_nlfunc, a_nlDfunc, a_phi);
 
   DataIterator dit = a_phi.dataIterator();
 
@@ -707,7 +707,8 @@ void VCAMRNonLinearPoissonOpFactory::define(const ProblemDomain&         a_coars
                                    const Real&                           a_alpha,
                                    Vector<RefCountedPtr<LevelData<FArrayBox> > >& a_aCoef,
                                    const Real&                           a_beta,
-                                   Vector<RefCountedPtr<LevelData<FluxBox> > >&   a_bCoef)
+                                   Vector<RefCountedPtr<LevelData<FluxBox> > >&   a_bCoef,
+                                   AmrHydro* a_amrHydro, NL_level a_nllevel)
 {
   CH_TIME("VCAMRNonLinearPoissonOpFactory::define");
 
@@ -751,6 +752,9 @@ void VCAMRNonLinearPoissonOpFactory::define(const ProblemDomain&         a_coars
   m_beta  = a_beta;
   m_bCoef = a_bCoef;
 
+  m_amrHydro = a_amrHydro;
+  m_nllevel  = a_nllevel;
+
 }
 //-----------------------------------------------------------------------
 
@@ -769,6 +773,8 @@ VCAMRNonLinearPoissonOpFactory::define(const ProblemDomain&   a_coarseDomain,
   // the other define() method.
   Vector<RefCountedPtr<LevelData<FArrayBox> > > aCoef(a_grids.size());
   Vector<RefCountedPtr<LevelData<FluxBox> > > bCoef(a_grids.size());
+  AmrHydro* amrHydro;
+  NL_level  nllevel; 
   for (int i = 0; i < a_grids.size(); ++i)
   {
     aCoef[i] = RefCountedPtr<LevelData<FArrayBox> >(
@@ -787,7 +793,7 @@ VCAMRNonLinearPoissonOpFactory::define(const ProblemDomain&   a_coarseDomain,
   // these choices are weird and not in accordance with the default Lapl
   Real alpha = 1.0, beta = 1.0;
   define(a_coarseDomain, a_grids, a_refRatios, a_coarsedx, a_bc,
-         alpha, aCoef, beta, bCoef);
+         alpha, aCoef, beta, bCoef, amrHydro, nllevel);
 }
 //-----------------------------------------------------------------------
 
@@ -849,8 +855,12 @@ MGLevelOp<LevelData<FArrayBox> >* VCAMRNonLinearPoissonOpFactory::MGnewOp(const 
 
   newOp->define(layout, dx, domain, m_bc, ex, cfregion);
 
-  newOp->m_alpha = m_alpha;
-  newOp->m_beta  = m_beta;
+  newOp->m_alpha     = m_alpha;
+  newOp->m_beta      = m_beta;
+  newOp->m_amrHydro  = m_amrHydro;
+
+  
+  newOp->m_nllevel   = m_nllevel;
 
   if (a_depth == 0)
     {
@@ -982,6 +992,10 @@ AMRLevelOp<LevelData<FArrayBox> >* VCAMRNonLinearPoissonOpFactory::AMRnewOp(cons
 
   newOp->m_aCoef = m_aCoef[ref];
   newOp->m_bCoef = m_bCoef[ref];
+
+  newOp->m_amrHydro  = m_amrHydro;
+
+  newOp->m_nllevel   = m_nllevel;
 
   if (newOp->m_aCoef != NULL)
   {

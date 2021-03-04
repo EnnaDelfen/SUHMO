@@ -13,8 +13,14 @@
 
 #include "AMRNonLinearPoissonOp.H"
 #include "CoefficientInterpolator.H"
+#include "AmrHydro.H"
 
 #include "NamespaceHeader.H"
+
+#define MEMBER_FUNC_PTR(object,ptrToMember) ((object).*(ptrToMember))
+
+typedef void (AmrHydro::*NL_level) (LevelData<FArrayBox>& a_NL, LevelData<FArrayBox>& a_dNL, const LevelData<FArrayBox>&  a_u);
+typedef void (AmrHydro::*NL) (Vector<LevelData<FArrayBox>* > a_NL, Vector<LevelData<FArrayBox>* > a_dNL, const Vector<LevelData<FArrayBox>* >  a_u, int a_finestLevel);
 
 ///
 /**
@@ -213,6 +219,10 @@ public:
       }
     
   }
+
+  NL_level m_nllevel = nullptr;
+  NL       m_nl      = nullptr;
+  AmrHydro* m_amrHydro = nullptr;
   
 protected:
   LayoutData<CFIVS> m_loCFIVS[SpaceDim];
@@ -252,6 +262,7 @@ protected:
                        const Box&       a_facebox,
                        int              a_dir,
                        int              a_ref = 1) const ;
+
 };
 
 ///
@@ -289,7 +300,8 @@ public:
               const Real&                                    a_alpha,
               Vector<RefCountedPtr<LevelData<FArrayBox> > >& a_aCoef,
               const Real&                                    a_beta,
-              Vector<RefCountedPtr<LevelData<FluxBox> > >&   a_bCoef);
+              Vector<RefCountedPtr<LevelData<FluxBox> > >&   a_bCoef,
+              AmrHydro* a_amrHydro, NL_level a_nllevel);
 
   //! Defines a factory for VCAMRNonLinearPoissonOp which allows the operators to
   //! allocate their own coefficient data. \f$\alpha\f$ and \f$\beta\f$
@@ -336,6 +348,10 @@ private:
  
   Vector<RefCountedPtr<LevelData<FArrayBox> > > m_aCoef;
   Vector<RefCountedPtr<LevelData<FluxBox> > >   m_bCoef;
+
+  NL_level m_nllevel = nullptr;
+  NL       m_nl      = nullptr;
+  AmrHydro* m_amrHydro = nullptr;
 
   Vector<RefCountedPtr<LevelData<FArrayBox> > > m_lambda;
 
