@@ -1149,7 +1149,10 @@ AmrHydro::run(Real a_max_time, int a_max_step)
 /* Needed routines for timeStep */
 void AmrHydro::NonLinear_level(LevelData<FArrayBox>&        a_NL, 
                                LevelData<FArrayBox>&        a_dNL,
-                               const LevelData<FArrayBox>&  a_u)
+                               const LevelData<FArrayBox>&  a_u,
+                               LevelData<FArrayBox>&        a_B,
+                               LevelData<FArrayBox>&        a_Pi,
+                               LevelData<FArrayBox>&        a_zb)
 {
 
   DataIterator levelDit = a_NL.dataIterator();
@@ -1158,16 +1161,19 @@ void AmrHydro::NonLinear_level(LevelData<FArrayBox>&        a_NL,
       FArrayBox& thisNL          = a_NL[levelDit];
       FArrayBox& thisdNL         = a_dNL[levelDit];
       const FArrayBox& thisU     = a_u[levelDit];
+      FArrayBox& thisB           = a_B[levelDit];
+      FArrayBox& thisPi          = a_Pi[levelDit];
+      FArrayBox& thiszb          = a_zb[levelDit];
 
       BoxIterator bit(thisNL.box());
       for (bit.begin(); bit.ok(); ++bit) {
           IntVect iv = bit();
-          thisNL(iv, 0)  = 0.0; //m_suhmoParm->m_A * B(iv,0) * 
-                             //std::pow( (Pi(iv,0) - m_suhmoParm->m_rho_w * m_suhmoParm->m_G *
-                             //(thisU(iv,0) - Zb(iv,0))), 3);
-          thisdNL(iv, 0) = 0.0; //- 3.0 * m_suhmoParm->m_A * B(iv,0) * m_suhmoParm->m_rho_w *m_suhmoParm->m_G * thisU(iv,0) *
-                             //( std::pow( (Pi(iv,0) - m_suhmoParm->m_rho_w * m_suhmoParm->m_G * 
-                             //(thisU(iv,0) - Zb(iv,0))), 2);
+          thisNL(iv, 0)  = m_suhmoParm->m_A * thiszb(iv,0) * 
+                           std::pow( (thisPi(iv,0) - m_suhmoParm->m_rho_w * m_suhmoParm->m_G *
+                           (thisU(iv,0) -thiszb(iv,0))), 3);
+          thisdNL(iv, 0) = - 3.0 * m_suhmoParm->m_A * thisB(iv,0) * m_suhmoParm->m_rho_w *m_suhmoParm->m_G * thisU(iv,0) *
+                             ( std::pow( (thisPi(iv,0) - m_suhmoParm->m_rho_w * m_suhmoParm->m_G * 
+                             (thisU(iv,0) - thiszb(iv,0))), 2) );
       }
   } // end loop over grids on this level
 }

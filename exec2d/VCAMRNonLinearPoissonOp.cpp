@@ -44,7 +44,8 @@ void VCAMRNonLinearPoissonOp::residualI(LevelData<FArrayBox>&   a_lhs,
 
   LevelData<FArrayBox>  a_nlfunc(dbl, 1, IntVect::Zero);
   LevelData<FArrayBox>  a_nlDfunc(dbl, 1, IntVect::Zero);
-  MEMBER_FUNC_PTR(*m_amrHydro, m_nllevel)(a_nlfunc, a_nlDfunc, a_phi);
+  MEMBER_FUNC_PTR(*m_amrHydro, m_nllevel)(a_nlfunc, a_nlDfunc, a_phi,
+                                          *m_B, *m_Pi, *m_zb);
 
   DataIterator dit = phi.dataIterator();
   {
@@ -62,6 +63,10 @@ void VCAMRNonLinearPoissonOp::residualI(LevelData<FArrayBox>&   a_lhs,
     {
       const Box& region = dbl[dit()];
       const FluxBox& thisBCoef = (*m_bCoef)[dit];
+
+      // REMOVE
+      a_nlfunc[dit].setVal(0.0);
+      a_nlDfunc[dit].setVal(0.0);
 
 #if CH_SPACEDIM == 1
       FORT_VCNLCOMPUTERES1D
@@ -189,7 +194,8 @@ void VCAMRNonLinearPoissonOp::applyOpNoBoundary(LevelData<FArrayBox>&       a_lh
 
   LevelData<FArrayBox>  a_nlfunc(dbl, 1, IntVect::Zero);
   LevelData<FArrayBox>  a_nlDfunc(dbl, 1, IntVect::Zero);
-  MEMBER_FUNC_PTR(*m_amrHydro, m_nllevel)(a_nlfunc, a_nlDfunc, a_phi);
+  MEMBER_FUNC_PTR(*m_amrHydro, m_nllevel)(a_nlfunc, a_nlDfunc, a_phi,
+                                          *m_B, *m_Pi, *m_zb);
 
   DataIterator dit = phi.dataIterator();
   phi.exchange(phi.interval(), m_exchangeCopier);
@@ -198,6 +204,11 @@ void VCAMRNonLinearPoissonOp::applyOpNoBoundary(LevelData<FArrayBox>&       a_lh
     {
       const Box& region = dbl[dit()];
       const FluxBox& thisBCoef = (*m_bCoef)[dit];
+
+      // REMOVE
+      a_nlfunc[dit].setVal(0.0);
+      a_nlDfunc[dit].setVal(0.0);
+
 #if CH_SPACEDIM == 1
       FORT_VCNLCOMPUTEOP1D
 #elif CH_SPACEDIM == 2
@@ -267,7 +278,8 @@ void VCAMRNonLinearPoissonOp::restrictResidual(LevelData<FArrayBox>&     a_resCo
 
   LevelData<FArrayBox>  a_nlfunc(dblFine, 1, IntVect::Zero);
   LevelData<FArrayBox>  a_nlDfunc(dblFine, 1, IntVect::Zero);
-  MEMBER_FUNC_PTR(*m_amrHydro, m_nllevel)(a_nlfunc, a_nlDfunc, a_phiFine);
+  MEMBER_FUNC_PTR(*m_amrHydro, m_nllevel)(a_nlfunc, a_nlDfunc, a_phiFine,
+                                          *m_B, *m_Pi, *m_zb);
 
   for (DataIterator dit = a_phiFine.dataIterator(); dit.ok(); ++dit)
     {
@@ -293,6 +305,10 @@ void VCAMRNonLinearPoissonOp::restrictResidual(LevelData<FArrayBox>&     a_resCo
       IntVect civ = coarsen(iv, 2);
 
       res.setVal(0.0);
+
+      // REMOVE
+      nlfunc.setVal(0.0);
+      a_nlDfunc[dit].setVal(0.0);
 
 #if CH_SPACEDIM == 1
       FORT_RESTRICTRESVCNL1D
@@ -513,7 +529,8 @@ void VCAMRNonLinearPoissonOp::levelGSRB(LevelData<FArrayBox>&       a_phi,
 
   LevelData<FArrayBox>  a_nlfunc(dbl, 1, IntVect::Zero);
   LevelData<FArrayBox>  a_nlDfunc(dbl, 1, IntVect::Zero);
-  MEMBER_FUNC_PTR(*m_amrHydro, m_nllevel)(a_nlfunc, a_nlDfunc, a_phi);
+  MEMBER_FUNC_PTR(*m_amrHydro, m_nllevel)(a_nlfunc, a_nlDfunc, a_phi,
+                                          *m_B, *m_Pi, *m_zb);
 
   DataIterator dit = a_phi.dataIterator();
 
@@ -547,6 +564,10 @@ void VCAMRNonLinearPoissonOp::levelGSRB(LevelData<FArrayBox>&       a_phi,
         {
           const Box& region = dbl.get(dit());
           const FluxBox& thisBCoef  = (*m_bCoef)[dit];
+
+          // REMOVE
+          a_nlfunc[dit].setVal(0.0);
+          a_nlDfunc[dit].setVal(0.0);
 
 #if CH_SPACEDIM == 1
           FORT_GSRBHELMHOLTZVCNL1D

@@ -19,7 +19,8 @@
 
 #define MEMBER_FUNC_PTR(object,ptrToMember) ((object).*(ptrToMember))
 
-typedef void (AmrHydro::*NL_level) (LevelData<FArrayBox>& a_NL, LevelData<FArrayBox>& a_dNL, const LevelData<FArrayBox>&  a_u);
+typedef void (AmrHydro::*NL_level) (LevelData<FArrayBox>& a_NL, LevelData<FArrayBox>& a_dNL, const LevelData<FArrayBox>&  a_u,
+                                    LevelData<FArrayBox>& a_B, LevelData<FArrayBox>& a_Pi, LevelData<FArrayBox>& a_zb);
 typedef void (AmrHydro::*NL) (Vector<LevelData<FArrayBox>* > a_NL, Vector<LevelData<FArrayBox>* > a_dNL, const Vector<LevelData<FArrayBox>* >  a_u, int a_finestLevel);
 
 ///
