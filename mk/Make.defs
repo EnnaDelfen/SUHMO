@@ -16,7 +16,7 @@ AMR_HOME=/home/lake/users/amfelden/ANAG/0_CODES/AMR_DRIVER_DIR/
 endif
 
 ifeq ($(CHOMBO_HOME),)
-CHOMBO_HOME = $(BISICLES_HOME)/Chombo-3.2/lib
+CHOMBO_HOME = $(BISICLES_HOME)/Chombo_3_2_GIT/lib
 endif
 
 include $(CHOMBO_HOME)/mk/Make.defs
