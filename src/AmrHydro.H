@@ -114,8 +114,7 @@ public:
                        Real a_dt,
                        LevelData<FArrayBox>& levelRHS_b_A);
 
-    void SolveForHead(
-                      const Vector<DisjointBoxLayout>&               a_grids,
+    void SolveForHead(const Vector<DisjointBoxLayout>&               a_grids,
                       Vector<RefCountedPtr<LevelData<FArrayBox> > >& a_aCoef,
                       Vector<RefCountedPtr<LevelData<FluxBox> > >&   a_bCoef,
                       Vector<ProblemDomain>& a_domains,
@@ -123,6 +122,15 @@ public:
                       Real& coarsestDx,
                       Vector<LevelData<FArrayBox>*>& a_head, 
                       Vector<LevelData<FArrayBox>*>& a_RHS);
+
+    void SolveForHead_nl(const Vector<DisjointBoxLayout>&               a_grids,
+                          Vector<RefCountedPtr<LevelData<FArrayBox> > >& a_aCoef,
+                          Vector<RefCountedPtr<LevelData<FluxBox> > >&   a_bCoef,
+                          Vector<ProblemDomain>& a_domains,
+                          Vector<int>& refRatio,
+                          Real& coarsestDx,
+                          Vector<LevelData<FArrayBox>*>& a_head, 
+                          Vector<LevelData<FArrayBox>*>& a_RHS);
 
     /* regridding */
     void regrid();
@@ -276,6 +284,9 @@ protected:
 
     /// compute timestep at initial time
     Real computeInitialDt();
+
+    /// FAS
+    bool m_use_FAS;
 
     /// IBC
     HydroIBC* m_IBCPtr;

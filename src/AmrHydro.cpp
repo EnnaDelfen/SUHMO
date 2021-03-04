@@ -40,7 +40,6 @@ using std::string;
 #include "CoarseAverageFace.H"
 #include "CoarseAverage.H"
 #include "FineInterp.H"
-#include "AMRPoissonOpF_F.H"
 #include "DivergenceF_F.H"
 #include "AMRUtilF_F.H"
 #include "CH_HDF5.H"
@@ -49,6 +48,9 @@ using std::string;
 #include "CONSTANTS.H"
 #include "Gradient.H"
 #include "ExtrapGhostCells.H"
+
+#include "AMRFASMultiGrid.H"
+#include "VCAMRNonLinearPoissonOp.H"
 
 #include "NamespaceHeader.H"
 
@@ -391,6 +393,62 @@ void NullBCFill(FArrayBox& a_state,
 }
 
 
+void
+AmrHydro::SolveForHead_nl(const Vector<DisjointBoxLayout>&               a_grids,
+                          Vector<RefCountedPtr<LevelData<FArrayBox> > >& a_aCoef,
+                          Vector<RefCountedPtr<LevelData<FluxBox> > >&   a_bCoef,
+                          Vector<ProblemDomain>& a_domains,
+                          Vector<int>& refRatio,
+                          Real& coarsestDx,
+                          Vector<LevelData<FArrayBox>*>& a_head, 
+                          Vector<LevelData<FArrayBox>*>& a_RHS)
+{
+    VCAMRNonLinearPoissonOpFactory poissonOpF_head;
+    poissonOpF_head.define(a_domains[0],
+                           a_grids,
+                           refRatio,
+                           coarsestDx,
+                           &mixBCValues,
+                           0.0, a_aCoef,
+                           - 1.0, a_bCoef);
+    AMRLevelOpFactory<LevelData<FArrayBox> >& opFactoryPtr = (AMRLevelOpFactory<LevelData<FArrayBox> >& ) poissonOpF_head;
+
+    AMRMultiGrid<LevelData<FArrayBox> > *amrSolver;
+    amrSolver = new AMRFASMultiGrid<LevelData<FArrayBox> >();
+
+    // bottom solver ?
+    BiCGStabSolver<LevelData<FArrayBox> > bottomSolver;
+    if (m_verbosity > 3) {
+        bottomSolver.m_verbosity = 4;
+    } else {
+        bottomSolver.m_verbosity = 1;
+    }
+
+    int numLevels = m_finest_level + 1;
+    amrSolver->define(a_domains[0], opFactoryPtr,
+                      &bottomSolver, numLevels);
+
+    int numSmooth = 4;
+    int numMG     = 1;
+    int maxIter   = 100;
+    int numBottom = 1;
+    Real eps        =  1.0e-10;
+    Real hang       =  1.0e-12; 
+    Real normThresh =  1.0e-30;
+    amrSolver->setSolverParameters(numSmooth, numSmooth, numBottom,
+                                   numMG, maxIter, eps, hang, normThresh);
+
+    if (m_verbosity > 3) {
+        amrSolver->m_verbosity = 4;
+    } else {
+        amrSolver->m_verbosity = 1;
+    } 
+
+    // solve !
+    bool zeroInitialGuess = false;
+    amrSolver->solve(a_head, a_RHS, m_finest_level, 0, zeroInitialGuess);
+}
+
 /* AmrHydro class functions */
 void
 AmrHydro::SolveForHead(
@@ -601,7 +659,11 @@ AmrHydro::initialize()
     }
 
     /* PARSING */
+    ParmParse ppSolver("solver");
+    m_use_FAS  = false;
+
     ParmParse ppAmr("AmrHydro");
+    ppSolver.query("use_fas", m_use_FAS); 
     m_time     = 0.0;  // start at t = 0
     m_cur_step = 0;    // start at dt = 0
     ppAmr.get("max_level", m_max_level);  // max level
@@ -1061,7 +1123,6 @@ AmrHydro::run(Real a_max_time, int a_max_step)
     }
 }
 
-/* Needed routines for timeStep */
 void
 AmrHydro::aCoeff_bCoeff(LevelData<FArrayBox>&  levelacoef, 
                         LevelData<FluxBox>&    levelbcoef, 
@@ -1986,9 +2047,16 @@ AmrHydro::timeStep(Real a_dt)
         if (m_verbosity > 3) {
             pout() <<"        Poisson solve for h "<< endl;
         }
-        SolveForHead(m_amrGrids_curr, aCoef, bCoef,
+
+        if (m_use_FAS) {
+            SolveForHead_nl(m_amrGrids_curr, aCoef, bCoef,
+                            m_amrDomains_curr, m_refinement_ratios, coarsestDx,
+                            a_head_curr, RHS_h);
+        } else {
+            SolveForHead(m_amrGrids_curr, aCoef, bCoef,
                      m_amrDomains_curr, m_refinement_ratios, coarsestDx,
                      a_head_curr, RHS_h);
+        }
 
         for (int lev = 0; lev <= m_finest_level; lev++) {
             m_head[lev] = a_head_curr[lev];
@@ -2371,86 +2439,6 @@ AmrHydro::timeStep(Real a_dt)
 
 }
 
-/* update head */
-//void
-//AmrHydro::updateHead(Vector<LevelData<FArrayBox>*>& a_new_head,
-//                     const Vector<LevelData<FArrayBox>*>& a_old_head,
-//                     const Vector<LevelData<FluxBox>*>& a_vectFluxes,
-//                     Real a_dt)
-//{
-//    for (int lev = 0; lev <= m_finest_level; lev++)
-//    {
-//        DisjointBoxLayout& levelGrids = m_amrGrids[lev];
-//        LevelData<FluxBox>& levelFlux = *a_vectFluxes[lev];
-//        LevelData<FArrayBox>& levelNewH = *a_new_head[lev];
-//        LevelData<FArrayBox>& levelOldH = *a_old_head[lev];
-//
-//        const RealVect& dx = m_amrDx[lev];
-//
-//        DataIterator dit = levelGrids.dataIterator();
-//
-//        for (dit.begin(); dit.ok(); ++dit)
-//        {
-//            const Box& gridBox = levelGrids[dit];
-//            FArrayBox& newH    = levelNewH[dit];
-//            FArrayBox& oldH    = levelOldH[dit];
-//            FluxBox& thisFlux  = levelFlux[dit];
-//            newH.setVal(0.0);
-//
-//            // loop over directions and increment with div(F)
-//            for (int dir = 0; dir < SpaceDim; dir++)
-//            {
-//                // use the divergence from
-//                // Chombo/example/fourthOrderMappedGrids/util/DivergenceF.ChF
-//                FORT_DIVERGENCE(CHF_CONST_FRA(thisFlux[dir]),
-//                                CHF_FRA(newH),
-//                                CHF_BOX(gridBox),
-//                                CHF_CONST_REAL(dx[dir]),
-//                                CHF_INT(dir));
-//            }
-//
-//            newH *= -1 * a_dt;
-//            newH.plus(oldH, 0, 0, 1);
-//
-//        } // end loop over grids
-//    }     // end loop over levels
-//
-//    // average down thickness to coarser levels and fill in ghost cells
-//    // before calling recomputeGeometry.
-//    int headGhost = a_new_head[0]->ghostVect()[0];
-//    // average from the finest level down
-//    for (int lev = m_finest_level; lev > 0; lev--)
-//    {
-//        CoarseAverage averager(m_amrGrids[lev], 1, m_refinement_ratios[lev - 1]);
-//        averager.averageToCoarse(*a_new_head[lev - 1], *a_new_head[lev]);
-//    }
-//
-//    // now pass back over and do PiecewiseLinearFillPatch
-//    for (int lev = 1; lev <= m_finest_level; lev++)
-//    {
-//        PiecewiseLinearFillPatch filler(
-//            m_amrGrids[lev], m_amrGrids[lev - 1], 1, m_amrDomains[lev - 1], m_refinement_ratios[lev - 1], headGhost);
-//
-//        Real interp_coef = 0;
-//        filler.fillInterp(*a_new_head[lev], *a_new_head[lev - 1], *a_new_head[lev - 1], interp_coef, 0, 0, 1);
-//    }
-//
-//    // average from the finest level down
-//    for (int lev = m_finest_level; lev > 0; lev--)
-//    {
-//        CoarseAverage averager(m_amrGrids[lev], 1, m_refinement_ratios[lev - 1]);
-//        averager.averageToCoarse(*a_new_head[lev - 1], *a_new_head[lev]);
-//    }
-//
-//    for (int lev = 1; lev <= m_finest_level; lev++)
-//    {
-//        PiecewiseLinearFillPatch filler(
-//            m_amrGrids[lev], m_amrGrids[lev - 1], 1, m_amrDomains[lev - 1], m_refinement_ratios[lev - 1], headGhost);
-//
-//        Real interp_coef = 0;
-//        filler.fillInterp(*a_new_head[lev], *a_new_head[lev - 1], *a_new_head[lev - 1], interp_coef, 0, 0, 1);
-//    }
-//}
 
 // do regridding
 void
