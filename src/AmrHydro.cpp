@@ -403,6 +403,26 @@ AmrHydro::SolveForHead_nl(const Vector<DisjointBoxLayout>&               a_grids
                           Vector<LevelData<FArrayBox>*>& a_head, 
                           Vector<LevelData<FArrayBox>*>& a_RHS)
 {
+    Vector<RefCountedPtr<LevelData<FArrayBox> > > B(m_finest_level + 1);
+    Vector<RefCountedPtr<LevelData<FArrayBox> > > Pri(m_finest_level + 1);
+    Vector<RefCountedPtr<LevelData<FArrayBox> > > zb(m_finest_level + 1);
+
+    IntVect nGhost  = m_num_head_ghost * IntVect::Unit;
+
+    for (int lev = 0; lev <= m_finest_level; lev++) {
+        B[lev]   = RefCountedPtr<LevelData<FArrayBox> >(new LevelData<FArrayBox>(m_amrGrids[lev], 1, nGhost));
+        Pri[lev] = RefCountedPtr<LevelData<FArrayBox> >(new LevelData<FArrayBox>(m_amrGrids[lev], 1, nGhost));
+        zb[lev]  = RefCountedPtr<LevelData<FArrayBox> >(new LevelData<FArrayBox>(m_amrGrids[lev], 1, nGhost));
+
+        LevelData<FArrayBox>& levelGapHeight = *m_gapheight[lev];
+        DataIterator dit = levelGapHeight.dataIterator();
+        for (dit.begin(); dit.ok(); ++dit) {
+            (*B[lev])[dit].copy(levelGapHeight[dit], 0, 0, 1);
+            (*Pri[lev])[dit].copy((*m_overburdenpress[lev])[dit], 0, 0, 1);
+            (*zb[lev])[dit].copy((*m_gapheight[lev])[dit], 0, 0, 1);
+        }
+    }
+
     VCAMRNonLinearPoissonOpFactory poissonOpF_head;
     NL_level functTmp = &AmrHydro::NonLinear_level;
     poissonOpF_head.define(a_domains[0],
@@ -412,7 +432,8 @@ AmrHydro::SolveForHead_nl(const Vector<DisjointBoxLayout>&               a_grids
                            &mixBCValues,
                            0.0, a_aCoef,
                            - 1.0, a_bCoef,
-                          this, functTmp);
+                          this, functTmp,
+                          B, Pri, zb);
 
     AMRLevelOpFactory<LevelData<FArrayBox> >& opFactoryPtr = (AMRLevelOpFactory<LevelData<FArrayBox> >& ) poissonOpF_head;
 
@@ -454,8 +475,7 @@ AmrHydro::SolveForHead_nl(const Vector<DisjointBoxLayout>&               a_grids
 
 /* AmrHydro class functions */
 void
-AmrHydro::SolveForHead(
-                      const Vector<DisjointBoxLayout>&               a_grids,
+AmrHydro::SolveForHead(const Vector<DisjointBoxLayout>&               a_grids,
                       Vector<RefCountedPtr<LevelData<FArrayBox> > >& a_aCoef,
                       Vector<RefCountedPtr<LevelData<FluxBox> > >&   a_bCoef,
                       Vector<ProblemDomain>& a_domains,

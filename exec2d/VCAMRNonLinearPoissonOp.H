@@ -103,6 +103,10 @@ public:
   virtual void setAlphaAndBeta(const Real& a_alpha,
                                const Real& a_beta);
 
+  virtual void setSpecificParams(const RefCountedPtr<LevelData<FArrayBox> >& a_B,
+                                 const RefCountedPtr<LevelData<FArrayBox> >& a_Pi,
+                                 const RefCountedPtr<LevelData<FArrayBox> >& a_zb);
+
   /// Also calls reset lambda
   virtual void setCoefs(const RefCountedPtr<LevelData<FArrayBox> >& a_aCoef,
                         const RefCountedPtr<LevelData<FluxBox>   >& a_bCoef,
@@ -185,6 +189,11 @@ public:
 
   /// Laplacian operator spatially varying coefficient storage (face-centered) --- if you change this call resetLambda()
   RefCountedPtr<LevelData<FluxBox> > m_bCoef;
+
+  // Problem SPECIFIC
+  RefCountedPtr<LevelData<FArrayBox> > m_B;  // Gap Height
+  RefCountedPtr<LevelData<FArrayBox> > m_Pi; // Overb Press
+  RefCountedPtr<LevelData<FArrayBox> > m_zb; // Bed Elevation
 
   /// Reciprocal of the diagonal entry of the operator matrix
   LevelData<FArrayBox> m_lambda;
@@ -301,7 +310,10 @@ public:
               Vector<RefCountedPtr<LevelData<FArrayBox> > >& a_aCoef,
               const Real&                                    a_beta,
               Vector<RefCountedPtr<LevelData<FluxBox> > >&   a_bCoef,
-              AmrHydro* a_amrHydro, NL_level a_nllevel);
+              AmrHydro* a_amrHydro, NL_level a_nllevel,
+              Vector<RefCountedPtr<LevelData<FArrayBox> > >& a_B,
+              Vector<RefCountedPtr<LevelData<FArrayBox> > >& a_Pi,
+              Vector<RefCountedPtr<LevelData<FArrayBox> > >& a_zb);
 
   //! Defines a factory for VCAMRNonLinearPoissonOp which allows the operators to
   //! allocate their own coefficient data. \f$\alpha\f$ and \f$\beta\f$
@@ -348,6 +360,11 @@ private:
  
   Vector<RefCountedPtr<LevelData<FArrayBox> > > m_aCoef;
   Vector<RefCountedPtr<LevelData<FluxBox> > >   m_bCoef;
+  
+  // Problem SPECIFIC
+  Vector<RefCountedPtr<LevelData<FArrayBox> > > m_B;  // Gap Height
+  Vector<RefCountedPtr<LevelData<FArrayBox> > > m_Pi; // Overb Press
+  Vector<RefCountedPtr<LevelData<FArrayBox> > > m_zb; // Bed Elevation
 
   NL_level m_nllevel = nullptr;
   NL       m_nl      = nullptr;
