@@ -76,6 +76,8 @@ public:
     /* compute one timestep */
     void timeStep(Real a_dt);
 
+    void timeStepFAS(Real a_dt);
+
     void NonLinear_level(LevelData<FArrayBox>&        a_NL, 
                          LevelData<FArrayBox>&        a_dNL,
                          const LevelData<FArrayBox>&  a_u,
@@ -108,23 +110,29 @@ public:
 
     void Calc_moulin_source_term(LevelData<FArrayBox>& levelMoulinSrc);
 
+    void CalcRHS_gapHeightFAS(LevelData<FArrayBox>& levelRHS_b, 
+                              LevelData<FArrayBox>& levelPi, 
+                              LevelData<FArrayBox>& levelPw, 
+                              LevelData<FArrayBox>& levelmR, 
+                              LevelData<FArrayBox>& levelB);
+
     void CalcRHS_gapHeight(LevelData<FArrayBox>& levelRHS_b, 
-                       LevelData<FArrayBox>& levelPi, 
-                       LevelData<FArrayBox>& levelPw, 
-                       LevelData<FArrayBox>& levelmR, 
-                       LevelData<FArrayBox>& levelB,
-                       LevelData<FArrayBox>& levelRHS_b_A,
-                       LevelData<FArrayBox>& levelRHS_b_B,
-                       LevelData<FArrayBox>& levelRHS_b_C);
+                           LevelData<FArrayBox>& levelPi, 
+                           LevelData<FArrayBox>& levelPw, 
+                           LevelData<FArrayBox>& levelmR, 
+                           LevelData<FArrayBox>& levelB,
+                           LevelData<FArrayBox>& levelRHS_b_A,
+                           LevelData<FArrayBox>& levelRHS_b_B,
+                           LevelData<FArrayBox>& levelRHS_b_C);
 
     void CalcRHS_gapHeight_semiExpl(LevelData<FArrayBox>& levelRHS_b, 
-                       LevelData<FArrayBox>& levelDENOM_b, 
-                       LevelData<FArrayBox>& levelPi, 
-                       LevelData<FArrayBox>& levelPw, 
-                       LevelData<FArrayBox>& levelmR, 
-                       LevelData<FArrayBox>& levelB,
-                       Real a_dt,
-                       LevelData<FArrayBox>& levelRHS_b_A);
+                                    LevelData<FArrayBox>& levelDENOM_b, 
+                                    LevelData<FArrayBox>& levelPi, 
+                                    LevelData<FArrayBox>& levelPw, 
+                                    LevelData<FArrayBox>& levelmR, 
+                                    LevelData<FArrayBox>& levelB,
+                                    Real a_dt,
+                                    LevelData<FArrayBox>& levelRHS_b_A);
 
     void SolveForHead(const Vector<DisjointBoxLayout>&               a_grids,
                       Vector<RefCountedPtr<LevelData<FArrayBox> > >& a_aCoef,

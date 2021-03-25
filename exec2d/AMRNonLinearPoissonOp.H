@@ -24,8 +24,15 @@
 #include "CFRegion.H"
 #include "AMRIO.H"
 #include "CornerCopier.H"
+#include "AmrHydro.H"
 
 #include "NamespaceHeader.H"
+
+#define MEMBER_FUNC_PTR(object,ptrToMember) ((object).*(ptrToMember))
+
+typedef void (AmrHydro::*NL_level) (LevelData<FArrayBox>& a_NL, LevelData<FArrayBox>& a_dNL, const LevelData<FArrayBox>&  a_u,
+                                    LevelData<FArrayBox>& a_B, LevelData<FArrayBox>& a_Pi, LevelData<FArrayBox>& a_zb);
+//typedef void (AmrHydro::*NL) (Vector<LevelData<FArrayBox>* > a_NL, Vector<LevelData<FArrayBox>* > a_dNL, const Vector<LevelData<FArrayBox>* >  a_u, int a_finestLevel);
 
 ///
 /**
@@ -446,8 +453,21 @@ public:
 
   /*@}*/
 
+  //! This is called on multigrid operators when their AMR operators
+  //! are altered.
+  void finerOperatorChanged(const MGLevelOp<LevelData<FArrayBox> >& a_operator,
+                            int a_coarseningFactor);
+
   /// public constants
   Real m_alpha, m_beta, m_aCoef, m_bCoef;
+
+  // Problem SPECIFIC
+  RefCountedPtr<LevelData<FArrayBox> > m_B;  // Gap Height
+  RefCountedPtr<LevelData<FArrayBox> > m_Pi; // Overb Press
+  RefCountedPtr<LevelData<FArrayBox> > m_zb; // Bed Elevation
+
+  NL_level m_nllevel = nullptr;
+  AmrHydro* m_amrHydro = nullptr;
 
   // needed for homogeneous interpolation
   // set by the factory
@@ -561,6 +581,11 @@ public:
               const Vector<int>&               a_refRatios,
               const Real&                      a_coarsedx,
               BCHolder                         a_bc,
+              AmrHydro*                        a_amrHydro,
+              NL_level                         a_nllevel,
+              Vector<RefCountedPtr<LevelData<FArrayBox> > >& a_B,
+              Vector<RefCountedPtr<LevelData<FArrayBox> > >& a_Pi,
+              Vector<RefCountedPtr<LevelData<FArrayBox> > >& a_zb,
               Real                             a_alpha = 0.0,
               Real                             a_beta  = 1.0);
 
@@ -595,6 +620,14 @@ private:
 
   Real m_alpha;
   Real m_beta;
+
+  // Problem SPECIFIC
+  Vector<RefCountedPtr<LevelData<FArrayBox> > > m_B;  // Gap Height
+  Vector<RefCountedPtr<LevelData<FArrayBox> > > m_Pi; // Overb Press
+  Vector<RefCountedPtr<LevelData<FArrayBox> > > m_zb; // Bed Elevation
+
+  NL_level m_nllevel    = nullptr;
+  AmrHydro* m_amrHydro  = nullptr;
 
   Vector<Copier>   m_exchangeCopiers;
   Vector<CFRegion> m_cfregion;

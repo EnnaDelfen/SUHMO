@@ -13,17 +13,9 @@
 
 #include "AMRNonLinearPoissonOp.H"
 #include "CoefficientInterpolator.H"
-#include "AmrHydro.H"
 
 #include "NamespaceHeader.H"
 
-#define MEMBER_FUNC_PTR(object,ptrToMember) ((object).*(ptrToMember))
-
-typedef void (AmrHydro::*NL_level) (LevelData<FArrayBox>& a_NL, LevelData<FArrayBox>& a_dNL, const LevelData<FArrayBox>&  a_u,
-                                    LevelData<FArrayBox>& a_B, LevelData<FArrayBox>& a_Pi, LevelData<FArrayBox>& a_zb);
-typedef void (AmrHydro::*NL) (Vector<LevelData<FArrayBox>* > a_NL, Vector<LevelData<FArrayBox>* > a_dNL, const Vector<LevelData<FArrayBox>* >  a_u, int a_finestLevel);
-
-///
 /**
    Operator for solving variable-coefficient
    (alpha * aCoef(x) * I - beta * Div(bCoef(x) . Grad)) phi = rho
@@ -62,7 +54,6 @@ public:
                        const LevelData<FArrayBox>& a_residual);
 
   // FAS Multigrid needs access to a method which will apply an operator
-  // ANNE
   virtual void applyOpMg(LevelData<FArrayBox>& a_lhs,
                          LevelData<FArrayBox>& a_phi,
                          LevelData<FArrayBox>* a_phiCoarse,
@@ -191,11 +182,6 @@ public:
   /// Laplacian operator spatially varying coefficient storage (face-centered) --- if you change this call resetLambda()
   RefCountedPtr<LevelData<FluxBox> > m_bCoef;
 
-  // Problem SPECIFIC
-  RefCountedPtr<LevelData<FArrayBox> > m_B;  // Gap Height
-  RefCountedPtr<LevelData<FArrayBox> > m_Pi; // Overb Press
-  RefCountedPtr<LevelData<FArrayBox> > m_zb; // Bed Elevation
-
   /// Reciprocal of the diagonal entry of the operator matrix
   LevelData<FArrayBox> m_lambda;
 
@@ -230,10 +216,6 @@ public:
     
   }
 
-  NL_level m_nllevel = nullptr;
-  NL       m_nl      = nullptr;
-  AmrHydro* m_amrHydro = nullptr;
-  
 protected:
   LayoutData<CFIVS> m_loCFIVS[SpaceDim];
   LayoutData<CFIVS> m_hiCFIVS[SpaceDim];
@@ -367,9 +349,8 @@ private:
   Vector<RefCountedPtr<LevelData<FArrayBox> > > m_Pi; // Overb Press
   Vector<RefCountedPtr<LevelData<FArrayBox> > > m_zb; // Bed Elevation
 
-  NL_level m_nllevel = nullptr;
-  NL       m_nl      = nullptr;
-  AmrHydro* m_amrHydro = nullptr;
+  NL_level m_nllevel      = nullptr;
+  AmrHydro* m_amrHydro    = nullptr;
 
   Vector<RefCountedPtr<LevelData<FArrayBox> > > m_lambda;
 

@@ -25,8 +25,6 @@
 #include "VCAMRNonLinearPoissonOpF_F.H"
 #include "DebugOut.H"
 
-#include "external_NLfunc.H"
-
 #include "NamespaceHeader.H"
 
 void VCAMRNonLinearPoissonOp::residualI(LevelData<FArrayBox>&   a_lhs,
@@ -63,10 +61,6 @@ void VCAMRNonLinearPoissonOp::residualI(LevelData<FArrayBox>&   a_lhs,
     {
       const Box& region = dbl[dit()];
       const FluxBox& thisBCoef = (*m_bCoef)[dit];
-
-      // REMOVE
-      a_nlfunc[dit].setVal(0.0);
-      a_nlDfunc[dit].setVal(0.0);
 
 #if CH_SPACEDIM == 1
       FORT_VCNLCOMPUTERES1D
@@ -107,7 +101,7 @@ void VCAMRNonLinearPoissonOp::residualI(LevelData<FArrayBox>&   a_lhs,
 // then smooths with a couple of passes of levelGSRB
 // Preconditionior is not used for FAS solve !!
 void VCAMRNonLinearPoissonOp::preCond(LevelData<FArrayBox>&       a_phi,
-                              const LevelData<FArrayBox>& a_rhs)
+                                      const LevelData<FArrayBox>& a_rhs)
 {
   CH_TIME("VCAMRNonLinearPoissonOp::preCond");
 
@@ -204,11 +198,6 @@ void VCAMRNonLinearPoissonOp::applyOpNoBoundary(LevelData<FArrayBox>&       a_lh
     {
       const Box& region = dbl[dit()];
       const FluxBox& thisBCoef = (*m_bCoef)[dit];
-
-      // REMOVE
-      a_nlfunc[dit].setVal(0.0);
-      a_nlDfunc[dit].setVal(0.0);
-
 #if CH_SPACEDIM == 1
       FORT_VCNLCOMPUTEOP1D
 #elif CH_SPACEDIM == 2
@@ -305,10 +294,6 @@ void VCAMRNonLinearPoissonOp::restrictResidual(LevelData<FArrayBox>&     a_resCo
       IntVect civ = coarsen(iv, 2);
 
       res.setVal(0.0);
-
-      // REMOVE
-      nlfunc.setVal(0.0);
-      a_nlDfunc[dit].setVal(0.0);
 
 #if CH_SPACEDIM == 1
       FORT_RESTRICTRESVCNL1D
@@ -565,10 +550,6 @@ void VCAMRNonLinearPoissonOp::levelGSRB(LevelData<FArrayBox>&       a_phi,
           const Box& region = dbl.get(dit());
           const FluxBox& thisBCoef  = (*m_bCoef)[dit];
 
-          // REMOVE
-          a_nlfunc[dit].setVal(0.0);
-          a_nlDfunc[dit].setVal(0.0);
-
 #if CH_SPACEDIM == 1
           FORT_GSRBHELMHOLTZVCNL1D
 #elif CH_SPACEDIM == 2
@@ -721,18 +702,18 @@ VCAMRNonLinearPoissonOpFactory::VCAMRNonLinearPoissonOpFactory()
 //-----------------------------------------------------------------------
 //  AMR Factory define function
 void VCAMRNonLinearPoissonOpFactory::define(const ProblemDomain&         a_coarseDomain,
-                                   const Vector<DisjointBoxLayout>&      a_grids,
-                                   const Vector<int>&                    a_refRatios,
-                                   const Real&                           a_coarsedx,
-                                   BCHolder                              a_bc,
-                                   const Real&                           a_alpha,
-                                   Vector<RefCountedPtr<LevelData<FArrayBox> > >& a_aCoef,
-                                   const Real&                           a_beta,
-                                   Vector<RefCountedPtr<LevelData<FluxBox> > >&   a_bCoef,
-                                   AmrHydro* a_amrHydro, NL_level a_nllevel,
-                                   Vector<RefCountedPtr<LevelData<FArrayBox> > >& a_B,
-                                   Vector<RefCountedPtr<LevelData<FArrayBox> > >& a_Pi,
-                                   Vector<RefCountedPtr<LevelData<FArrayBox> > >& a_zb)
+                                            const Vector<DisjointBoxLayout>&      a_grids,
+                                            const Vector<int>&                    a_refRatios,
+                                            const Real&                           a_coarsedx,
+                                            BCHolder                              a_bc,
+                                            const Real&                           a_alpha,
+                                            Vector<RefCountedPtr<LevelData<FArrayBox> > >& a_aCoef,
+                                            const Real&                           a_beta,
+                                            Vector<RefCountedPtr<LevelData<FluxBox> > >&   a_bCoef,
+                                            AmrHydro* a_amrHydro, NL_level a_nllevel,
+                                            Vector<RefCountedPtr<LevelData<FArrayBox> > >& a_B,
+                                            Vector<RefCountedPtr<LevelData<FArrayBox> > >& a_Pi,
+                                            Vector<RefCountedPtr<LevelData<FArrayBox> > >& a_zb)
 {
   CH_TIME("VCAMRNonLinearPoissonOpFactory::define");
 
@@ -776,7 +757,7 @@ void VCAMRNonLinearPoissonOpFactory::define(const ProblemDomain&         a_coars
   m_beta  = a_beta;
   m_bCoef = a_bCoef;
 
-  m_amrHydro = a_amrHydro;
+  m_amrHydro   = a_amrHydro;
   m_nllevel  = a_nllevel;
 
   m_B  = a_B;  // Gap Height
@@ -888,13 +869,13 @@ MGLevelOp<LevelData<FArrayBox> >* VCAMRNonLinearPoissonOpFactory::MGnewOp(const 
   }
 
   VCAMRNonLinearPoissonOp* newOp = new VCAMRNonLinearPoissonOp;
-
   newOp->define(layout, dx, domain, m_bc, ex, cfregion);
 
-  newOp->m_alpha     = m_alpha;
-  newOp->m_beta      = m_beta;
-  newOp->m_amrHydro  = m_amrHydro; 
-  newOp->m_nllevel   = m_nllevel;
+  newOp->m_alpha       = m_alpha;
+  newOp->m_beta        = m_beta;
+
+  newOp->m_amrHydro    = m_amrHydro; 
+  newOp->m_nllevel     = m_nllevel;
 
   if (a_depth == 0) {
       // don't need to coarsen anything for this
@@ -1048,8 +1029,8 @@ AMRLevelOp<LevelData<FArrayBox> >* VCAMRNonLinearPoissonOpFactory::AMRnewOp(cons
   newOp->m_aCoef = m_aCoef[ref];
   newOp->m_bCoef = m_bCoef[ref];
 
-  newOp->m_amrHydro  = m_amrHydro;
-  newOp->m_nllevel   = m_nllevel;
+  newOp->m_amrHydro   = m_amrHydro;
+  newOp->m_nllevel  = m_nllevel;
 
   // Problem SPECIFIC
   newOp->m_B  = m_B[ref];  // Gap Height

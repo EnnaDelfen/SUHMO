@@ -19,7 +19,6 @@
 #include "AMRMultiGrid.H"
 #include "Misc.H"
 #include "computeSum.H"
-#include "external_NLfunc.H"
 
 #include "AMRNonLinearPoissonOp.H"
 #include "AMRNonLinearPoissonOpF_F.H"
@@ -59,16 +58,16 @@ amrpgetMultiColors(Vector<IntVect>& a_colors)
 // ---------------------------------------------------------
 /** full define function for AMRLevelOp with both coarser and finer levels */
 void AMRNonLinearPoissonOp::define(const DisjointBoxLayout& a_grids,
-                          const DisjointBoxLayout& a_gridsFiner,
-                          const DisjointBoxLayout& a_gridsCoarser,
-                          const Real&              a_dxLevel,
-                          int                      a_refRatio,
-                          int                      a_refRatioFiner,
-                          const ProblemDomain&     a_domain,
-                          BCHolder                 a_bc,
-                          const Copier&            a_exchange,
-                          const CFRegion&          a_cfregion,
-                          const int                a_nComp)
+                                   const DisjointBoxLayout& a_gridsFiner,
+                                   const DisjointBoxLayout& a_gridsCoarser,
+                                   const Real&              a_dxLevel,
+                                   int                      a_refRatio,
+                                   int                      a_refRatioFiner,
+                                   const ProblemDomain&     a_domain,
+                                   BCHolder                 a_bc,
+                                   const Copier&            a_exchange,
+                                   const CFRegion&          a_cfregion,
+                                   const int                a_nComp)
 
 {
   CH_TIME("AMRNonLinearPoissonOp::define1");
@@ -93,15 +92,15 @@ void AMRNonLinearPoissonOp::define(const DisjointBoxLayout& a_grids,
 // ---------------------------------------------------------
 /** full define function for AMRLevelOp<LevelData<FArrayBox> > with finer levels, but no coarser */
 void AMRNonLinearPoissonOp::define(const DisjointBoxLayout& a_grids,
-                          const DisjointBoxLayout& a_gridsFiner,
-                          const Real&              a_dxLevel,
-                          int                      a_refRatio, // dummy arg
-                          int                      a_refRatioFiner,
-                          const ProblemDomain&     a_domain,
-                          BCHolder                 a_bc,
-                          const Copier&            a_exchange,
-                          const CFRegion&          a_cfregion,
-                          const int                a_nComp)
+                                   const DisjointBoxLayout& a_gridsFiner,
+                                   const Real&              a_dxLevel,
+                                   int                      a_refRatio, // dummy arg
+                                   int                      a_refRatioFiner,
+                                   const ProblemDomain&     a_domain,
+                                   BCHolder                 a_bc,
+                                   const Copier&            a_exchange,
+                                   const CFRegion&          a_cfregion,
+                                   const int                a_nComp)
 {
   CH_TIME("AMRNonLinearPoissonOp::define2");
 
@@ -123,14 +122,14 @@ void AMRNonLinearPoissonOp::define(const DisjointBoxLayout& a_grids,
 
 // ---------------------------------------------------------
 void AMRNonLinearPoissonOp::define(const DisjointBoxLayout& a_grids,
-                          const DisjointBoxLayout& a_coarse,
-                          const Real&              a_dxLevel,
-                          int                      a_refRatio,
-                          const ProblemDomain&     a_domain,
-                          BCHolder                 a_bc,
-                          const Copier&            a_exchange,
-                          const CFRegion&          a_cfregion,
-                          int a_numComp)
+                                   const DisjointBoxLayout& a_coarse,
+                                   const Real&              a_dxLevel,
+                                   int                      a_refRatio,
+                                   const ProblemDomain&     a_domain,
+                                   BCHolder                 a_bc,
+                                   const Copier&            a_exchange,
+                                   const CFRegion&          a_cfregion,
+                                   int a_numComp)
 {
   CH_TIME("AMRNonLinearPoissonOp::define3");
 
@@ -148,11 +147,11 @@ void AMRNonLinearPoissonOp::define(const DisjointBoxLayout& a_grids,
 
 // ---------------------------------------------------------
 void AMRNonLinearPoissonOp::define(const DisjointBoxLayout& a_grids,
-                          const Real&              a_dx,
-                          const ProblemDomain&     a_domain,
-                          BCHolder                 a_bc,
-                          const Copier&            a_exchange,
-                          const CFRegion&          a_cfregion)
+                                   const Real&              a_dx,
+                                   const ProblemDomain&     a_domain,
+                                   BCHolder                 a_bc,
+                                   const Copier&            a_exchange,
+                                   const CFRegion&          a_cfregion)
 {
   CH_TIME("AMRNonLinearPoissonOp::define4");
 
@@ -182,9 +181,9 @@ void AMRNonLinearPoissonOp::define(const DisjointBoxLayout& a_grids,
 
 // ---------------------------------------------------------
 void AMRNonLinearPoissonOp::define(const DisjointBoxLayout& a_grids,
-                          const Real&              a_dx,
-                          const ProblemDomain&     a_domain,
-                          BCHolder                 a_bc)
+                                   const Real&              a_dx,
+                                   const ProblemDomain&     a_domain,
+                                   BCHolder                 a_bc)
 {
   CH_TIME("AMRNonLinearPoissonOp::define5");
 
@@ -200,11 +199,11 @@ void AMRNonLinearPoissonOp::define(const DisjointBoxLayout& a_grids,
 }
 
 void AMRNonLinearPoissonOp::define(const DisjointBoxLayout& a_grids,
-                          const DisjointBoxLayout* a_baseBAPtr,
-                          Real                     a_dx,
-                          int                      a_refRatio,
-                          const ProblemDomain&     a_domain,
-                          BCHolder                 a_bc)
+                                   const DisjointBoxLayout* a_baseBAPtr,
+                                   Real                     a_dx,
+                                   int                      a_refRatio,
+                                   const ProblemDomain&     a_domain,
+                                   BCHolder                 a_bc)
 {
   Copier exchangeCopier;
   exchangeCopier.define(a_grids, a_grids, IntVect::Unit, true);
@@ -279,7 +278,8 @@ void AMRNonLinearPoissonOp::residualI(LevelData<FArrayBox>&       a_lhs,
 
   LevelData<FArrayBox>  a_nlfunc(dbl, 1, IntVect::Zero);
   LevelData<FArrayBox>  a_nlDfunc(dbl, 1, IntVect::Zero);
-  setNL_Level(a_nlfunc, a_nlDfunc, a_phi);
+  MEMBER_FUNC_PTR(*m_amrHydro, m_nllevel)(a_nlfunc, a_nlDfunc, a_phi,
+                                        *m_B, *m_Pi, *m_zb);
 
   DataIterator dit = phi.dataIterator();
   {
@@ -391,7 +391,8 @@ void AMRNonLinearPoissonOp::applyOpI(LevelData<FArrayBox>&       a_lhs,
 
   LevelData<FArrayBox>  a_nlfunc(dbl, 1, IntVect::Zero);
   LevelData<FArrayBox>  a_nlDfunc(dbl, 1, IntVect::Zero);
-  setNL_Level(a_nlfunc, a_nlDfunc, a_phi);
+  MEMBER_FUNC_PTR(*m_amrHydro, m_nllevel)(a_nlfunc, a_nlDfunc, a_phi,
+                                        *m_B, *m_Pi, *m_zb);
 
   DataIterator dit = phi.dataIterator();
   int nbox=dit.size();
@@ -430,7 +431,8 @@ void AMRNonLinearPoissonOp::applyOpNoBoundary(LevelData<FArrayBox>&       a_lhs,
 
   LevelData<FArrayBox>  a_nlfunc(dbl, 1, IntVect::Zero);
   LevelData<FArrayBox>  a_nlDfunc(dbl, 1, IntVect::Zero);
-  setNL_Level(a_nlfunc, a_nlDfunc, a_phi);
+  MEMBER_FUNC_PTR(*m_amrHydro, m_nllevel)(a_nlfunc, a_nlDfunc, a_phi,
+                                        *m_B, *m_Pi, *m_zb);
 
   DataIterator dit = phi.dataIterator();
   int nbox=dit.size();
@@ -744,7 +746,8 @@ void AMRNonLinearPoissonOp::restrictResidual(LevelData<FArrayBox>&       a_resCo
 
   LevelData<FArrayBox>  a_nlfunc(dblFine, 1, IntVect::Zero);
   LevelData<FArrayBox>  a_nlDfunc(dblFine, 1, IntVect::Zero);
-  setNL_Level(a_nlfunc, a_nlDfunc, a_phiFine);
+  MEMBER_FUNC_PTR(*m_amrHydro, m_nllevel)(a_nlfunc, a_nlDfunc, a_phiFine,
+                                        *m_B, *m_Pi, *m_zb);
 
   DataIterator dit = a_phiFine.dataIterator();
   int nbox=dit.size();
@@ -1075,11 +1078,11 @@ void AMRNonLinearPoissonOp::AMRProlongS(LevelData<FArrayBox>&       a_correction
 
 // ---------------------------------------------------------
 void AMRNonLinearPoissonOp::AMRProlongS_2(LevelData<FArrayBox>&       a_correction,
-                                 const LevelData<FArrayBox>& a_coarseCorrection,
-                                 LevelData<FArrayBox>&       a_temp,
-                                 const Copier&               a_copier,
-                                 const Copier&         a_cornerCopier,
-                                 const AMRLevelOp<LevelData<FArrayBox> >* a_crsOp )
+                                         const LevelData<FArrayBox>& a_coarseCorrection,
+                                         LevelData<FArrayBox>&       a_temp,
+                                         const Copier&               a_copier,
+                                         const Copier&         a_cornerCopier,
+                                         const AMRLevelOp<LevelData<FArrayBox> >* a_crsOp )
 {
   CH_TIME("AMRNonLinearPoissonOp::AMRProlongS_2");
   
@@ -1150,9 +1153,9 @@ void AMRNonLinearPoissonOp::AMRUpdateResidual(LevelData<FArrayBox>&       a_resi
 // ---------------------------------------------------------
 ///compute norm over all cells on coarse not covered by finer
 Real AMRNonLinearPoissonOp::AMRNorm(const LevelData<FArrayBox>& a_coarResid,
-                           const LevelData<FArrayBox>& a_fineResid,
-                           const int&                  a_refRat,
-                           const int&                  a_ord)
+                                    const LevelData<FArrayBox>& a_fineResid,
+                                    const int&                  a_refRat,
+                                    const int&                  a_ord)
 
 {
   CH_TIME("AMRNonLinearPoissonOp::AMRNorm");
@@ -1209,9 +1212,9 @@ void AMRNonLinearPoissonOp::setBC(const BCHolder& a_bc)
 
 // ---------------------------------------------------------
 void AMRNonLinearPoissonOp::reflux(const LevelData<FArrayBox>&        a_phiFine,
-                          const LevelData<FArrayBox>&        a_phi,
-                          LevelData<FArrayBox>&              a_residual,
-                          AMRLevelOp<LevelData<FArrayBox> >* a_finerOp)
+                                   const LevelData<FArrayBox>&        a_phi,
+                                   LevelData<FArrayBox>&              a_residual,
+                                   AMRLevelOp<LevelData<FArrayBox> >* a_finerOp)
 {
   CH_TIMERS("AMRNonLinearPoissonOp::reflux");
   CH_TIMER("AMRNonLinearPoissonOp::reflux::incrementCoarse", t2);
@@ -1228,7 +1231,6 @@ void AMRNonLinearPoissonOp::reflux(const LevelData<FArrayBox>&        a_phiFine,
 
       if (m_levfluxreg.hasCF(dit()))
         {
-          //pout() << " AMRNonLinearPoissonOp::reflux: " << coarfab.box() << endl;
           for (int idir = 0; idir < SpaceDim; idir++)
             {
               FArrayBox coarflux;
@@ -1321,7 +1323,8 @@ void AMRNonLinearPoissonOp::levelGSRB( LevelData<FArrayBox>&       a_phi,
 
   LevelData<FArrayBox>  a_nlfunc(dbl, 1, IntVect::Zero);
   LevelData<FArrayBox>  a_nlDfunc(dbl, 1, IntVect::Zero);
-  setNL_Level(a_nlfunc, a_nlDfunc, a_phi);
+  MEMBER_FUNC_PTR(*m_amrHydro, m_nllevel)(a_nlfunc, a_nlDfunc, a_phi,
+                                        *m_B, *m_Pi, *m_zb);
 
   DataIterator dit = a_phi.dataIterator();
   int nbox=dit.size();
@@ -1334,7 +1337,7 @@ void AMRNonLinearPoissonOp::levelGSRB( LevelData<FArrayBox>&       a_phi,
       {
         CH_TIME("AMRNonLinearPoissonOp::levelGSRB::homogeneousCFInterp");
         // For FAS, we don't want to do this?
-//        homogeneousCFInterp(a_phi);
+        //homogeneousCFInterp(a_phi);
       }
 
       {
@@ -1444,7 +1447,8 @@ void AMRNonLinearPoissonOp::levelGS( LevelData<FArrayBox>&       a_phi,
 
   LevelData<FArrayBox>  a_nlfunc(dbl, 1, IntVect::Zero);
   LevelData<FArrayBox>  a_nlDfunc(dbl, 1, IntVect::Zero);
-  setNL_Level(a_nlfunc, a_nlDfunc, a_phi);
+  MEMBER_FUNC_PTR(*m_amrHydro, m_nllevel)(a_nlfunc, a_nlDfunc, a_phi,
+                                        *m_B, *m_Pi, *m_zb);
 
   DataIterator dit = a_phi.dataIterator();
   int nbox=dit.size();
@@ -1531,9 +1535,9 @@ void AMRNonLinearPoissonOp::homogeneousCFInterp(LevelData<FArrayBox>& a_phif)
 
 // ---------------------------------------------------------
 void AMRNonLinearPoissonOp::homogeneousCFInterp(LevelData<FArrayBox>& a_phif,
-                                       const DataIndex&      a_datInd,
-                                       int                   a_idir,
-                                       Side::LoHiSide        a_hiorlo)
+                                                const DataIndex&      a_datInd,
+                                                int                   a_idir,
+                                                Side::LoHiSide        a_hiorlo)
 {
   // CH_TIME("AMRNonLinearPoissonOp::homogeneousCFInterp");
 
@@ -1610,10 +1614,10 @@ void AMRNonLinearPoissonOp::singleBoxCFInterp(FArrayBox& a_phi)
 
 // ---------------------------------------------------------
 void AMRNonLinearPoissonOp::interpOnIVSHomo(LevelData<FArrayBox>& a_phif,
-                                   const DataIndex&      a_datInd,
-                                   const int             a_idir,
-                                   const Side::LoHiSide  a_hiorlo,
-                                   const IntVectSet&     a_interpIVS)
+                                            const DataIndex&      a_datInd,
+                                            const int             a_idir,
+                                            const Side::LoHiSide  a_hiorlo,
+                                            const IntVectSet&     a_interpIVS)
 {
   // CH_TIME("AMRNonLinearPoissonOp::interpOnIVSHomo");
 
@@ -1708,10 +1712,10 @@ void AMRNonLinearPoissonOp::interpOnIVSHomo(LevelData<FArrayBox>& a_phif,
 
 // ---------------------------------------------------------
 void AMRNonLinearPoissonOp::getFlux(FArrayBox&       a_flux,
-                           const FArrayBox& a_data,
-                           const Box&       a_edgebox,
-                           int              a_dir,
-                           int              a_ref) const
+                                    const FArrayBox& a_data,
+                                    const Box&       a_edgebox,
+                                    int              a_dir,
+                                    int              a_ref) const
 {
   // In this version of getFlux, the edgebox is passed in, and the flux array
   // is already defined.
@@ -1735,9 +1739,9 @@ void AMRNonLinearPoissonOp::getFlux(FArrayBox&       a_flux,
 
 // ---------------------------------------------------------
 void AMRNonLinearPoissonOp::getFlux(FArrayBox&       a_flux,
-                           const FArrayBox& a_data,
-                           int              a_dir,
-                           int              a_ref) const
+                                    const FArrayBox& a_data,
+                                    int              a_dir,
+                                    int              a_ref) const
 {
   CH_TIME("AMRNonLinearPoissonOp::getFlux2");
 
@@ -1768,12 +1772,17 @@ void AMRNonLinearPoissonOp::getFlux(FArrayBox&       a_flux,
 // ---------------------------------------------------------
 //  AMR Factory define function
 void AMRNonLinearPoissonOpFactory::define(const ProblemDomain&             a_coarseDomain,
-                                 const Vector<DisjointBoxLayout>& a_grids,
-                                 const Vector<int>&               a_refRatios,
-                                 const Real&                      a_coarsedx,
-                                 BCHolder                         a_bc,
-                                 Real                             a_alpha,
-                                 Real                             a_beta)
+                                          const Vector<DisjointBoxLayout>& a_grids,
+                                          const Vector<int>&               a_refRatios,
+                                          const Real&                      a_coarsedx,
+                                          BCHolder                         a_bc,
+                                          AmrHydro*                        a_amrHydro,
+                                          NL_level                         a_nllevel,
+                                          Vector<RefCountedPtr<LevelData<FArrayBox> > >& a_B,
+                                          Vector<RefCountedPtr<LevelData<FArrayBox> > >& a_Pi,
+                                          Vector<RefCountedPtr<LevelData<FArrayBox> > >& a_zb,
+                                          Real                             a_alpha,
+                                          Real                             a_beta)
 {
   CH_TIME("AMRNonLinearPoissonOpFactory::define");
 
@@ -1813,10 +1822,17 @@ void AMRNonLinearPoissonOpFactory::define(const ProblemDomain&             a_coa
 
   m_alpha = a_alpha;
   m_beta = a_beta;
+
+  m_amrHydro = a_amrHydro;
+  m_nllevel  = a_nllevel;
+
+  m_B  = a_B;  // Gap Height
+  m_Pi = a_Pi; // Overb Press  
+  m_zb = a_zb; // Bed Elevation
 }
 
 // ---------------------------------------------------------
-// MultiGrid define function
+// MultiGrid define function -- totally not going to work with NL func
 void AMRNonLinearPoissonOpFactory::define(const ProblemDomain&     a_domain,
                                           const DisjointBoxLayout& a_grid,
                                           const Real&              a_dx,
@@ -1825,17 +1841,39 @@ void AMRNonLinearPoissonOpFactory::define(const ProblemDomain&     a_domain,
                                           Real                     a_alpha,
                                           Real                     a_beta)
 {
+  AmrHydro* amrHydro;
+  NL_level  nllevel; 
 
   Vector<DisjointBoxLayout> grids(1);
   grids[0] = a_grid;
   Vector<int> refRatio(1, 2);
-  define(a_domain, grids, refRatio, a_dx, a_bc, a_alpha, a_beta);
+
+  Vector<RefCountedPtr<LevelData<FArrayBox> > >  B(grids.size());  // Gap Height
+  Vector<RefCountedPtr<LevelData<FArrayBox> > >  Pri(grids.size());// Overb Press  
+  Vector<RefCountedPtr<LevelData<FArrayBox> > >  zb(grids.size()); // Bed Elevation
+  for (int i = 0; i < grids.size(); ++i) {
+      B[i]   = RefCountedPtr<LevelData<FArrayBox> >(
+                   new LevelData<FArrayBox>(grids[i], 1, IntVect::Unit));
+      Pri[i] = RefCountedPtr<LevelData<FArrayBox> >(
+                   new LevelData<FArrayBox>(grids[i], 1, IntVect::Unit));
+      zb[i]  = RefCountedPtr<LevelData<FArrayBox> >(
+                   new LevelData<FArrayBox>(grids[i], 1, IntVect::Unit));
+
+      for (DataIterator dit = B[i]->dataIterator(); dit.ok(); ++dit) {
+          (*B[i])[dit()].setVal(1.0);
+          (*Pri[i])[dit()].setVal(1.0);
+          (*zb[i])[dit()].setVal(1.0);
+      }
+  }
+
+  define(a_domain, grids, refRatio, a_dx, a_bc, 
+         amrHydro, nllevel, B, Pri, zb, a_alpha, a_beta);
 }
 
 // ---------------------------------------------------------
 MGLevelOp<LevelData<FArrayBox> >* AMRNonLinearPoissonOpFactory::MGnewOp(const ProblemDomain& a_indexSpace,
-                                                                int                  a_depth,
-                                                                bool                 a_homoOnly)
+                                                                        int                  a_depth,
+                                                                        bool                 a_homoOnly)
 {
   CH_TIME("AMRNonLinearPoissonOpFactory::MGnewOp");
 
@@ -1843,13 +1881,11 @@ MGLevelOp<LevelData<FArrayBox> >* AMRNonLinearPoissonOpFactory::MGnewOp(const Pr
 
   int ref;
 
-  for (ref = 0; ref< m_domains.size(); ref++)
-    {
-      if (a_indexSpace.domainBox() == m_domains[ref].domainBox())
-      {
-        break;
+  for (ref = 0; ref< m_domains.size(); ref++) {
+      if (a_indexSpace.domainBox() == m_domains[ref].domainBox()) {
+          break;
       }
-    }
+  }
 
   CH_assert(ref != m_domains.size()); // didn't find domain
 
@@ -1881,11 +1917,10 @@ MGLevelOp<LevelData<FArrayBox> >* AMRNonLinearPoissonOpFactory::MGnewOp(const Pr
   Copier ex = m_exchangeCopiers[ref];
   CFRegion cfregion = m_cfregion[ref];
 
-  if (coarsening > 1)
-    {
+  if (coarsening > 1) {
       ex.coarsen(coarsening);
       cfregion.coarsen(coarsening);
-    }
+  }
 
   AMRNonLinearPoissonOp* newOp = new AMRNonLinearPoissonOp;
   newOp->define(layout, dx, domain, m_bc, ex, cfregion);
@@ -1895,6 +1930,55 @@ MGLevelOp<LevelData<FArrayBox> >* AMRNonLinearPoissonOpFactory::MGnewOp(const Pr
 
   newOp->m_aCoef = m_alpha;
   newOp->m_bCoef = m_beta;
+
+  newOp->m_amrHydro  = m_amrHydro; 
+  newOp->m_nllevel   = m_nllevel;
+
+  if (a_depth == 0) {
+      // Problem SPECIFIC
+      newOp->m_B  = m_B[ref];  // Gap Height
+      newOp->m_Pi = m_Pi[ref]; // Overb Press  
+      newOp->m_zb = m_zb[ref]; // Bed Elevation
+  } else {
+      // Problem SPECIFIC
+      RefCountedPtr<LevelData<FArrayBox> > B( new LevelData<FArrayBox> );
+      RefCountedPtr<LevelData<FArrayBox> > Pri( new LevelData<FArrayBox> );
+      RefCountedPtr<LevelData<FArrayBox> > zb( new LevelData<FArrayBox> );
+      B->define(layout,   m_B[ref]->nComp(),  m_B[ref]->ghostVect());
+      Pri->define(layout, m_Pi[ref]->nComp(), m_Pi[ref]->ghostVect());
+      zb->define(layout,  m_zb[ref]->nComp(), m_zb[ref]->ghostVect());
+
+      // average coefficients to coarser level
+      // for now, do this with a CoarseAverage --
+      // may want to switch to harmonic averaging at some point
+      CoarseAverage averagerB(m_B[ref]->getBoxes(),
+                             layout, B->nComp(), coarsening);
+      CoarseAverage averagerPi(m_Pi[ref]->getBoxes(),
+                             layout, Pri->nComp(), coarsening);
+      CoarseAverage averagerZb(m_zb[ref]->getBoxes(),
+                             layout, zb->nComp(), coarsening);
+
+      //if (m_coefficient_average_type == CoarseAverage::arithmetic)
+      //  {
+          averagerB.averageToCoarse(*B,   *(m_B[ref]));
+          averagerPi.averageToCoarse(*Pri, *(m_Pi[ref]));
+          averagerZb.averageToCoarse(*zb,  *(m_zb[ref]));
+      //  }
+      //else if (m_coefficient_average_type == CoarseAverage::harmonic)
+      //  {
+      //    averagerB.averageToCoarseHarmonic(*B,   *(m_B[ref]));
+      //    averagerPi.averageToCoarseHarmonic(*Pri, *(m_Pi[ref]));
+      //    averagerZb.averageToCoarseHarmonic(*zb,  *(m_zb[ref]));
+      //  }
+      //else
+      //  {
+      //    MayDay::Abort("AMRNonLinearPoissonOpFactory::MGNewOp -- bad averagetype");
+      //  }
+
+      newOp->m_B  = B;   // Gap Height
+      newOp->m_Pi = Pri; // Overb Press  
+      newOp->m_zb = zb;  // Bed Elevation
+    }
 
   newOp->m_dxCrse = dxCrse;
 
@@ -1911,26 +1995,20 @@ AMRLevelOp<LevelData<FArrayBox> >* AMRNonLinearPoissonOpFactory::AMRnewOp(const 
 
   int ref;
 
-  for (ref = 0; ref< m_domains.size(); ref++)
-    {
-      if (a_indexSpace.domainBox() == m_domains[ref].domainBox())
-      {
-        break;
+  for (ref = 0; ref< m_domains.size(); ref++) {
+      if (a_indexSpace.domainBox() == m_domains[ref].domainBox()) {
+          break;
       }
-    }
+  }
 
-  if (ref == 0)
-    {
+  if (ref == 0) {
       // coarsest AMR level
-      if ((m_domains.size() == 1) || (!m_boxes[1].isClosed()) )
-        {
+      if ((m_domains.size() == 1) || (!m_boxes[1].isClosed()) ) {
           // no finer level
           newOp->define(m_boxes[0], m_dx[0],
                         a_indexSpace, m_bc,
                         m_exchangeCopiers[0], m_cfregion[0]);
-        }
-      else
-        {
+      } else {
           // finer level exists but no coarser
           int dummyRat = 1;  // argument so compiler can find right function
           int refToFiner = m_refRatios[0]; // actual refinement ratio
@@ -1938,10 +2016,8 @@ AMRLevelOp<LevelData<FArrayBox> >* AMRNonLinearPoissonOpFactory::AMRnewOp(const 
                         dummyRat, refToFiner,
                         a_indexSpace, m_bc,
                         m_exchangeCopiers[0], m_cfregion[0]);
-        }
-    }
-  else if ((ref ==  m_domains.size()-1) || (!m_boxes[ref+1].isClosed()))
-    {
+      }
+  } else if ((ref ==  m_domains.size()-1) || (!m_boxes[ref+1].isClosed())) {
       dxCrse = m_dx[ref-1];
 
       // finest AMR level
@@ -1949,14 +2025,10 @@ AMRLevelOp<LevelData<FArrayBox> >* AMRNonLinearPoissonOpFactory::AMRnewOp(const 
                     m_refRatios[ref-1],
                     a_indexSpace, m_bc,
                     m_exchangeCopiers[ref], m_cfregion[ref]);
-    }
-  else if ( ref == m_domains.size())
-    {
+  } else if ( ref == m_domains.size()) {
       MayDay::Abort("Did not find a domain to match AMRnewOp(const ProblemDomain& a_indexSpace)");
 
-    }
-  else
-    {
+  } else {
       dxCrse = m_dx[ref-1];
 
       // intermediate AMR level, full define
@@ -1964,7 +2036,7 @@ AMRLevelOp<LevelData<FArrayBox> >* AMRNonLinearPoissonOpFactory::AMRnewOp(const 
                     m_refRatios[ref-1], m_refRatios[ref],
                     a_indexSpace, m_bc,
                     m_exchangeCopiers[ref], m_cfregion[ref]);
-    }
+  }
 
   newOp->m_alpha = m_alpha;
   newOp->m_beta  = m_beta;
@@ -1972,10 +2044,70 @@ AMRLevelOp<LevelData<FArrayBox> >* AMRNonLinearPoissonOpFactory::AMRnewOp(const 
   newOp->m_aCoef = m_alpha;
   newOp->m_bCoef = m_beta;
 
+  newOp->m_amrHydro  = m_amrHydro; 
+  newOp->m_nllevel   = m_nllevel;
+
   newOp->m_dxCrse = dxCrse;
+
+  // Problem SPECIFIC
+  newOp->m_B  = m_B[ref];  // Gap Height
+  newOp->m_Pi = m_Pi[ref]; // Overb Press  
+  newOp->m_zb = m_zb[ref]; // Bed Elevation
 
   return (AMRLevelOp<LevelData<FArrayBox> >*)newOp;
 }
+
+//-----------------------------------------------------------------------
+void
+AMRNonLinearPoissonOp::finerOperatorChanged(const MGLevelOp<LevelData<FArrayBox> >& a_operator,
+                                              int a_coarseningFactor)
+{
+  const AMRNonLinearPoissonOp& op =
+    dynamic_cast<const AMRNonLinearPoissonOp&>(a_operator);
+
+  // Problem SPECIFIC
+  LevelData<FArrayBox>& BCoar     = *m_B;  // Gap Height
+  LevelData<FArrayBox>& PiCoar    = *m_Pi; // Overb Press
+  LevelData<FArrayBox>& zbCoar    = *m_zb; // Bed Elevation
+
+  // Problem SPECIFIC
+  const LevelData<FArrayBox>& BFine  = *(op.m_B);
+  const LevelData<FArrayBox>& PiFine = *(op.m_Pi);
+  const LevelData<FArrayBox>& zbFine = *(op.m_zb);
+
+  if (a_coarseningFactor != 1) {
+      // B
+      CoarseAverage cellAverageB(BFine.disjointBoxLayout(),
+                                BCoar.disjointBoxLayout(),
+                                1, a_coarseningFactor);
+      for (DataIterator dit = BCoar.disjointBoxLayout().dataIterator(); dit.ok(); ++dit)
+        BCoar[dit()].setVal(0.);
+      cellAverageB.averageToCoarse(BCoar, BFine);
+      // Pi
+      CoarseAverage cellAveragePi(PiFine.disjointBoxLayout(),
+                                PiCoar.disjointBoxLayout(),
+                                1, a_coarseningFactor);
+      for (DataIterator dit = PiCoar.disjointBoxLayout().dataIterator(); dit.ok(); ++dit)
+        PiCoar[dit()].setVal(0.);
+      cellAveragePi.averageToCoarse(PiCoar, PiFine);
+      // zb
+      CoarseAverage cellAverageZb(zbFine.disjointBoxLayout(),
+                                zbCoar.disjointBoxLayout(),
+                                1, a_coarseningFactor);
+      for (DataIterator dit = zbCoar.disjointBoxLayout().dataIterator(); dit.ok(); ++dit)
+        zbCoar[dit()].setVal(0.);
+      cellAverageZb.averageToCoarse(zbCoar, zbFine);
+  }
+
+  // Handle inter-box ghost cells.
+  BCoar.exchange();
+  PiCoar.exchange();
+  zbCoar.exchange();
+
+  // Notify any observers of this change.
+  notifyObserversOfChange();
+}
+//-----------------------------------------------------------------------
 
 // ---------------------------------------------------------
 int AMRNonLinearPoissonOpFactory::refToFiner(const ProblemDomain& a_domain) const
@@ -1983,14 +2115,12 @@ int AMRNonLinearPoissonOpFactory::refToFiner(const ProblemDomain& a_domain) cons
   int retval = -1;
   bool found = false;
 
-  for (int ilev = 0; ilev < m_domains.size(); ilev++)
-    {
-      if (m_domains[ilev].domainBox() == a_domain.domainBox())
-        {
+  for (int ilev = 0; ilev < m_domains.size(); ilev++) {
+      if (m_domains[ilev].domainBox() == a_domain.domainBox()) {
           retval = m_refRatios[ilev];
           found = true;
-        }
-    }
+      }
+  }
 
   if (!found)
     {
