@@ -175,7 +175,6 @@ void FixedNeumBCFill(FArrayBox& a_state,
 {
   // If box is outside of domain bounds ?
   if(!a_domain.domainBox().contains(a_state.box())) {
-
       for(int dir=0; dir<CH_SPACEDIM; ++dir) {
           // don't do anything if periodic -- should be perio in y dir 1
           if (!a_domain.isPeriodic(dir)) {
@@ -426,7 +425,8 @@ AmrHydro::SolveForHead_nl(const Vector<DisjointBoxLayout>&               a_grids
     }
 
     VCAMRNonLinearPoissonOpFactory poissonOpF_head;
-    NL_level functTmp = &AmrHydro::NonLinear_level;
+    NL_level NLfunctTmp        = &AmrHydro::NonLinear_level;
+    waterFlux_level wFfunctTmp = &AmrHydro::WFlx_level;
     poissonOpF_head.define(a_domains[0],
                            a_grids,
                            refRatio,
@@ -434,7 +434,7 @@ AmrHydro::SolveForHead_nl(const Vector<DisjointBoxLayout>&               a_grids
                            &mixBCValues,
                            0.0, a_aCoef,
                            - 1.0, a_bCoef,
-                          this, functTmp,
+                          this, NLfunctTmp, wFfunctTmp,
                           B, Pri, zb);
 
     AMRLevelOpFactory<LevelData<FArrayBox> >& opFactoryPtr = (AMRLevelOpFactory<LevelData<FArrayBox> >& ) poissonOpF_head;
@@ -454,15 +454,16 @@ AmrHydro::SolveForHead_nl(const Vector<DisjointBoxLayout>&               a_grids
     amrSolver->define(a_domains[0], opFactoryPtr,
                       &bottomSolver, numLevels);
 
-    int numSmooth = 8;
-    int numMG     = 1;
-    int maxIter   = 100;
-    int numBottom = 4;
-    Real eps        =  1.0e-10;
-    Real hang       =  1.0e-12; 
-    Real normThresh =  1.0e-30;
+    int numSmooth = 4;  // number of relax before averaging
+    int numBottom = 2;  // num of bottom smoothings
+    int numMG     = 1;  // Vcycle selected
+    int maxIter   = 100; // max number of v cycles
+    Real eps        =  1.0e-10;  // solution tolerance
+    Real hang       =  0.1;      // next rnorm should be < (1-m_hang)*norm_last 
+    Real normThresh =  1.0e-16;  // abs tol
     amrSolver->setSolverParameters(numSmooth, numSmooth, numBottom,
-                                   numMG, maxIter, eps, hang, normThresh);
+                                   numMG, maxIter, 
+                                   eps, hang, normThresh);
 
     if (m_verbosity > 3) {
         amrSolver->m_verbosity = 4;
@@ -1149,6 +1150,98 @@ AmrHydro::run(Real a_max_time, int a_max_step)
 }
 
 /* Needed routines for timeStep */
+void AmrHydro::WFlx_level(LevelData<FluxBox>&          a_bcoef, 
+                          const LevelData<FArrayBox>&  a_u,
+                          LevelData<FArrayBox>&        a_B,
+                          Real                         a_dx)
+{
+    const DisjointBoxLayout& levelGrids  = a_u.disjointBoxLayout();
+    const ProblemDomain&     levelDomain = levelGrids.physDomain();
+
+    //pout() << " Dx ? " << a_dx << "\n";
+
+    // Copy phi
+    LevelData<FArrayBox> lcl_u(levelGrids, 1, a_u.ghostVect() ); 
+    DataIterator dit = a_u.dataIterator();
+    for (dit.begin(); dit.ok(); ++dit) {
+        lcl_u[dit].copy(  a_u[dit], 0, 0, 1);
+        const FArrayBox& aU     = a_u[dit];
+        BoxIterator bit(aU.box()); // can use gridBox? 
+        for (bit.begin(); bit.ok(); ++bit) {
+            IntVect iv = bit();
+        }
+    }
+
+    // Compute CC gradient of phi
+    LevelData<FArrayBox> lvlgradH(levelGrids, SpaceDim, a_u.ghostVect() ); 
+    LevelData<FArrayBox>* crsePsiPtr = NULL;
+    LevelData<FArrayBox>* finePsiPtr = NULL;
+    int nRefCrse=-1;
+    int nRefFine=-1;
+    // CC version -- GC ???
+    Gradient::compGradientCC(lvlgradH, lcl_u,
+                             crsePsiPtr, finePsiPtr,
+                             a_dx, nRefCrse, nRefFine,
+                             levelDomain);
+    lvlgradH.exchange();
+    ExtrapGhostCells( lvlgradH, levelDomain);
+
+    // Compute Re
+    LevelData<FArrayBox> lvlRe(levelGrids, 1, a_u.ghostVect() ); 
+    for (dit.begin(); dit.ok(); ++dit) {
+        FArrayBox& GradH   = lvlgradH[dit];
+        FArrayBox& B       = a_B[dit];
+        FArrayBox& Re      = lvlRe[dit];
+
+        BoxIterator bit(Re.box()); // can use gridBox? 
+        for (bit.begin(); bit.ok(); ++bit) {
+            IntVect iv = bit();
+            Real sqrt_gradH_cc = std::sqrt(GradH(iv, 0) * GradH(iv, 0) + GradH(iv, 1) * GradH(iv, 1));
+            Real discr = 1.0 + 4.0 * m_suhmoParm->m_omega * (
+                        std::pow(B(iv, 0), 3) * m_suhmoParm->m_gravity * sqrt_gradH_cc) / (
+                        12.0 * m_suhmoParm->m_nu * m_suhmoParm->m_nu);  
+            Re(iv, 0) = (- 1.0 + std::sqrt(discr)) / (2.0 * m_suhmoParm->m_omega) ; 
+            //pout() << " -- cell B ? " << iv << " " << B(iv, 0) <<"\n";
+        }
+    }
+    //pout() << "\n  INFO \n";
+    
+    // CC -> EC
+    LevelData<FluxBox>   lvlB_ec(levelGrids, 1, IntVect::Zero);
+    LevelData<FluxBox>   lvlRe_ec(levelGrids, 1, IntVect::Zero);
+    CellToEdge(lvlRe, lvlRe_ec);
+    CellToEdge(a_B, lvlB_ec);
+
+    // Update Bcoef
+    dit = a_bcoef.dataIterator();
+    for (dit.begin(); dit.ok(); ++dit) {
+        FluxBox& bC        = a_bcoef[dit];
+        FluxBox& B_ec      = lvlB_ec[dit];
+        FluxBox& Re_ec     = lvlRe_ec[dit];
+        // loop over directions
+        for (int dir = 0; dir<SpaceDim; dir++) {
+            FArrayBox& bCFab = bC[dir];
+            FArrayBox& BFab  = B_ec[dir];
+            FArrayBox& ReFab = Re_ec[dir];
+
+            // initialize 
+            bCFab.setVal(0.0);
+
+            BoxIterator bit(bCFab.box()); 
+            for (bit.begin(); bit.ok(); ++bit) {
+                IntVect iv = bit();
+                // Update b coeff
+                Real num_q = - std::pow(BFab(iv, 0),3) * m_suhmoParm->m_gravity;
+                Real denom_q = 12.0 * m_suhmoParm->m_nu * (1 + m_suhmoParm->m_omega * ReFab(iv, 0));
+                bCFab(iv, 0) = num_q/denom_q;
+                //pout() << " -- cell dir Bc-EC " << iv << " " << dir << " " << bCFab(iv, 0) << "\n";
+            }
+        }
+    }
+
+}
+
+
 void AmrHydro::NonLinear_level(LevelData<FArrayBox>&        a_NL, 
                                LevelData<FArrayBox>&        a_dNL,
                                const LevelData<FArrayBox>&  a_u,
@@ -1170,7 +1263,6 @@ void AmrHydro::NonLinear_level(LevelData<FArrayBox>&        a_NL,
       BoxIterator bit(thisNL.box());
       for (bit.begin(); bit.ok(); ++bit) {
           IntVect iv = bit();
-          //pout() << "Bedelev in NonLinear_level ? " << iv << " " << thiszb(iv,0) << "\n";
           thisNL(iv, 0)  = - m_suhmoParm->m_A * thisB(iv,0) * 
                            std::pow( (thisPi(iv,0) - m_suhmoParm->m_rho_w * m_suhmoParm->m_gravity *
                            (thisU(iv,0) -thiszb(iv,0))), 3);

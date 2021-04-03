@@ -452,7 +452,6 @@ Gradient::compGradientCC(LevelData<FArrayBox>& a_grad,
                          const LayoutData<IntVectSet>& a_gridIVS,
                          QuadCFInterp& cfInterpCrse)
 {
-  //pout() << "End up there for compGradientCC ?"<< endl;
   // first compute edge-centered gradient
   const DisjointBoxLayout& grids = a_grad.getBoxes();
   int ncompGrad = a_grad.nComp();
@@ -561,9 +560,8 @@ Gradient::compGradientCC(LevelData<FArrayBox>& a_grad,
   // Modify the LoSide of edgeGrad in x-dir to account for Dirichlet  
   // i.e. on Dirichlet BCs, the ghost cell value actually lives on the face
   // so the gradient should be multiplied by 2.
-  //pout() << "Hacking face gradient for Dirichlet \n";
 
-  //DataIterator dit = edgeGrad.dataIterator();
+  DataIterator dit = edgeGrad.dataIterator();
   //for (dit.reset(); dit.ok(); ++dit) {
   //   FluxBox& thisEdgeGrad = edgeGrad[dit];
   //   FArrayBox& edgeGradXFab = thisEdgeGrad[0];
@@ -571,9 +569,9 @@ Gradient::compGradientCC(LevelData<FArrayBox>& a_grad,
   //   for (bit.begin(); bit.ok(); ++bit)
   //   {
   //      const IntVect& iv = bit();
-  //      //pout() << " iv edgeGradXFab box " << iv << "\n";   
-  //      //pout() << " edgeGradXFab " << edgeGradXFab(iv,0) << "\n";   
-  //      if ( iv[0] == 0 ) edgeGradXFab(iv,0) *= 2.0;
+  //      pout() << " iv GradHedgeX " << iv << " " << edgeGradXFab(iv,0) <<"\n";   
+        //pout() << " edgeGradXFab " << edgeGradXFab(iv,0) << "\n";   
+        //if ( iv[0] == 0 ) edgeGradXFab(iv,0) *= 2.0;
   //      //if ( iv[0] == 0 ) pout() << " edgeGradXFab 0th face " << edgeGradXFab(iv,0);
   //      //if ( iv[0] == 1 ) pout() << " 1rst " << edgeGradXFab(iv,0);
   //      //if ( iv[0] == 2 ) pout() << " 2nd " << edgeGradXFab(iv,0) << "\n";

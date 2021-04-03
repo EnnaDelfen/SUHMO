@@ -32,6 +32,9 @@
 
 typedef void (AmrHydro::*NL_level) (LevelData<FArrayBox>& a_NL, LevelData<FArrayBox>& a_dNL, const LevelData<FArrayBox>&  a_u,
                                     LevelData<FArrayBox>& a_B, LevelData<FArrayBox>& a_Pi, LevelData<FArrayBox>& a_zb);
+
+typedef void (AmrHydro::*waterFlux_level) (LevelData<FluxBox>& a_Bcoef, const LevelData<FArrayBox>&  a_u, LevelData<FArrayBox>& a_B,
+              Real a_dx);
 //typedef void (AmrHydro::*NL) (Vector<LevelData<FArrayBox>* > a_NL, Vector<LevelData<FArrayBox>* > a_dNL, const Vector<LevelData<FArrayBox>* >  a_u, int a_finestLevel);
 
 ///
@@ -466,7 +469,8 @@ public:
   RefCountedPtr<LevelData<FArrayBox> > m_Pi; // Overb Press
   RefCountedPtr<LevelData<FArrayBox> > m_zb; // Bed Elevation
 
-  NL_level m_nllevel = nullptr;
+  NL_level m_nllevel               = nullptr;
+  waterFlux_level m_waterFluxlevel = nullptr;
   AmrHydro* m_amrHydro = nullptr;
 
   // needed for homogeneous interpolation
@@ -626,7 +630,8 @@ private:
   Vector<RefCountedPtr<LevelData<FArrayBox> > > m_Pi; // Overb Press
   Vector<RefCountedPtr<LevelData<FArrayBox> > > m_zb; // Bed Elevation
 
-  NL_level m_nllevel    = nullptr;
+  NL_level m_nllevel               = nullptr;
+  waterFlux_level m_waterFluxlevel = nullptr;
   AmrHydro* m_amrHydro  = nullptr;
 
   Vector<Copier>   m_exchangeCopiers;

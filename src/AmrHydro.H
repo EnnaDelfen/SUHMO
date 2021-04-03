@@ -85,6 +85,11 @@ public:
                          LevelData<FArrayBox>&        a_Pi,
                          LevelData<FArrayBox>&        a_zb);
 
+    void WFlx_level(LevelData<FluxBox>&          a_bcoef, 
+                    const LevelData<FArrayBox>&  a_u,
+                    LevelData<FArrayBox>&        a_B,
+                    Real                         a_dx);
+
     void NonLinear(Vector<LevelData<FArrayBox>* >        a_NL,
                    Vector<LevelData<FArrayBox>* >        a_dNL, 
                    const Vector<LevelData<FArrayBox>* >  a_u,

@@ -25,7 +25,10 @@
 #include "VCAMRNonLinearPoissonOpF_F.H"
 #include "DebugOut.H"
 
+#include "ExtrapGhostCells.H"
+
 #include "NamespaceHeader.H"
+
 
 void VCAMRNonLinearPoissonOp::residualI(LevelData<FArrayBox>&   a_lhs,
                                const LevelData<FArrayBox>&      a_phi,
@@ -33,6 +36,7 @@ void VCAMRNonLinearPoissonOp::residualI(LevelData<FArrayBox>&   a_lhs,
                                bool                             a_homogeneous)
 {
   CH_TIME("VCAMRNonLinearPoissonOp::residualI");
+  pout() << "VCAMRNonLinearPoissonOp::residualI\n";
 
   LevelData<FArrayBox>& phi = (LevelData<FArrayBox>&)a_phi;
 
@@ -42,8 +46,6 @@ void VCAMRNonLinearPoissonOp::residualI(LevelData<FArrayBox>&   a_lhs,
 
   LevelData<FArrayBox>  a_nlfunc(dbl, 1, IntVect::Zero);
   LevelData<FArrayBox>  a_nlDfunc(dbl, 1, IntVect::Zero);
-  MEMBER_FUNC_PTR(*m_amrHydro, m_nllevel)(a_nlfunc, a_nlDfunc, a_phi,
-                                          *m_B, *m_Pi, *m_zb);
 
   DataIterator dit = phi.dataIterator();
   {
@@ -55,7 +57,11 @@ void VCAMRNonLinearPoissonOp::residualI(LevelData<FArrayBox>&   a_lhs,
     }
   }
 
-  //phi.exchange(phi.interval(), m_exchangeCopier);
+  MEMBER_FUNC_PTR(*m_amrHydro, m_nllevel)(a_nlfunc, a_nlDfunc, a_phi,
+                                          *m_B, *m_Pi, *m_zb);
+  // test for updating the Re
+  MEMBER_FUNC_PTR(*m_amrHydro, m_waterFluxlevel)(*m_bCoef, a_phi,
+                                                 *m_B, m_dx);
 
   for (dit.begin(); dit.ok(); ++dit)
     {
@@ -181,6 +187,7 @@ void VCAMRNonLinearPoissonOp::applyOpNoBoundary(LevelData<FArrayBox>&       a_lh
                                                 const LevelData<FArrayBox>& a_phi)
 {
   CH_TIME("VCAMRNonLinearPoissonOp::applyOpNoBoundary");
+  pout() <<"VCAMRNonLinearPoissonOp::applyOpNoBoundary \n";
 
   LevelData<FArrayBox>& phi = (LevelData<FArrayBox>&)a_phi;
 
@@ -188,12 +195,17 @@ void VCAMRNonLinearPoissonOp::applyOpNoBoundary(LevelData<FArrayBox>&       a_lh
 
   LevelData<FArrayBox>  a_nlfunc(dbl, 1, IntVect::Zero);
   LevelData<FArrayBox>  a_nlDfunc(dbl, 1, IntVect::Zero);
+
+  phi.exchange(phi.interval(), m_exchangeCopier);
+
   MEMBER_FUNC_PTR(*m_amrHydro, m_nllevel)(a_nlfunc, a_nlDfunc, a_phi,
                                           *m_B, *m_Pi, *m_zb);
 
-  DataIterator dit = phi.dataIterator();
-  phi.exchange(phi.interval(), m_exchangeCopier);
+  // test for updating the Re
+  MEMBER_FUNC_PTR(*m_amrHydro, m_waterFluxlevel)(*m_bCoef, a_phi,
+                                                 *m_B, m_dx);
 
+  DataIterator dit = phi.dataIterator();
   for (dit.begin(); dit.ok(); ++dit)
     {
       const Box& region = dbl[dit()];
@@ -234,6 +246,7 @@ void VCAMRNonLinearPoissonOp::restrictR(LevelData<FArrayBox>& a_phiCoarse,
                                         const LevelData<FArrayBox>& a_phiFine)
 {
   //    a_phiFine.exchange(a_phiFine.interval(), m_exchangeCopier);
+  pout() << "VCAMRNonLinearPoissonOp::restrictR\n"; 
 
   const DisjointBoxLayout& dblFine = a_phiFine.disjointBoxLayout();
 
@@ -267,8 +280,6 @@ void VCAMRNonLinearPoissonOp::restrictResidual(LevelData<FArrayBox>&     a_resCo
 
   LevelData<FArrayBox>  a_nlfunc(dblFine, 1, IntVect::Zero);
   LevelData<FArrayBox>  a_nlDfunc(dblFine, 1, IntVect::Zero);
-  MEMBER_FUNC_PTR(*m_amrHydro, m_nllevel)(a_nlfunc, a_nlDfunc, a_phiFine,
-                                          *m_B, *m_Pi, *m_zb);
 
   for (DataIterator dit = a_phiFine.dataIterator(); dit.ok(); ++dit)
     {
@@ -277,6 +288,13 @@ void VCAMRNonLinearPoissonOp::restrictResidual(LevelData<FArrayBox>&     a_resCo
     }
 
   a_phiFine.exchange(a_phiFine.interval(), m_exchangeCopier);
+
+  MEMBER_FUNC_PTR(*m_amrHydro, m_nllevel)(a_nlfunc, a_nlDfunc, a_phiFine,
+                                          *m_B, *m_Pi, *m_zb);
+
+  // test for updating the Re
+  MEMBER_FUNC_PTR(*m_amrHydro, m_waterFluxlevel)(*m_bCoef, a_phiFine,
+                                                 *m_B, m_dx);
 
   for (DataIterator dit = a_phiFine.dataIterator(); dit.ok(); ++dit)
     {
@@ -514,11 +532,8 @@ void VCAMRNonLinearPoissonOp::levelGSRB(LevelData<FArrayBox>&       a_phi,
 
   LevelData<FArrayBox>  a_nlfunc(dbl, 1, IntVect::Zero);
   LevelData<FArrayBox>  a_nlDfunc(dbl, 1, IntVect::Zero);
-  MEMBER_FUNC_PTR(*m_amrHydro, m_nllevel)(a_nlfunc, a_nlDfunc, a_phi,
-                                          *m_B, *m_Pi, *m_zb);
 
   DataIterator dit = a_phi.dataIterator();
-
   // do first red, then black passes
   for (int whichPass = 0; whichPass <= 1; whichPass++)
     {
@@ -544,6 +559,12 @@ void VCAMRNonLinearPoissonOp::levelGSRB(LevelData<FArrayBox>&       a_phi,
             m_bc(a_phi[dit], dbl[dit()], m_domain, m_dx, true);
           }
       }
+
+      MEMBER_FUNC_PTR(*m_amrHydro, m_nllevel)(a_nlfunc, a_nlDfunc, a_phi,
+                                              *m_B, *m_Pi, *m_zb);
+      // test for updating the Re
+      MEMBER_FUNC_PTR(*m_amrHydro, m_waterFluxlevel)(*m_bCoef, a_phi,
+                                                     *m_B, m_dx);
 
       for (dit.begin(); dit.ok(); ++dit)
         {
@@ -584,6 +605,15 @@ void VCAMRNonLinearPoissonOp::levelGSRB(LevelData<FArrayBox>&       a_phi,
                                  CHF_CONST_INT(whichPass));
         } // end loop through grids
     } // end loop through red-black
+
+
+    // Uodate GC for purpose of recomputing bCoeff
+    // not sure we still need this
+    a_phi.exchange(a_phi.interval(), m_exchangeCopier);
+
+    for (dit.begin(); dit.ok(); ++dit) {
+        m_bc(a_phi[dit], dbl[dit()], m_domain, m_dx, true);
+    }
 }
 
 void VCAMRNonLinearPoissonOp::levelMultiColor(LevelData<FArrayBox>&       a_phi,
@@ -711,6 +741,7 @@ void VCAMRNonLinearPoissonOpFactory::define(const ProblemDomain&         a_coars
                                             const Real&                           a_beta,
                                             Vector<RefCountedPtr<LevelData<FluxBox> > >&   a_bCoef,
                                             AmrHydro* a_amrHydro, NL_level a_nllevel,
+                                            waterFlux_level a_wFlvl,
                                             Vector<RefCountedPtr<LevelData<FArrayBox> > >& a_B,
                                             Vector<RefCountedPtr<LevelData<FArrayBox> > >& a_Pi,
                                             Vector<RefCountedPtr<LevelData<FArrayBox> > >& a_zb)
@@ -758,7 +789,8 @@ void VCAMRNonLinearPoissonOpFactory::define(const ProblemDomain&         a_coars
   m_bCoef = a_bCoef;
 
   m_amrHydro   = a_amrHydro;
-  m_nllevel  = a_nllevel;
+  m_nllevel    = a_nllevel;
+  m_waterFluxlevel = a_wFlvl;
 
   m_B  = a_B;  // Gap Height
   m_Pi = a_Pi; // Overb Press  
@@ -787,6 +819,7 @@ VCAMRNonLinearPoissonOpFactory::define(const ProblemDomain&   a_coarseDomain,
   Vector<RefCountedPtr<LevelData<FArrayBox> > >  zb(a_grids.size()); // Bed Elevation
   AmrHydro* amrHydro;
   NL_level  nllevel; 
+  waterFlux_level wFlevel;
   for (int i = 0; i < a_grids.size(); ++i)
   {
     aCoef[i] = RefCountedPtr<LevelData<FArrayBox> >(
@@ -816,7 +849,7 @@ VCAMRNonLinearPoissonOpFactory::define(const ProblemDomain&   a_coarseDomain,
   // these choices are weird and not in accordance with the default Lapl
   Real alpha = 1.0, beta = 1.0;
   define(a_coarseDomain, a_grids, a_refRatios, a_coarsedx, a_bc,
-         alpha, aCoef, beta, bCoef, amrHydro, nllevel,
+         alpha, aCoef, beta, bCoef, amrHydro, nllevel, wFlevel,
          B, Pri, zb);
 }
 //-----------------------------------------------------------------------
@@ -851,6 +884,8 @@ MGLevelOp<LevelData<FArrayBox> >* VCAMRNonLinearPoissonOpFactory::MGnewOp(const 
       domain.coarsen(2);
   }
 
+  pout() << "VCAMRNonLinearPoissonOpFactory::MGnewOp ( depth, ref_ratio = " << a_depth << " " << coarsening << ")\n";
+
   if (coarsening > 1 && !m_boxes[ref].coarsenable(coarsening*VCAMRNonLinearPoissonOp::s_maxCoarse)) {
       return NULL;
   }
@@ -876,6 +911,7 @@ MGLevelOp<LevelData<FArrayBox> >* VCAMRNonLinearPoissonOpFactory::MGnewOp(const 
 
   newOp->m_amrHydro    = m_amrHydro; 
   newOp->m_nllevel     = m_nllevel;
+  newOp->m_waterFluxlevel = m_waterFluxlevel;
 
   if (a_depth == 0) {
       // don't need to coarsen anything for this
@@ -909,11 +945,11 @@ MGLevelOp<LevelData<FArrayBox> >* VCAMRNonLinearPoissonOpFactory::MGnewOp(const 
                                      bCoef->nComp(), coarsening);
 
       CoarseAverage averagerB(m_B[ref]->getBoxes(),
-                             layout, B->nComp(), coarsening);
+                             layout, B->nComp(), coarsening, m_B[ref]->ghostVect());
       CoarseAverage averagerPi(m_Pi[ref]->getBoxes(),
-                             layout, Pri->nComp(), coarsening);
+                             layout, Pri->nComp(), coarsening, m_Pi[ref]->ghostVect());
       CoarseAverage averagerZb(m_zb[ref]->getBoxes(),
-                             layout, zb->nComp(), coarsening);
+                             layout, zb->nComp(), coarsening, m_zb[ref]->ghostVect());
 
       if (m_coefficient_average_type == CoarseAverage::arithmetic)
         {
@@ -923,6 +959,16 @@ MGLevelOp<LevelData<FArrayBox> >* VCAMRNonLinearPoissonOpFactory::MGnewOp(const 
           averagerB.averageToCoarse(*B,   *(m_B[ref]));
           averagerPi.averageToCoarse(*Pri, *(m_Pi[ref]));
           averagerZb.averageToCoarse(*zb,  *(m_zb[ref]));
+
+          // freakin boundaries and ghost cells
+          // exchange ? Right now no bec we added the last arg to CoarseAverage def and it seems to do the perio fine
+          const DisjointBoxLayout& B_dbl = B->getBoxes();
+          const ProblemDomain&     B_dom = B_dbl.physDomain();
+          DataIterator dit               = B->dataIterator();
+          for (dit.begin(); dit.ok(); ++dit) {
+              const Box& validBox = B_dbl.get(dit);
+              NeumBCForB((*B)[dit], validBox, B_dom, dx);
+          }
         }
       else if (m_coefficient_average_type == CoarseAverage::harmonic)
         {
@@ -945,7 +991,7 @@ MGLevelOp<LevelData<FArrayBox> >* VCAMRNonLinearPoissonOpFactory::MGnewOp(const 
       newOp->m_B  = B;   // Gap Height
       newOp->m_Pi = Pri; // Overb Press  
       newOp->m_zb = zb;  // Bed Elevation
-    }
+  }
 
   newOp->computeLambda();
 
@@ -1031,6 +1077,7 @@ AMRLevelOp<LevelData<FArrayBox> >* VCAMRNonLinearPoissonOpFactory::AMRnewOp(cons
 
   newOp->m_amrHydro   = m_amrHydro;
   newOp->m_nllevel  = m_nllevel;
+  newOp->m_waterFluxlevel = m_waterFluxlevel;
 
   // Problem SPECIFIC
   newOp->m_B  = m_B[ref];  // Gap Height
@@ -1067,6 +1114,41 @@ int VCAMRNonLinearPoissonOpFactory::refToFiner(const ProblemDomain& a_domain) co
 }
 
 //-----------------------------------------------------------------------
+void VCAMRNonLinearPoissonOpFactory::NeumBCForB(FArrayBox& a_state,
+                                                const Box& a_valid,
+                                                const ProblemDomain& a_domain,
+                                                Real a_dx)
+{
+  // If box is outside of domain bounds ?
+  if(!a_domain.domainBox().contains(a_state.box())) {
+      for(int dir=0; dir<CH_SPACEDIM; ++dir) {
+          // don't do anything if periodic -- should be perio in y dir 1
+          if (!a_domain.isPeriodic(dir)) {
+              Box ghostBoxLo = adjCellBox(a_valid, dir, Side::Lo, 1);
+              Box ghostBoxHi = adjCellBox(a_valid, dir, Side::Hi, 1);
+
+              if ((!a_domain.domainBox().contains(ghostBoxLo)) && (a_state.box().contains(ghostBoxLo)) ) {
+                  // Neum
+                  Box fromRegion = ghostBoxLo;
+                  int isign = sign(Side::Lo);
+                  fromRegion.shift(dir, -isign);
+                  a_state.copy(a_state, fromRegion, 0, ghostBoxLo, 0, a_state.nComp());
+              } // End ghostBoxLo in dir
+
+              if ((!a_domain.domainBox().contains(ghostBoxHi)) && (a_state.box().contains(ghostBoxHi)) ) {
+                  // Neum
+                  Box fromRegion = ghostBoxHi;
+                  int isign = sign(Side::Hi);
+                  fromRegion.shift(dir, -isign);
+                  a_state.copy(a_state, fromRegion, 0, ghostBoxHi, 0, a_state.nComp());
+              } // End ghostBoxHi in dir
+
+          } // end if is not periodic in ith direction
+      } // end dir loop
+  }
+}
+
+
 void VCAMRNonLinearPoissonOpFactory::setDefaultValues()
 {
   // Default to Laplacian operator
@@ -1083,7 +1165,7 @@ VCAMRNonLinearPoissonOp::finerOperatorChanged(const MGLevelOp<LevelData<FArrayBo
                                               int a_coarseningFactor)
 {
   const VCAMRNonLinearPoissonOp& op =
-    dynamic_cast<const VCAMRNonLinearPoissonOp&>(a_operator);
+  dynamic_cast<const VCAMRNonLinearPoissonOp&>(a_operator);
 
   // Perform multigrid coarsening on the operator data.
   LevelData<FArrayBox>& acoefCoar = *m_aCoef;
@@ -1143,6 +1225,7 @@ VCAMRNonLinearPoissonOp::finerOperatorChanged(const MGLevelOp<LevelData<FArrayBo
 
   // Problem SPECIFIC
   BCoar.exchange();
+  //ExtrapGhostCells( BCoar, BCoar.disjointBoxLayout().physDomain());
   PiCoar.exchange();
   zbCoar.exchange();
 

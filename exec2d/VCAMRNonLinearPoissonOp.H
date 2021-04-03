@@ -293,7 +293,7 @@ public:
               Vector<RefCountedPtr<LevelData<FArrayBox> > >& a_aCoef,
               const Real&                                    a_beta,
               Vector<RefCountedPtr<LevelData<FluxBox> > >&   a_bCoef,
-              AmrHydro* a_amrHydro, NL_level a_nllevel,
+              AmrHydro* a_amrHydro, NL_level a_nllevel, waterFlux_level a_wFlvl,
               Vector<RefCountedPtr<LevelData<FArrayBox> > >& a_B,
               Vector<RefCountedPtr<LevelData<FArrayBox> > >& a_Pi,
               Vector<RefCountedPtr<LevelData<FArrayBox> > >& a_zb);
@@ -330,6 +330,11 @@ public:
 private:
   void setDefaultValues();
 
+  void NeumBCForB(FArrayBox& a_state,
+                  const Box& a_valid,
+                  const ProblemDomain& a_domain,
+                  Real a_dx);
+
   Vector<ProblemDomain>     m_domains;
   Vector<DisjointBoxLayout> m_boxes;
 
@@ -349,7 +354,8 @@ private:
   Vector<RefCountedPtr<LevelData<FArrayBox> > > m_Pi; // Overb Press
   Vector<RefCountedPtr<LevelData<FArrayBox> > > m_zb; // Bed Elevation
 
-  NL_level m_nllevel      = nullptr;
+  NL_level m_nllevel               = nullptr;
+  waterFlux_level m_waterFluxlevel = nullptr;
   AmrHydro* m_amrHydro    = nullptr;
 
   Vector<RefCountedPtr<LevelData<FArrayBox> > > m_lambda;

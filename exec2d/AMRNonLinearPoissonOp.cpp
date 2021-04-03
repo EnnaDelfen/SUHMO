@@ -265,6 +265,7 @@ void AMRNonLinearPoissonOp::residualI(LevelData<FArrayBox>&       a_lhs,
                                       bool                        a_homogeneous)
 {
   CH_TIME("AMRNonLinearPoissonOp::residualI");
+  pout() << "AMRNonLinearPoissonOp::residualI\n";
 
   LevelData<FArrayBox>& phi = (LevelData<FArrayBox>&)a_phi;
   if (s_exchangeMode == 0)
@@ -457,7 +458,7 @@ void AMRNonLinearPoissonOp::applyOpNoBoundary(LevelData<FArrayBox>&       a_lhs,
 
 // ---------------------------------------------------------
 void AMRNonLinearPoissonOp::create(LevelData<FArrayBox>&       a_lhs,
-                          const LevelData<FArrayBox>& a_rhs)
+                                   const LevelData<FArrayBox>& a_rhs)
 {
   CH_TIME("AMRNonLinearPoissonOp::create");
 
@@ -651,9 +652,11 @@ void AMRNonLinearPoissonOp::relax(LevelData<FArrayBox>&       a_e,
                                   int                         a_iterations)
 {
   CH_TIME("AMRNonLinearPoissonOp::relax");
+  pout() << "AMRNonLinearPoissonOp::relax\n"; 
 
   for (int i = 0; i < a_iterations; i++)
     {
+      pout() <<" levelGSRB "<< i <<"\n";
       switch (s_relaxMode)
         {
         case 0:
@@ -791,9 +794,10 @@ void AMRNonLinearPoissonOp::restrictResidual(LevelData<FArrayBox>&       a_resCo
 
 // ---------------------------------------------------------
 void AMRNonLinearPoissonOp::prolongIncrement(LevelData<FArrayBox>&       a_phiThisLevel,
-                                    const LevelData<FArrayBox>& a_correctCoarse)
+                                             const LevelData<FArrayBox>& a_correctCoarse)
 {
   CH_TIME("AMRNonLinearPoissonOp::prolongIncrement");
+  pout() << "AMRNonLinearPoissonOp::prolongIncrement\n";
   
   DisjointBoxLayout dbl = a_phiThisLevel.disjointBoxLayout();
   int mgref = 2; //this is a multigrid func
