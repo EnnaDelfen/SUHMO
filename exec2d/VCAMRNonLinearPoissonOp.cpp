@@ -1100,6 +1100,9 @@ AMRLevelOp<LevelData<FArrayBox> >* VCAMRNonLinearPoissonOpFactory::AMRnewOp(cons
   newOp->m_alpha = m_alpha;
   newOp->m_beta  = m_beta;
 
+  newOp->compute_Bcoeff = compute_Bcoeff;
+  newOp->m_verbosity = m_verbosity;
+
   newOp->m_aCoef = m_aCoef[ref];
   newOp->m_bCoef = m_bCoef[ref];
 

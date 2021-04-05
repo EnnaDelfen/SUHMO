@@ -435,7 +435,7 @@ AmrHydro::SolveForHead_nl(const Vector<DisjointBoxLayout>&               a_grids
                            0.0, a_aCoef,
                            - 1.0, a_bCoef,
                           this, NLfunctTmp, wFfunctTmp,
-                          B, Pri, zbi, m_compute_Bcoeff);
+                          B, Pri, zb, m_compute_Bcoeff);
 
     AMRLevelOpFactory<LevelData<FArrayBox> >& opFactoryPtr = (AMRLevelOpFactory<LevelData<FArrayBox> >& ) poissonOpF_head;
 
