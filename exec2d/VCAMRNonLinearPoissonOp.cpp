@@ -36,7 +36,9 @@ void VCAMRNonLinearPoissonOp::residualI(LevelData<FArrayBox>&   a_lhs,
                                bool                             a_homogeneous)
 {
   CH_TIME("VCAMRNonLinearPoissonOp::residualI");
-  pout() << "VCAMRNonLinearPoissonOp::residualI\n";
+  if (m_verbosity > 3) {
+      pout() << "VCAMRNonLinearPoissonOp::residualI\n";
+  }
 
   LevelData<FArrayBox>& phi = (LevelData<FArrayBox>&)a_phi;
 
@@ -60,8 +62,10 @@ void VCAMRNonLinearPoissonOp::residualI(LevelData<FArrayBox>&   a_lhs,
   MEMBER_FUNC_PTR(*m_amrHydro, m_nllevel)(a_nlfunc, a_nlDfunc, a_phi,
                                           *m_B, *m_Pi, *m_zb);
   // test for updating the Re
-  MEMBER_FUNC_PTR(*m_amrHydro, m_waterFluxlevel)(*m_bCoef, a_phi,
+  if (compute_Bcoeff) {
+      MEMBER_FUNC_PTR(*m_amrHydro, m_waterFluxlevel)(*m_bCoef, a_phi,
                                                  *m_B, m_dx);
+  }
 
   for (dit.begin(); dit.ok(); ++dit)
     {
@@ -187,7 +191,9 @@ void VCAMRNonLinearPoissonOp::applyOpNoBoundary(LevelData<FArrayBox>&       a_lh
                                                 const LevelData<FArrayBox>& a_phi)
 {
   CH_TIME("VCAMRNonLinearPoissonOp::applyOpNoBoundary");
-  pout() <<"VCAMRNonLinearPoissonOp::applyOpNoBoundary \n";
+  if (m_verbosity > 3) {
+      pout() <<"VCAMRNonLinearPoissonOp::applyOpNoBoundary \n";
+  }
 
   LevelData<FArrayBox>& phi = (LevelData<FArrayBox>&)a_phi;
 
@@ -202,8 +208,10 @@ void VCAMRNonLinearPoissonOp::applyOpNoBoundary(LevelData<FArrayBox>&       a_lh
                                           *m_B, *m_Pi, *m_zb);
 
   // test for updating the Re
-  MEMBER_FUNC_PTR(*m_amrHydro, m_waterFluxlevel)(*m_bCoef, a_phi,
+  if (compute_Bcoeff) {
+      MEMBER_FUNC_PTR(*m_amrHydro, m_waterFluxlevel)(*m_bCoef, a_phi,
                                                  *m_B, m_dx);
+  }
 
   DataIterator dit = phi.dataIterator();
   for (dit.begin(); dit.ok(); ++dit)
@@ -246,7 +254,9 @@ void VCAMRNonLinearPoissonOp::restrictR(LevelData<FArrayBox>& a_phiCoarse,
                                         const LevelData<FArrayBox>& a_phiFine)
 {
   //    a_phiFine.exchange(a_phiFine.interval(), m_exchangeCopier);
-  pout() << "VCAMRNonLinearPoissonOp::restrictR\n"; 
+  if (m_verbosity > 3) {
+      pout() << "VCAMRNonLinearPoissonOp::restrictR\n"; 
+  }
 
   const DisjointBoxLayout& dblFine = a_phiFine.disjointBoxLayout();
 
@@ -293,8 +303,10 @@ void VCAMRNonLinearPoissonOp::restrictResidual(LevelData<FArrayBox>&     a_resCo
                                           *m_B, *m_Pi, *m_zb);
 
   // test for updating the Re
-  MEMBER_FUNC_PTR(*m_amrHydro, m_waterFluxlevel)(*m_bCoef, a_phiFine,
+  if (compute_Bcoeff) {
+      MEMBER_FUNC_PTR(*m_amrHydro, m_waterFluxlevel)(*m_bCoef, a_phiFine,
                                                  *m_B, m_dx);
+  }
 
   for (DataIterator dit = a_phiFine.dataIterator(); dit.ok(); ++dit)
     {
@@ -354,6 +366,11 @@ void VCAMRNonLinearPoissonOp::setAlphaAndBeta(const Real& a_alpha,
 
   // Our relaxation parameter is officially out of date!
   m_lambdaNeedsResetting = true;
+}
+
+void VCAMRNonLinearPoissonOp::computeCoeffsOTF(bool a_compute_Bcoeff)
+{
+  compute_Bcoeff = a_compute_Bcoeff;
 }
 
 
@@ -563,8 +580,10 @@ void VCAMRNonLinearPoissonOp::levelGSRB(LevelData<FArrayBox>&       a_phi,
       MEMBER_FUNC_PTR(*m_amrHydro, m_nllevel)(a_nlfunc, a_nlDfunc, a_phi,
                                               *m_B, *m_Pi, *m_zb);
       // test for updating the Re
-      MEMBER_FUNC_PTR(*m_amrHydro, m_waterFluxlevel)(*m_bCoef, a_phi,
+      if (compute_Bcoeff) {
+          MEMBER_FUNC_PTR(*m_amrHydro, m_waterFluxlevel)(*m_bCoef, a_phi,
                                                      *m_B, m_dx);
+      }
 
       for (dit.begin(); dit.ok(); ++dit)
         {
@@ -744,7 +763,8 @@ void VCAMRNonLinearPoissonOpFactory::define(const ProblemDomain&         a_coars
                                             waterFlux_level a_wFlvl,
                                             Vector<RefCountedPtr<LevelData<FArrayBox> > >& a_B,
                                             Vector<RefCountedPtr<LevelData<FArrayBox> > >& a_Pi,
-                                            Vector<RefCountedPtr<LevelData<FArrayBox> > >& a_zb)
+                                            Vector<RefCountedPtr<LevelData<FArrayBox> > >& a_zb,
+                                            bool a_compute_Bcoeff)
 {
   CH_TIME("VCAMRNonLinearPoissonOpFactory::define");
 
@@ -791,6 +811,9 @@ void VCAMRNonLinearPoissonOpFactory::define(const ProblemDomain&         a_coars
   m_amrHydro   = a_amrHydro;
   m_nllevel    = a_nllevel;
   m_waterFluxlevel = a_wFlvl;
+
+  m_verbosity = 3;
+  compute_Bcoeff = a_compute_Bcoeff;
 
   m_B  = a_B;  // Gap Height
   m_Pi = a_Pi; // Overb Press  
@@ -850,7 +873,7 @@ VCAMRNonLinearPoissonOpFactory::define(const ProblemDomain&   a_coarseDomain,
   Real alpha = 1.0, beta = 1.0;
   define(a_coarseDomain, a_grids, a_refRatios, a_coarsedx, a_bc,
          alpha, aCoef, beta, bCoef, amrHydro, nllevel, wFlevel,
-         B, Pri, zb);
+         B, Pri, zb, true);
 }
 //-----------------------------------------------------------------------
 
@@ -884,7 +907,9 @@ MGLevelOp<LevelData<FArrayBox> >* VCAMRNonLinearPoissonOpFactory::MGnewOp(const 
       domain.coarsen(2);
   }
 
-  pout() << "VCAMRNonLinearPoissonOpFactory::MGnewOp ( depth, ref_ratio = " << a_depth << " " << coarsening << ")\n";
+  if (m_verbosity > 3) {
+      pout() << "VCAMRNonLinearPoissonOpFactory::MGnewOp ( depth, ref_ratio = " << a_depth << " " << coarsening << ")\n";
+  }
 
   if (coarsening > 1 && !m_boxes[ref].coarsenable(coarsening*VCAMRNonLinearPoissonOp::s_maxCoarse)) {
       return NULL;
@@ -908,6 +933,9 @@ MGLevelOp<LevelData<FArrayBox> >* VCAMRNonLinearPoissonOpFactory::MGnewOp(const 
 
   newOp->m_alpha       = m_alpha;
   newOp->m_beta        = m_beta;
+
+  newOp->compute_Bcoeff = compute_Bcoeff;
+  newOp->m_verbosity = m_verbosity;
 
   newOp->m_amrHydro    = m_amrHydro; 
   newOp->m_nllevel     = m_nllevel;

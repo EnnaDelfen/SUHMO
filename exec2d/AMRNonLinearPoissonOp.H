@@ -53,9 +53,7 @@ public:
   ///
   /**
    */
-  AMRNonLinearPoissonOp()
-  {
-  }
+  AMRNonLinearPoissonOp();
 
   ///
   /**
@@ -463,6 +461,7 @@ public:
 
   /// public constants
   Real m_alpha, m_beta, m_aCoef, m_bCoef;
+  Real m_verbosity;
 
   // Problem SPECIFIC
   RefCountedPtr<LevelData<FArrayBox> > m_B;  // Gap Height
@@ -624,6 +623,8 @@ private:
 
   Real m_alpha;
   Real m_beta;
+
+  Real m_verbosity;
 
   // Problem SPECIFIC
   Vector<RefCountedPtr<LevelData<FArrayBox> > > m_B;  // Gap Height

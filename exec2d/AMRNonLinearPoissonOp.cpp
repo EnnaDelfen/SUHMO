@@ -56,6 +56,12 @@ amrpgetMultiColors(Vector<IntVect>& a_colors)
 }
 
 // ---------------------------------------------------------
+
+AMRNonLinearPoissonOp::AMRNonLinearPoissonOp()
+    :m_verbosity(3)
+{
+}
+
 /** full define function for AMRLevelOp with both coarser and finer levels */
 void AMRNonLinearPoissonOp::define(const DisjointBoxLayout& a_grids,
                                    const DisjointBoxLayout& a_gridsFiner,
@@ -265,7 +271,9 @@ void AMRNonLinearPoissonOp::residualI(LevelData<FArrayBox>&       a_lhs,
                                       bool                        a_homogeneous)
 {
   CH_TIME("AMRNonLinearPoissonOp::residualI");
-  pout() << "AMRNonLinearPoissonOp::residualI\n";
+  if (m_verbosity > 3) {
+      pout() << "AMRNonLinearPoissonOp::residualI\n";
+  }
 
   LevelData<FArrayBox>& phi = (LevelData<FArrayBox>&)a_phi;
   if (s_exchangeMode == 0)
@@ -652,11 +660,15 @@ void AMRNonLinearPoissonOp::relax(LevelData<FArrayBox>&       a_e,
                                   int                         a_iterations)
 {
   CH_TIME("AMRNonLinearPoissonOp::relax");
-  pout() << "AMRNonLinearPoissonOp::relax\n"; 
+  if (m_verbosity > 3) {
+      pout() << "AMRNonLinearPoissonOp::relax\n"; 
+  }
 
   for (int i = 0; i < a_iterations; i++)
     {
-      pout() <<" levelGSRB "<< i <<"\n";
+      if (m_verbosity > 3) {
+          pout() <<" levelGSRB "<< i <<"\n";
+      }
       switch (s_relaxMode)
         {
         case 0:
@@ -797,7 +809,9 @@ void AMRNonLinearPoissonOp::prolongIncrement(LevelData<FArrayBox>&       a_phiTh
                                              const LevelData<FArrayBox>& a_correctCoarse)
 {
   CH_TIME("AMRNonLinearPoissonOp::prolongIncrement");
-  pout() << "AMRNonLinearPoissonOp::prolongIncrement\n";
+  if (m_verbosity > 3) {
+      pout() << "AMRNonLinearPoissonOp::prolongIncrement\n";
+  }
   
   DisjointBoxLayout dbl = a_phiThisLevel.disjointBoxLayout();
   int mgref = 2; //this is a multigrid func
@@ -1830,6 +1844,8 @@ void AMRNonLinearPoissonOpFactory::define(const ProblemDomain&             a_coa
   m_amrHydro = a_amrHydro;
   m_nllevel  = a_nllevel;
 
+  m_verbosity = 3;
+
   m_B  = a_B;  // Gap Height
   m_Pi = a_Pi; // Overb Press  
   m_zb = a_zb; // Bed Elevation
@@ -1934,6 +1950,8 @@ MGLevelOp<LevelData<FArrayBox> >* AMRNonLinearPoissonOpFactory::MGnewOp(const Pr
 
   newOp->m_aCoef = m_alpha;
   newOp->m_bCoef = m_beta;
+
+  newOp->m_verbosity = m_verbosity;
 
   newOp->m_amrHydro  = m_amrHydro; 
   newOp->m_nllevel   = m_nllevel;

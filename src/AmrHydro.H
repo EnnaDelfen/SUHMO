@@ -312,6 +312,7 @@ protected:
 
     /// FAS
     bool m_use_FAS;
+    bool m_compute_Bcoeff;
 
     /// IBC
     HydroIBC* m_IBCPtr;

@@ -34,6 +34,8 @@ public:
   VCAMRNonLinearPoissonOp()
   {
     m_lambdaNeedsResetting = true;
+    m_verbosity = 3;
+    compute_Bcoeff = true;
   }
 
   ///
@@ -94,6 +96,8 @@ public:
   /// For tga stuff
   virtual void setAlphaAndBeta(const Real& a_alpha,
                                const Real& a_beta);
+
+  virtual void computeCoeffsOTF(bool a_compute_Bcoeff);
 
   virtual void setSpecificParams(const RefCountedPtr<LevelData<FArrayBox> >& a_B,
                                  const RefCountedPtr<LevelData<FArrayBox> >& a_Pi,
@@ -216,6 +220,8 @@ public:
     
   }
 
+  bool compute_Bcoeff;
+
 protected:
   LayoutData<CFIVS> m_loCFIVS[SpaceDim];
   LayoutData<CFIVS> m_hiCFIVS[SpaceDim];
@@ -296,7 +302,8 @@ public:
               AmrHydro* a_amrHydro, NL_level a_nllevel, waterFlux_level a_wFlvl,
               Vector<RefCountedPtr<LevelData<FArrayBox> > >& a_B,
               Vector<RefCountedPtr<LevelData<FArrayBox> > >& a_Pi,
-              Vector<RefCountedPtr<LevelData<FArrayBox> > >& a_zb);
+              Vector<RefCountedPtr<LevelData<FArrayBox> > >& a_zb,
+              bool a_BcoeffOTF);
 
   //! Defines a factory for VCAMRNonLinearPoissonOp which allows the operators to
   //! allocate their own coefficient data. \f$\alpha\f$ and \f$\beta\f$
@@ -345,6 +352,9 @@ private:
 
   Real m_alpha;
   Real m_beta;
+
+  Real m_verbosity;
+  bool compute_Bcoeff;
  
   Vector<RefCountedPtr<LevelData<FArrayBox> > > m_aCoef;
   Vector<RefCountedPtr<LevelData<FluxBox> > >   m_bCoef;

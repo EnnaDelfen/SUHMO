@@ -435,7 +435,7 @@ AmrHydro::SolveForHead_nl(const Vector<DisjointBoxLayout>&               a_grids
                            0.0, a_aCoef,
                            - 1.0, a_bCoef,
                           this, NLfunctTmp, wFfunctTmp,
-                          B, Pri, zb);
+                          B, Pri, zbi, m_compute_Bcoeff);
 
     AMRLevelOpFactory<LevelData<FArrayBox> >& opFactoryPtr = (AMRLevelOpFactory<LevelData<FArrayBox> >& ) poissonOpF_head;
 
@@ -687,9 +687,11 @@ AmrHydro::initialize()
     /* PARSING */
     ParmParse ppSolver("solver");
     m_use_FAS  = false;
+    m_compute_Bcoeff = true;
 
     ParmParse ppAmr("AmrHydro");
     ppSolver.query("use_fas", m_use_FAS); 
+    ppSolver.query("bcoeff_otf", m_compute_Bcoeff); 
     m_time     = 0.0;  // start at t = 0
     m_cur_step = 0;    // start at dt = 0
     ppAmr.get("max_level", m_max_level);  // max level
