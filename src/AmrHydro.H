@@ -88,7 +88,10 @@ public:
     void WFlx_level(LevelData<FluxBox>&          a_bcoef, 
                     const LevelData<FArrayBox>&  a_u,
                     LevelData<FArrayBox>&        a_B,
-                    Real                         a_dx);
+                    Real                         a_dx,
+                    bool                         a_print,
+                    int                          a_smooth,
+                    int                          a_depth);
 
     void NonLinear(Vector<LevelData<FArrayBox>* >        a_NL,
                    Vector<LevelData<FArrayBox>* >        a_dNL, 
@@ -173,6 +176,14 @@ public:
                         Vector<std::string>& vectName,
                         Vector<Vector<LevelData<FArrayBox>*>> stp,
                         string namePlot);
+
+    void writePltWFX(int numPlotComps,
+                        Vector<std::string>& vectName,
+                        Vector<Vector<LevelData<FArrayBox>*>> stp,
+                        const ProblemDomain& a_pbDom, 
+                        const DisjointBoxLayout& a_dbl,
+                        int a_smooth, int a_depth);
+
 
     /** writes plotfile to the standard location; filename is
         <plot_root>.<step>.<DIM>d.hdf5
@@ -396,7 +407,8 @@ protected:
     Real m_dt;          // most recent timestep
     Real m_stable_dt;   // most recent stable timestep (> m_dt if we took a step just to hit a plot interval)
 
-    int m_cur_step;     // current step
+    int m_cur_step;          // current step
+    int m_cur_PicardIte;     // current Picard It
 
     Real m_cfl;         // timestep scaling
 

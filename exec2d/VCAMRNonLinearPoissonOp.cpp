@@ -64,7 +64,7 @@ void VCAMRNonLinearPoissonOp::residualI(LevelData<FArrayBox>&   a_lhs,
   // test for updating the Re
   if (compute_Bcoeff) {
       MEMBER_FUNC_PTR(*m_amrHydro, m_waterFluxlevel)(*m_bCoef, a_phi,
-                                                 *m_B, m_dx);
+                                                     *m_B, m_dx, false, 0, 0);
   }
 
   for (dit.begin(); dit.ok(); ++dit)
@@ -142,8 +142,8 @@ void VCAMRNonLinearPoissonOp::preCond(LevelData<FArrayBox>&       a_phi,
       a_phi[dit].copy(a_rhs[dit]);
       a_phi[dit].mult(m_lambda[dit], gridBox, 0, 0, ncomp);
     }
-
-  relax(a_phi, a_rhs, 2);
+  int dummyDepth = 0;
+  relax(a_phi, a_rhs, 2, dummyDepth);
 }
 
 void VCAMRNonLinearPoissonOp::applyOpMg(LevelData<FArrayBox>& a_lhs,
@@ -210,7 +210,7 @@ void VCAMRNonLinearPoissonOp::applyOpNoBoundary(LevelData<FArrayBox>&       a_lh
   // test for updating the Re
   if (compute_Bcoeff) {
       MEMBER_FUNC_PTR(*m_amrHydro, m_waterFluxlevel)(*m_bCoef, a_phi,
-                                                 *m_B, m_dx);
+                                                     *m_B, m_dx, false, 0, 0);
   }
 
   DataIterator dit = phi.dataIterator();
@@ -305,7 +305,7 @@ void VCAMRNonLinearPoissonOp::restrictResidual(LevelData<FArrayBox>&     a_resCo
   // test for updating the Re
   if (compute_Bcoeff) {
       MEMBER_FUNC_PTR(*m_amrHydro, m_waterFluxlevel)(*m_bCoef, a_phiFine,
-                                                 *m_B, m_dx);
+                                                     *m_B, m_dx, false, 0, 0);
   }
 
   for (DataIterator dit = a_phiFine.dataIterator(); dit.ok(); ++dit)
@@ -533,7 +533,9 @@ void VCAMRNonLinearPoissonOp::reflux(const LevelData<FArrayBox>&        a_phiFin
 }
 
 void VCAMRNonLinearPoissonOp::levelGSRB(LevelData<FArrayBox>&       a_phi,
-                                        const LevelData<FArrayBox>& a_rhs)
+                                        const LevelData<FArrayBox>& a_rhs,
+                                        int                         a_ite,
+                                        int                         a_depth)
 {
   CH_TIME("VCAMRNonLinearPoissonOp::levelGSRB");
 
@@ -549,6 +551,8 @@ void VCAMRNonLinearPoissonOp::levelGSRB(LevelData<FArrayBox>&       a_phi,
 
   LevelData<FArrayBox>  a_nlfunc(dbl, 1, IntVect::Zero);
   LevelData<FArrayBox>  a_nlDfunc(dbl, 1, IntVect::Zero);
+
+  bool a_print_WFX = false;
 
   DataIterator dit = a_phi.dataIterator();
   // do first red, then black passes
@@ -579,10 +583,14 @@ void VCAMRNonLinearPoissonOp::levelGSRB(LevelData<FArrayBox>&       a_phi,
 
       MEMBER_FUNC_PTR(*m_amrHydro, m_nllevel)(a_nlfunc, a_nlDfunc, a_phi,
                                               *m_B, *m_Pi, *m_zb);
+      if (whichPass == 1) {
+          a_print_WFX = true;
+      } 
       // test for updating the Re
       if (compute_Bcoeff) {
           MEMBER_FUNC_PTR(*m_amrHydro, m_waterFluxlevel)(*m_bCoef, a_phi,
-                                                     *m_B, m_dx);
+                                                         *m_B, m_dx, 
+                                                          a_print_WFX, a_ite, a_depth);
       }
 
       for (dit.begin(); dit.ok(); ++dit)

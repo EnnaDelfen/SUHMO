@@ -34,7 +34,7 @@ typedef void (AmrHydro::*NL_level) (LevelData<FArrayBox>& a_NL, LevelData<FArray
                                     LevelData<FArrayBox>& a_B, LevelData<FArrayBox>& a_Pi, LevelData<FArrayBox>& a_zb);
 
 typedef void (AmrHydro::*waterFlux_level) (LevelData<FluxBox>& a_Bcoef, const LevelData<FArrayBox>&  a_u, LevelData<FArrayBox>& a_B,
-              Real a_dx);
+                                           Real a_dx, bool a_print, int a_smooth, int a_depth);
 //typedef void (AmrHydro::*NL) (Vector<LevelData<FArrayBox>* > a_NL, Vector<LevelData<FArrayBox>* > a_dNL, const Vector<LevelData<FArrayBox>* >  a_u, int a_finestLevel);
 
 ///
@@ -233,13 +233,15 @@ public:
 
   virtual void relax(LevelData<FArrayBox>&       a_e,
                      const LevelData<FArrayBox>& a_residual,
-                     int                         a_iterations);
+                     int                         a_iterations,
+                     int                         a_depth);
 
   // For FAS stuff - do CF interpolation then relax as normal
   virtual void relaxNF(LevelData<FArrayBox>& a_phi,
                        const LevelData<FArrayBox>* a_phiCoarse,
                        const LevelData<FArrayBox>& a_rhs,
-                       int a_iterations);
+                       int a_iterations,
+                       int a_depth);
 
   virtual void createCoarser(LevelData<FArrayBox>&       a_coarse,
                              const LevelData<FArrayBox>& a_fine,
@@ -509,7 +511,9 @@ protected:
   int                     m_refToFiner;
 
   virtual void levelGSRB(LevelData<FArrayBox>&       a_phi,
-                         const LevelData<FArrayBox>& a_rhs);
+                         const LevelData<FArrayBox>& a_rhs,
+                         int                         a_ite,
+                         int                         a_depth);
 
   virtual void levelGS(LevelData<FArrayBox>&       a_phi,
                            const LevelData<FArrayBox>& a_rhs);
