@@ -167,6 +167,41 @@ void DirichletValue(Real* pos,
     a_values[0] = DirichletValue(*dir, *side);
 }
 
+// could be same as below
+void NeumBCForHcoarse(FArrayBox& a_state,
+                      const Box& a_valid,
+                      const ProblemDomain& a_domain,
+                      Real a_dx)
+{
+  // If box is outside of domain bounds ?
+  if(!a_domain.domainBox().contains(a_state.box())) {
+      for(int dir=0; dir<CH_SPACEDIM; ++dir) {
+          // don't do anything if periodic -- should be perio in y dir 1
+          if (!a_domain.isPeriodic(dir)) {
+              Box ghostBoxLo = adjCellBox(a_valid, dir, Side::Lo, 1);
+              Box ghostBoxHi = adjCellBox(a_valid, dir, Side::Hi, 1);
+
+              if ((!a_domain.domainBox().contains(ghostBoxLo)) && (a_state.box().contains(ghostBoxLo)) ) {
+                  // Neum
+                  Box fromRegion = ghostBoxLo;
+                  int isign = sign(Side::Lo);
+                  fromRegion.shift(dir, -isign);
+                  a_state.copy(a_state, fromRegion, 0, ghostBoxLo, 0, a_state.nComp());
+              } // End ghostBoxLo in dir
+
+              if ((!a_domain.domainBox().contains(ghostBoxHi)) && (a_state.box().contains(ghostBoxHi)) ) {
+                  // Neum
+                  Box fromRegion = ghostBoxHi;
+                  int isign = sign(Side::Hi);
+                  fromRegion.shift(dir, -isign);
+                  a_state.copy(a_state, fromRegion, 0, ghostBoxHi, 0, a_state.nComp());
+              } // End ghostBoxHi in dir
+
+          } // end if is not periodic in ith direction
+      } // end dir loop
+  }
+}
+
 
 void FixedNeumBCFill(FArrayBox& a_state,
             const Box& a_valid,
@@ -1094,7 +1129,6 @@ AmrHydro::run(Real a_max_time, int a_max_step)
         next_plot_time = std::min(next_plot_time, a_max_time);
 
         while ((next_plot_time > m_time) && (m_cur_step < a_max_step) && (dt > TIME_EPS)) {
-            // dump plotfile before regridding
             if ((m_cur_step % m_plot_interval == 0) && m_plot_interval > 0) {
 #ifdef CH_USE_HDF5
                 writePlotFile();
@@ -1106,7 +1140,6 @@ AmrHydro::run(Real a_max_time, int a_max_step)
             }
 
             if (m_cur_step != 0) {
-                // compute dt after regridding in case number of levels has changed
                 dt = computeDt();
             }
 
@@ -1169,11 +1202,8 @@ void AmrHydro::WFlx_level(LevelData<FluxBox>&          a_bcoef,
     DataIterator dit = a_u.dataIterator();
     for (dit.begin(); dit.ok(); ++dit) {
         lcl_u[dit].copy(  a_u[dit], 0, 0, 1);
-        const FArrayBox& aU     = a_u[dit];
-        BoxIterator bit(aU.box()); // can use gridBox? 
-        for (bit.begin(); bit.ok(); ++bit) {
-            IntVect iv = bit();
-        }
+        const Box& validBox = levelGrids.get(dit);
+        NeumBCForHcoarse(lcl_u[dit], validBox, levelDomain, a_dx);
     }
 
     // Compute CC gradient of phi
@@ -1207,7 +1237,7 @@ void AmrHydro::WFlx_level(LevelData<FluxBox>&          a_bcoef,
             Re(iv, 0) = (- 1.0 + std::sqrt(discr)) / (2.0 * m_suhmoParm->m_omega) ; 
         }
     }
-    if ((m_cur_step == 80) && (a_print_WFX)) {
+    if ((m_cur_step == 98) && (a_print_WFX)) {
         /* custom plt here -- debug print */
             int nStuffToPlot = 3;
             Vector<std::string> vectName;
@@ -2716,6 +2746,8 @@ AmrHydro::timeStepFAS(Real a_dt)
 {
     CH_TIME("AmrHydro::timestepFAS");
 
+    m_cur_step += 1;
+
     if (m_verbosity > 2) {
         pout() << "\n\n-- Timestep " << m_cur_step << " Advancing solution from time " << m_time << " ( " << time()
                << ")"
@@ -3385,7 +3417,7 @@ AmrHydro::timeStepFAS(Real a_dt)
         }
 
         /* custom plt here -- debug print */
-        if (m_PrintCustom && (m_cur_step == 10)) {
+        if (m_PrintCustom && (m_cur_step == 98)) {
             int nStuffToPlot = 12;
             Vector<std::string> vectName;
             vectName.resize(nStuffToPlot);
@@ -3596,11 +3628,11 @@ AmrHydro::timeStepFAS(Real a_dt)
     // finally, update to new time and increment current step
     m_dt = a_dt;
     m_time += a_dt;
-    m_cur_step += 1;
+    //m_cur_step += 1;
 
     // write diagnostic info
     if (m_verbosity > 0) {
-        pout() << "VERBOSE: AmrHydro::timestep " << m_cur_step - 1 << " --     end time = "
+        pout() << "VERBOSE: AmrHydro::timestep " << m_cur_step<< " --     end time = "
                //<< setiosflags(ios::fixed) << setprecision(6) << setw(12)
                << m_time << " ( " << time() << " )"
                //<< " (" << m_time/m_seconds_per_year << " yr)"
