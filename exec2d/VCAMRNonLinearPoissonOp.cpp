@@ -583,7 +583,7 @@ void VCAMRNonLinearPoissonOp::levelGSRB(LevelData<FArrayBox>&       a_phi,
 
       MEMBER_FUNC_PTR(*m_amrHydro, m_nllevel)(a_nlfunc, a_nlDfunc, a_phi,
                                               *m_B, *m_Pi, *m_zb);
-      if (whichPass == 1) {
+      if ((whichPass == 1) && (m_print)) {
           a_print_WFX = true;
       } 
       // test for updating the Re

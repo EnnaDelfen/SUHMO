@@ -58,7 +58,8 @@ amrpgetMultiColors(Vector<IntVect>& a_colors)
 // ---------------------------------------------------------
 
 AMRNonLinearPoissonOp::AMRNonLinearPoissonOp()
-    :m_verbosity(3)
+    :m_verbosity(3),
+     m_print(false)
 {
 }
 
@@ -641,7 +642,8 @@ void AMRNonLinearPoissonOp::relaxNF(LevelData<FArrayBox>&       a_e,
                                     const LevelData<FArrayBox>* a_eCoarse,
                                     const LevelData<FArrayBox>& a_residual,
                                     int                         a_iterations,
-                                    int                         a_depth)
+                                    int                         a_depth,
+                                    bool                        a_print)
 {
   if (a_eCoarse != NULL)
   {
@@ -652,6 +654,7 @@ void AMRNonLinearPoissonOp::relaxNF(LevelData<FArrayBox>&       a_e,
     homogeneousCFInterp(a_e);
   }
 
+  m_print = a_print;
   relax(a_e, a_residual, a_iterations, a_depth);
 
 }
@@ -663,15 +666,15 @@ void AMRNonLinearPoissonOp::relax(LevelData<FArrayBox>&       a_e,
                                   int                         a_depth)
 {
   CH_TIME("AMRNonLinearPoissonOp::relax");
-  //if (m_verbosity > 3) {
+  if (m_verbosity > 3) {
       pout() << "AMRNonLinearPoissonOp::relax depth = "<< a_depth <<" \n"; 
-  //} 
+  } 
 
   for (int i = 0; i < a_iterations; i++)
     {
-      //if (m_verbosity > 3) {
+      if (m_verbosity > 3) {
           pout() <<" levelGSRB "<< i <<"\n";
-      //}
+      }
       switch (s_relaxMode)
         {
         case 0:

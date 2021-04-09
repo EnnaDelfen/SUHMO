@@ -1207,9 +1207,7 @@ void AmrHydro::WFlx_level(LevelData<FluxBox>&          a_bcoef,
             Re(iv, 0) = (- 1.0 + std::sqrt(discr)) / (2.0 * m_suhmoParm->m_omega) ; 
         }
     }
-    if ((m_cur_step == 10) && (a_print_WFX)) {
-        //pout() << "\n  print Custom in WFlx_level ...";
-        pout() << " Dx ? " << a_dx << "\n";
+    if ((m_cur_step == 80) && (a_print_WFX)) {
         /* custom plt here -- debug print */
             int nStuffToPlot = 3;
             Vector<std::string> vectName;
@@ -4620,9 +4618,9 @@ AmrHydro::writePltWFX(int numPlotComps,
                       const DisjointBoxLayout& dbl,
                       int nbSmooth, int nbDepth)
 {
-    //if (m_verbosity > 3) {
+    if (m_verbosity > 4) {
         pout() << "AmrHydro::writePltWFX, depth/smooth = " << nbDepth << " " << nbSmooth <<endl;
-    //}
+    }
 
     Box domain = pbDom.domainBox();
     Real dt = 1.;

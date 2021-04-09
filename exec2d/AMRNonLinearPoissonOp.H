@@ -241,7 +241,8 @@ public:
                        const LevelData<FArrayBox>* a_phiCoarse,
                        const LevelData<FArrayBox>& a_rhs,
                        int a_iterations,
-                       int a_depth);
+                       int a_depth,
+                       bool a_print = false);
 
   virtual void createCoarser(LevelData<FArrayBox>&       a_coarse,
                              const LevelData<FArrayBox>& a_fine,
@@ -464,6 +465,7 @@ public:
   /// public constants
   Real m_alpha, m_beta, m_aCoef, m_bCoef;
   Real m_verbosity;
+  bool m_print;
 
   // Problem SPECIFIC
   RefCountedPtr<LevelData<FArrayBox> > m_B;  // Gap Height
