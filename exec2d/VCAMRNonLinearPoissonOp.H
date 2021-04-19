@@ -35,7 +35,7 @@ public:
   {
     m_lambdaNeedsResetting = true;
     m_verbosity = 3;
-    compute_Bcoeff = true;
+    m_compute_Bcoeff = true;
   }
 
   ///
@@ -228,8 +228,6 @@ public:
     
   }
 
-  bool compute_Bcoeff;
-
 protected:
   LayoutData<CFIVS> m_loCFIVS[SpaceDim];
   LayoutData<CFIVS> m_hiCFIVS[SpaceDim];
@@ -364,7 +362,7 @@ private:
   Real m_beta;
 
   Real m_verbosity;
-  bool compute_Bcoeff;
+  bool m_compute_Bcoeff;
  
   Vector<RefCountedPtr<LevelData<FArrayBox> > > m_aCoef;
   Vector<RefCountedPtr<LevelData<FluxBox> > >   m_bCoef;

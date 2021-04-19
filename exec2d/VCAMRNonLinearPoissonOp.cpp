@@ -406,7 +406,7 @@ void VCAMRNonLinearPoissonOp::setAlphaAndBeta(const Real& a_alpha,
 
 void VCAMRNonLinearPoissonOp::computeCoeffsOTF(bool a_compute_Bcoeff)
 {
-  compute_Bcoeff = a_compute_Bcoeff;
+  m_compute_Bcoeff = a_compute_Bcoeff;
 }
 
 
@@ -846,7 +846,7 @@ void VCAMRNonLinearPoissonOpFactory::define(const ProblemDomain&         a_coars
   m_waterFluxlevel = a_wFlvl;
 
   m_verbosity = 3;
-  compute_Bcoeff = a_compute_Bcoeff;
+  m_compute_Bcoeff = a_compute_Bcoeff;
 
   m_B  = a_B;  // Gap Height
   m_Pi = a_Pi; // Overb Press  
@@ -970,8 +970,8 @@ MGLevelOp<LevelData<FArrayBox> >* VCAMRNonLinearPoissonOpFactory::MGnewOp(const 
   newOp->m_alpha       = m_alpha;
   newOp->m_beta        = m_beta;
 
-  newOp->compute_Bcoeff = compute_Bcoeff;
-  newOp->m_verbosity   = m_verbosity;
+  newOp->m_compute_Bcoeff = m_compute_Bcoeff;
+  newOp->m_verbosity      = m_verbosity;
 
   newOp->m_amrHydro    = m_amrHydro; 
   newOp->m_nllevel     = m_nllevel;
@@ -1139,8 +1139,8 @@ AMRLevelOp<LevelData<FArrayBox> >* VCAMRNonLinearPoissonOpFactory::AMRnewOp(cons
   newOp->m_alpha = m_alpha;
   newOp->m_beta  = m_beta;
 
-  newOp->compute_Bcoeff = compute_Bcoeff;
-  newOp->m_verbosity = m_verbosity;
+  newOp->m_compute_Bcoeff = m_compute_Bcoeff;
+  newOp->m_verbosity      = m_verbosity;
 
   newOp->m_aCoef = m_aCoef[ref];
   newOp->m_bCoef = m_bCoef[ref];
