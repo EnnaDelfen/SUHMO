@@ -29,11 +29,65 @@
 
 #include "NamespaceHeader.H"
 
+// Func to call after before the start of each VCycle on finer level. 
+// to follow with averaging on subsequent levels
+void VCAMRNonLinearPoissonOp::EvaluateBcoef(const LevelData<FArrayBox>&   a_phi, 
+                                            int                           a_depth,
+                                            int                           a_AMRFASMGiter,
+                                            bool                          a_homogeneous) 
+{
+  CH_TIME("VCAMRNonLinearPoissonOp::EvaluateBcoef");
+  pout() << "VCAMRNonLinearPoissonOp::EvaluateBcoef on depth "<< a_depth << "\n"; 
 
-void VCAMRNonLinearPoissonOp::residualI(LevelData<FArrayBox>&   a_lhs,
-                               const LevelData<FArrayBox>&      a_phi,
-                               const LevelData<FArrayBox>&      a_rhs,
-                               bool                             a_homogeneous)
+  LevelData<FArrayBox>& phi = (LevelData<FArrayBox>&)a_phi;
+  phi.exchangeNoOverlap(m_exchangeCopier);
+
+  const DisjointBoxLayout& dbl = a_phi.disjointBoxLayout();
+  DataIterator dit = phi.dataIterator(); 
+  for (dit.begin(); dit.ok(); ++dit) {
+      m_bc(phi[dit], dbl[dit()],m_domain, m_dx, a_homogeneous);
+  }
+
+   //test for updating the Re
+   MEMBER_FUNC_PTR(*m_amrHydro, m_waterFluxlevel)(*m_bCoef, a_phi,
+                                                  *m_B, m_dx, 
+                                                   false, a_AMRFASMGiter, a_depth);
+
+}
+
+void VCAMRNonLinearPoissonOp::AverageBcoef(const MGLevelOp<LevelData<FArrayBox> >& a_operator,
+                                           int a_depth)
+{
+  CH_TIME("VCAMRNonLinearPoissonOpFactory::EvaluateBcoef");
+  pout() << "VCAMRNonLinearPoissonOp::AverageBcoef on depth "<< a_depth << "\n"; 
+
+  int coarsening = 1;
+  for (int i = 0; i < a_depth; i++) {
+      coarsening *= 2;
+  }
+
+  const VCAMRNonLinearPoissonOp& op = dynamic_cast<const VCAMRNonLinearPoissonOp&>(a_operator);
+
+  // Perform multigrid coarsening on the operator data.
+  LevelData<FluxBox>&   bcoefCoar       = *m_bCoef;
+  const LevelData<FluxBox>&   bcoefFine = *(op.m_bCoef);
+
+  if (coarsening != 1) {
+      // bCoef
+      CoarseAverageFace faceAverage(bcoefFine.disjointBoxLayout(),
+                                    1, coarsening);
+      faceAverage.averageToCoarse(bcoefCoar, bcoefFine);
+  }
+
+  // Handle inter-box ghost cells.
+  bcoefCoar.exchange();
+}
+
+
+void VCAMRNonLinearPoissonOp::residualI(LevelData<FArrayBox>&            a_lhs,
+                                        const LevelData<FArrayBox>&      a_phi,
+                                        const LevelData<FArrayBox>&      a_rhs,
+                                        bool                             a_homogeneous)
 {
   CH_TIME("VCAMRNonLinearPoissonOp::residualI");
   if (m_verbosity > 3) {
@@ -61,12 +115,6 @@ void VCAMRNonLinearPoissonOp::residualI(LevelData<FArrayBox>&   a_lhs,
 
   MEMBER_FUNC_PTR(*m_amrHydro, m_nllevel)(a_nlfunc, a_nlDfunc, a_phi,
                                           *m_B, *m_Pi, *m_zb);
-  // test for updating the Re
-  if (compute_Bcoeff) {
-      MEMBER_FUNC_PTR(*m_amrHydro, m_waterFluxlevel)(*m_bCoef, a_phi,
-                                                     *m_B, m_dx, false, 0, 0);
-  }
-
   for (dit.begin(); dit.ok(); ++dit)
     {
       const Box& region = dbl[dit()];
@@ -207,12 +255,6 @@ void VCAMRNonLinearPoissonOp::applyOpNoBoundary(LevelData<FArrayBox>&       a_lh
   MEMBER_FUNC_PTR(*m_amrHydro, m_nllevel)(a_nlfunc, a_nlDfunc, a_phi,
                                           *m_B, *m_Pi, *m_zb);
 
-  // test for updating the Re
-  if (compute_Bcoeff) {
-      MEMBER_FUNC_PTR(*m_amrHydro, m_waterFluxlevel)(*m_bCoef, a_phi,
-                                                     *m_B, m_dx, false, 0, 0);
-  }
-
   DataIterator dit = phi.dataIterator();
   for (dit.begin(); dit.ok(); ++dit)
     {
@@ -301,12 +343,6 @@ void VCAMRNonLinearPoissonOp::restrictResidual(LevelData<FArrayBox>&     a_resCo
 
   MEMBER_FUNC_PTR(*m_amrHydro, m_nllevel)(a_nlfunc, a_nlDfunc, a_phiFine,
                                           *m_B, *m_Pi, *m_zb);
-
-  // test for updating the Re
-  if (compute_Bcoeff) {
-      MEMBER_FUNC_PTR(*m_amrHydro, m_waterFluxlevel)(*m_bCoef, a_phiFine,
-                                                     *m_B, m_dx, false, 0, 0);
-  }
 
   for (DataIterator dit = a_phiFine.dataIterator(); dit.ok(); ++dit)
     {
@@ -552,8 +588,6 @@ void VCAMRNonLinearPoissonOp::levelGSRB(LevelData<FArrayBox>&       a_phi,
   LevelData<FArrayBox>  a_nlfunc(dbl, 1, IntVect::Zero);
   LevelData<FArrayBox>  a_nlDfunc(dbl, 1, IntVect::Zero);
 
-  bool a_print_WFX = false;
-
   DataIterator dit = a_phi.dataIterator();
   // do first red, then black passes
   for (int whichPass = 0; whichPass <= 1; whichPass++)
@@ -583,15 +617,6 @@ void VCAMRNonLinearPoissonOp::levelGSRB(LevelData<FArrayBox>&       a_phi,
 
       MEMBER_FUNC_PTR(*m_amrHydro, m_nllevel)(a_nlfunc, a_nlDfunc, a_phi,
                                               *m_B, *m_Pi, *m_zb);
-      if ((whichPass == 1) && (m_print)) {
-          a_print_WFX = true;
-      } 
-      // test for updating the Re
-      if (compute_Bcoeff) {
-          MEMBER_FUNC_PTR(*m_amrHydro, m_waterFluxlevel)(*m_bCoef, a_phi,
-                                                         *m_B, m_dx, 
-                                                          a_print_WFX, a_ite, a_depth);
-      }
 
       for (dit.begin(); dit.ok(); ++dit)
         {
@@ -673,12 +698,12 @@ void VCAMRNonLinearPoissonOp::levelJacobi(LevelData<FArrayBox>&       a_phi,
   MayDay::Abort("VCAMRNonLinearPoissonOp::levelJacobi - Not implemented");
 }
 
-void VCAMRNonLinearPoissonOp::getFlux(FArrayBox&  a_flux,
-                             const FArrayBox&     a_data,
-                             const FluxBox&       a_bCoef,
-                             const Box&           a_facebox,
-                             int                  a_dir,
-                             int                  a_ref) const
+void VCAMRNonLinearPoissonOp::getFlux(FArrayBox&            a_flux,
+                                       const FArrayBox&     a_data,
+                                       const FluxBox&       a_bCoef,
+                                       const Box&           a_facebox,
+                                       int                  a_dir,
+                                       int                  a_ref) const
 {
   CH_TIME("VCAMRNonLinearPoissonOp::getFlux");
 
@@ -883,13 +908,16 @@ VCAMRNonLinearPoissonOpFactory::define(const ProblemDomain&   a_coarseDomain,
          alpha, aCoef, beta, bCoef, amrHydro, nllevel, wFlevel,
          B, Pri, zb, true);
 }
-//-----------------------------------------------------------------------
 
+//-----------------------------------------------------------------------
 MGLevelOp<LevelData<FArrayBox> >* VCAMRNonLinearPoissonOpFactory::MGnewOp(const ProblemDomain& a_indexSpace,
                                                                           int                  a_depth,
                                                                           bool                 a_homoOnly)
 {
   CH_TIME("VCAMRNonLinearPoissonOpFactory::MGnewOp");
+  if (m_verbosity > 3) {
+      pout() << "In VCAMRNonLinearPoissonOpFactory::MGnewOp ! depth "<< a_depth <<"\n"; 
+  }
 
   Real dxCrse = -1.0;
 
@@ -943,7 +971,7 @@ MGLevelOp<LevelData<FArrayBox> >* VCAMRNonLinearPoissonOpFactory::MGnewOp(const 
   newOp->m_beta        = m_beta;
 
   newOp->compute_Bcoeff = compute_Bcoeff;
-  newOp->m_verbosity = m_verbosity;
+  newOp->m_verbosity   = m_verbosity;
 
   newOp->m_amrHydro    = m_amrHydro; 
   newOp->m_nllevel     = m_nllevel;
@@ -1039,6 +1067,9 @@ MGLevelOp<LevelData<FArrayBox> >* VCAMRNonLinearPoissonOpFactory::MGnewOp(const 
 AMRLevelOp<LevelData<FArrayBox> >* VCAMRNonLinearPoissonOpFactory::AMRnewOp(const ProblemDomain& a_indexSpace)
 {
   CH_TIME("VCAMRNonLinearPoissonOpFactory::AMRnewOp");
+  if (m_verbosity > 3) {
+      pout() << "In VCAMRNonLinearPoissonOpFactory::AMRnewOp ! \n"; 
+  }
 
   VCAMRNonLinearPoissonOp* newOp = new VCAMRNonLinearPoissonOp;
   Real dxCrse = -1.0;

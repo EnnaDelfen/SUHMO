@@ -146,6 +146,11 @@ public:
                           bool                        a_homogeneous = false);
 
  /// despite what you might think, the "I" here means "Ignore the coarse-fine boundary"
+  virtual void EvaluateBcoef(const LevelData<FArrayBox>&   a_phi, 
+                             int                           a_depth,
+                             int                           a_AMRFASMGiter,
+                             bool                          a_homogeneous); 
+
   virtual void residualI(LevelData<FArrayBox>&       a_lhs,
                          const LevelData<FArrayBox>& a_phi,
                          const LevelData<FArrayBox>& a_rhs,
@@ -461,6 +466,9 @@ public:
   //! are altered.
   void finerOperatorChanged(const MGLevelOp<LevelData<FArrayBox> >& a_operator,
                             int a_coarseningFactor);
+
+  void AverageBcoef(const MGLevelOp<LevelData<FArrayBox> >& a_operator,
+                    int a_depth);
 
   /// public constants
   Real m_alpha, m_beta, m_aCoef, m_bCoef;
