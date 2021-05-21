@@ -31,13 +31,16 @@
 
 // Func to call after before the start of each VCycle on finer level. 
 // to follow with averaging on subsequent levels
-void VCAMRNonLinearPoissonOp::EvaluateBcoef(const LevelData<FArrayBox>&   a_phi, 
+void VCAMRNonLinearPoissonOp::EvaluateBcoef(const LevelData<FArrayBox>&   a_phi,
+                                            const LevelData<FArrayBox>*   a_phicoarsePtr, 
                                             int                           a_depth,
                                             int                           a_AMRFASMGiter,
                                             bool                          a_homogeneous) 
 {
   CH_TIME("VCAMRNonLinearPoissonOp::EvaluateBcoef");
-  pout() << "VCAMRNonLinearPoissonOp::EvaluateBcoef on depth "<< a_depth << "\n"; 
+  if(a_homogeneous) {
+      MayDay::Abort("VCAMRNonLinearPoissonOp::EvaluateBcoef");
+  }
 
   LevelData<FArrayBox>& phi = (LevelData<FArrayBox>&)a_phi;
   phi.exchangeNoOverlap(m_exchangeCopier);
@@ -49,7 +52,7 @@ void VCAMRNonLinearPoissonOp::EvaluateBcoef(const LevelData<FArrayBox>&   a_phi,
   }
 
    //test for updating the Re
-   MEMBER_FUNC_PTR(*m_amrHydro, m_waterFluxlevel)(*m_bCoef, a_phi,
+   MEMBER_FUNC_PTR(*m_amrHydro, m_waterFluxlevel)(*m_bCoef, a_phi, a_phicoarsePtr,
                                                   *m_B, m_dx, 
                                                    false, a_AMRFASMGiter, a_depth);
 
@@ -58,8 +61,8 @@ void VCAMRNonLinearPoissonOp::EvaluateBcoef(const LevelData<FArrayBox>&   a_phi,
 void VCAMRNonLinearPoissonOp::AverageBcoef(const MGLevelOp<LevelData<FArrayBox> >& a_operator,
                                            int a_depth)
 {
-  CH_TIME("VCAMRNonLinearPoissonOpFactory::EvaluateBcoef");
-  pout() << "VCAMRNonLinearPoissonOp::AverageBcoef on depth "<< a_depth << "\n"; 
+  CH_TIME("VCAMRNonLinearPoissonOp::AverageBcoef");
+  //pout() << "VCAMRNonLinearPoissonOp::AverageBcoef on depth "<< a_depth << "\n"; 
 
   int coarsening = 1;
   for (int i = 0; i < a_depth; i++) {
@@ -321,26 +324,24 @@ void VCAMRNonLinearPoissonOp::restrictR(LevelData<FArrayBox>& a_phiCoarse,
 }
 
 
-void VCAMRNonLinearPoissonOp::restrictResidual(LevelData<FArrayBox>&     a_resCoarse,
-                                      LevelData<FArrayBox>&              a_phiFine,
-                                      const LevelData<FArrayBox>&        a_rhsFine)
-{
+void VCAMRNonLinearPoissonOp::restrictResidual(LevelData<FArrayBox>&       a_resCoarse,
+                                             LevelData<FArrayBox>&       a_phiFine,
+                                             const LevelData<FArrayBox>& a_rhsFine) {
   CH_TIME("VCAMRNonLinearPoissonOp::restrictResidual");
 
   homogeneousCFInterp(a_phiFine);
   const DisjointBoxLayout& dblFine = a_phiFine.disjointBoxLayout();
 
-  LevelData<FArrayBox>  a_nlfunc(dblFine, 1, IntVect::Zero);
-  LevelData<FArrayBox>  a_nlDfunc(dblFine, 1, IntVect::Zero);
 
-  for (DataIterator dit = a_phiFine.dataIterator(); dit.ok(); ++dit)
-    {
+  for (DataIterator dit = a_phiFine.dataIterator(); dit.ok(); ++dit) {
       FArrayBox& phi = a_phiFine[dit];
       m_bc(phi, dblFine[dit()], m_domain, m_dx, true);
     }
 
   a_phiFine.exchange(a_phiFine.interval(), m_exchangeCopier);
 
+  LevelData<FArrayBox>  a_nlfunc(dblFine, 1, IntVect::Zero);
+  LevelData<FArrayBox>  a_nlDfunc(dblFine, 1, IntVect::Zero);
   MEMBER_FUNC_PTR(*m_amrHydro, m_nllevel)(a_nlfunc, a_nlDfunc, a_phiFine,
                                           *m_B, *m_Pi, *m_zb);
 
@@ -475,6 +476,7 @@ void VCAMRNonLinearPoissonOp::computeLambda()
 
   // Define lambda
   m_lambda.define(m_aCoef->disjointBoxLayout(),m_aCoef->nComp());
+
   resetLambda();
 }
 
@@ -1145,8 +1147,8 @@ AMRLevelOp<LevelData<FArrayBox> >* VCAMRNonLinearPoissonOpFactory::AMRnewOp(cons
   newOp->m_aCoef = m_aCoef[ref];
   newOp->m_bCoef = m_bCoef[ref];
 
-  newOp->m_amrHydro   = m_amrHydro;
-  newOp->m_nllevel  = m_nllevel;
+  newOp->m_amrHydro       = m_amrHydro;
+  newOp->m_nllevel        = m_nllevel;
   newOp->m_waterFluxlevel = m_waterFluxlevel;
 
   // Problem SPECIFIC

@@ -46,6 +46,7 @@ public:
   }
 
   virtual void EvaluateBcoef(const LevelData<FArrayBox>&   a_phi, 
+                             const LevelData<FArrayBox>*   a_phicoarsePtr, 
                              int                           a_depth,
                              int                           a_AMRFASMGiter,
                              bool                          a_homogeneous); 

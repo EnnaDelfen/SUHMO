@@ -1189,6 +1189,7 @@ AmrHydro::run(Real a_max_time, int a_max_step)
 /* Needed routines for timeStep */
 void AmrHydro::WFlx_level(LevelData<FluxBox>&          a_bcoef, 
                           const LevelData<FArrayBox>&  a_u,
+                          const LevelData<FArrayBox>*  a_ucoarse,
                           LevelData<FArrayBox>&        a_B,
                           Real                         a_dx,
                           bool                         a_print_WFX,
@@ -1218,6 +1219,35 @@ void AmrHydro::WFlx_level(LevelData<FluxBox>&          a_bcoef,
                              levelDomain);
     lvlgradH.exchange();
     ExtrapGhostCells( lvlgradH, levelDomain);
+
+    // handle ghost cells on the coarse-fine interface
+    if ( a_ucoarse != NULL) {
+        const DisjointBoxLayout& levelGridscoarse  = a_ucoarse->getBoxes();
+        const ProblemDomain&     levelDomaincoarse = levelGridscoarse.physDomain();
+
+        // Copy phi coarse
+        LevelData<FArrayBox> lcl_ucoarse(levelGridscoarse, 1, a_ucoarse->ghostVect() ); 
+        DataIterator dit2 = (*a_ucoarse).dataIterator();
+        for (dit2.begin(); dit2.ok(); ++dit2) {
+            lcl_ucoarse[dit2].copy( (*a_ucoarse)[dit2], 0, 0, 1);
+        }
+
+        // Compute CC gradient of phi coarse
+        Real a_dxcoarse = a_dx*2;
+        LevelData<FArrayBox> lvlgradHcoarse(levelGridscoarse, SpaceDim, a_ucoarse->ghostVect() ); 
+        Gradient::compGradientCC(lvlgradHcoarse, lcl_ucoarse,
+                                 crsePsiPtr, finePsiPtr,
+                                 a_dxcoarse, nRefCrse, nRefFine,
+                                 levelDomaincoarse);
+        lvlgradHcoarse.exchange();
+        ExtrapGhostCells( lvlgradHcoarse, levelDomaincoarse);
+
+        QuadCFInterp qcfi(levelGrids, &levelGridscoarse,
+                          a_dx, 2.,  
+                          2,  // ncomps
+                          levelDomain);
+        qcfi.coarseFineInterp(lvlgradH, lvlgradHcoarse);
+    }
 
     // Compute Re
     LevelData<FArrayBox> lvlRe(levelGrids, 1, a_u.ghostVect() ); 
@@ -2007,18 +2037,6 @@ AmrHydro::timeStep(Real a_dt)
                 }
                 //NullBCFill(levelPw[dit], validBox, m_amrDomains[lev], m_amrDx[lev][0]);
             }
-            // Keep DEBUG for now
-            if (lev > 0 && (m_cur_step == 406)) {
-               pout() << " ITERATION NUMBER " << ite_idx << endl;
-               pout() << " Checking Pw after regrid in operations " << endl;
-               for (dit.begin(); dit.ok(); ++dit) {
-                   BoxIterator bit(levelPw[dit].box()); 
-                   for (bit.begin(); bit.ok(); ++bit) {
-                       IntVect iv = bit(); 
-                       pout() << iv << " Pw: " << levelPw[dit](iv,0) << endl;
-                   }
-               }
-            }
         } // end loop on levs
 
         //         Compute grad(h) and grad(Pw)
@@ -2094,27 +2112,6 @@ AmrHydro::timeStep(Real a_dt)
                                      crsePsiPtr, finePsiPtr,
                                      dx, nRefCrse, nRefFine,
                                      m_amrDomains[lev]);
-
-            // Keep DEBUG for now
-            FluxBox& gPw_ec = levelgradPw_ec[dit];
-            FluxBox& gH_ec = levelgradH_ec[dit];
-            if (lev > 0 && (m_cur_step == 406)) {
-               pout() << " Checking GradPw after regrid in operations " << endl;
-               FArrayBox& gradPwFab = gPw_ec[0];
-               FArrayBox& gradHFab = gH_ec[0];
-
-               BoxIterator bitEC(gradPwFab.box()); // can use gridBox? 
-               for (bitEC.begin(); bitEC.ok(); ++bitEC) {
-                   IntVect iv = bitEC();
-                   pout() << iv << " gradPw_xFace: " << gradPwFab(iv,0) << endl;
-               }
-
-               pout() << " Checking GradH after regrid in operations " << endl;
-               for (bitEC.begin(); bitEC.ok(); ++bitEC) {
-                   IntVect iv = bitEC();
-                   pout() << iv << " gradH_xFace: " << gradHFab(iv,0) << endl;
-               }
-            }
         } // end loop levels
 
 
@@ -2620,11 +2617,14 @@ AmrHydro::timeStep(Real a_dt)
         } // end customPlt
 
         ite_idx++;
+        m_cur_PicardIte++;
         if (m_verbosity > 3) {
             pout() << endl;
         }
     } // end while h solve
 
+
+   // III b calc
 
    /* SOLVE FOR B OUTSIDE THE LOOP */
    //     Form RHS for b -- using oldb
@@ -2652,13 +2652,9 @@ AmrHydro::timeStep(Real a_dt)
                           levelPw, levelmR, 
                           levelB, 
                           levelRHS_b_A, levelRHS_b_B, levelRHS_b_C);
-    //}  // loop on levs
-    ////     Solve for b using Forward Euler simple scheme -- use OLD b here
-    //for (int lev = 0; lev <= m_finest_level; lev++) {
-        LevelData<FArrayBox>& leveloldB  = *m_old_gapheight[lev];    
-        //LevelData<FArrayBox>& levelnewB  = *m_gapheight[lev];    
 
-        //LevelData<FArrayBox>& levelRHS_b   = *RHS_b[lev];
+        LevelData<FArrayBox>& leveloldB  = *m_old_gapheight[lev];    
+
 
         // 2. b : update gap height
         DisjointBoxLayout& levelGrids    = m_amrGrids[lev];
@@ -3246,7 +3242,6 @@ AmrHydro::timeStepFAS(Real a_dt)
                     FArrayBox& Re      = levelRe[dit];
                     FArrayBox& GradHcc = levelgradH[dit];
                     FArrayBox& B       = levelB[dit];
-                    //FArrayBox& Qw      = levelQw[dit];
 
                     BoxIterator bit(Re.box()); // can use gridBox? 
                     for (bit.begin(); bit.ok(); ++bit) {
@@ -3257,13 +3252,6 @@ AmrHydro::timeStepFAS(Real a_dt)
                                      std::pow(B(iv, 0), 3) * m_suhmoParm->m_gravity * sqrt_gradH_cc) / (
                                      12.0 * m_suhmoParm->m_nu * m_suhmoParm->m_nu);  
                         Re(iv, 0) = (- 1.0 + std::sqrt(discr)) / (2.0 * m_suhmoParm->m_omega) ; 
-                        //pout() << "idx sqrt_gradH discr Re " << iv << " " << sqrt_gradH_cc << " " << discr << " " << Re(iv, 0) << "\n";
-                        //pout() << "idx Re " << iv << " " << Re(iv, 0) << "\n";
-                        // Udpate Qw with Re CC ??
-                        //Real coeff = - std::pow(B(iv, 0), 3) * m_suhmoParm->m_gravity / (
-                        //             12.0 * m_suhmoParm->m_nu * ( 1.0 +  m_suhmoParm->m_omega * Re(iv, 0)) );
-                        //Qw(iv, 0) = coeff * GradHcc(iv, 0);
-                        //Qw(iv, 1) = coeff * GradHcc(iv, 1);
                     }
                 }
 
@@ -3274,7 +3262,6 @@ AmrHydro::timeStepFAS(Real a_dt)
                 LevelData<FluxBox>& levelgradH_ec   = *m_gradhead_ec[lev];
 
                 CellToEdge(levelRe, levelRe_ec);
-                //CellToEdge(levelQw, levelQw_ec);
  
                 for (dit.begin(); dit.ok(); ++dit) {
                     // EC quantities
@@ -3314,6 +3301,7 @@ AmrHydro::timeStepFAS(Real a_dt)
 
             } // end loop on levs
         }
+        // Just in case the quad resolution gives funky results
         Real minRe = computeMin(m_Re, m_refinement_ratios, Interval(0,0), 0);
         if (minRe < 0.0) {
             pout() <<"        Re min is NEG !! abort ... "<< endl;
@@ -3615,6 +3603,8 @@ AmrHydro::timeStepFAS(Real a_dt)
         }
     } // end while h solve
 
+
+   // III b calc
 
    /* SOLVE FOR B OUTSIDE THE LOOP */
    //     Form RHS for b -- using oldb

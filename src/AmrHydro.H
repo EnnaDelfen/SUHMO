@@ -87,6 +87,7 @@ public:
 
     void WFlx_level(LevelData<FluxBox>&          a_bcoef, 
                     const LevelData<FArrayBox>&  a_u,
+                    const LevelData<FArrayBox>*  a_ucoarse,
                     LevelData<FArrayBox>&        a_B,
                     Real                         a_dx,
                     bool                         a_print,
@@ -276,6 +277,8 @@ public:
         return m_amrGrids;
     }
 
+    int m_cur_step;          // current step
+
 protected:
     /// compute tags for regridding
     void tagCells(Vector<IntVectSet>& a_tags);
@@ -408,7 +411,6 @@ protected:
     Real m_dt;          // most recent timestep
     Real m_stable_dt;   // most recent stable timestep (> m_dt if we took a step just to hit a plot interval)
 
-    int m_cur_step;          // current step
     int m_cur_PicardIte;     // current Picard It
 
     Real m_cfl;         // timestep scaling

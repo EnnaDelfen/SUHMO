@@ -33,7 +33,8 @@
 typedef void (AmrHydro::*NL_level) (LevelData<FArrayBox>& a_NL, LevelData<FArrayBox>& a_dNL, const LevelData<FArrayBox>&  a_u,
                                     LevelData<FArrayBox>& a_B, LevelData<FArrayBox>& a_Pi, LevelData<FArrayBox>& a_zb);
 
-typedef void (AmrHydro::*waterFlux_level) (LevelData<FluxBox>& a_Bcoef, const LevelData<FArrayBox>&  a_u, LevelData<FArrayBox>& a_B,
+typedef void (AmrHydro::*waterFlux_level) (LevelData<FluxBox>& a_Bcoef, const LevelData<FArrayBox>&  a_u, 
+                                           const LevelData<FArrayBox>*  a_ucoarse, LevelData<FArrayBox>& a_B,
                                            Real a_dx, bool a_print, int a_smooth, int a_depth);
 //typedef void (AmrHydro::*NL) (Vector<LevelData<FArrayBox>* > a_NL, Vector<LevelData<FArrayBox>* > a_dNL, const Vector<LevelData<FArrayBox>* >  a_u, int a_finestLevel);
 
@@ -147,6 +148,7 @@ public:
 
  /// despite what you might think, the "I" here means "Ignore the coarse-fine boundary"
   virtual void EvaluateBcoef(const LevelData<FArrayBox>&   a_phi, 
+                             const LevelData<FArrayBox>*   a_phicoarsePtr, 
                              int                           a_depth,
                              int                           a_AMRFASMGiter,
                              bool                          a_homogeneous); 
