@@ -343,7 +343,7 @@ mixBCValues(FArrayBox& a_state,
 		                     a_homogeneous,
 		                     DirichletValue,
 		                     dir,
-		                     Side::Lo);
+		                     Side::Lo, 1);
                   } else if (GlobalBCRS::s_bcLo[dir] == 1) {
 		              NeumBC(a_state,
 		                     valid,
@@ -363,7 +363,7 @@ mixBCValues(FArrayBox& a_state,
 		                     a_homogeneous,
 		                     DirichletValue,
 		                     dir,
-		                     Side::Hi);
+		                     Side::Hi, 1);
                   } else if (GlobalBCRS::s_bcHi[dir] == 1) {
 		              NeumBC(a_state,
 		                     valid,
@@ -1952,6 +1952,7 @@ AmrHydro::timeStep(Real a_dt)
     }
     bool converged_h = false;
     int ite_idx = 0;
+    m_cur_PicardIte = 0;
     while (!converged_h) { 
         if (m_verbosity > 3) {
             pout() <<"   ------------------------------------- "<< endl;
@@ -2652,7 +2653,6 @@ AmrHydro::timeStep(Real a_dt)
 
         LevelData<FArrayBox>& leveloldB  = *m_old_gapheight[lev];    
 
-
         // 2. b : update gap height
         DisjointBoxLayout& levelGrids    = m_amrGrids[lev];
         DataIterator dit = levelGrids.dataIterator();
@@ -2764,10 +2764,11 @@ AmrHydro::timeStepFAS(Real a_dt)
     //     Put h into h_lag (GC too) and b into b_lag
     //     Interp CC b to EC
     //     Compute grad(h) and grad(zb)
-    //     IV INNER LOOP: Re/Qw !! (fixed nb of iter for now)
-    //             Update VECTOR Qw = f(Re, grad(h))
-    //             Update Re = f(Qw)
+    //     IV Re/Qw dependency !! TWO options 
+    //             One: inner loop with fixed nb of iter
+    //             Second: Solve for quad equation to get Re
     //     Update  RHS = f(Qw, grad(zb))
+    //     Evaluate mR 
     //     Compute lagged adv term = f((Qw, grad(h))
     //     Compute alpha, aCoeff (0) and beta, bCoeff
     //     Solve for h with FAS scheme
@@ -3063,7 +3064,6 @@ AmrHydro::timeStepFAS(Real a_dt)
             }
             Real dx = m_amrDx[lev][0];  
             // CC version
-            // levelgradH is just for debug purposes
             Gradient::compGradientCC(levelgradH, levelcurrentH,
                                      crsePsiPtr, finePsiPtr,
                                      dx, nRefCrse, nRefFine,
@@ -3107,13 +3107,14 @@ AmrHydro::timeStepFAS(Real a_dt)
         } // end loop levels
 
 
-        //     IV INNER LOOP: Re/Qw !! (fixed nb of iter for now)
-        //             Update VECTOR Qw = f(Re, grad(h))
-        //             Update Re = f(Qw)
+        //     IV Re/Qw dependency !! TWO options 
         bool m_Re_Q_loop = false;
         if (m_verbosity > 3) {
             pout() <<"        Re/Qw dependency "<< endl;
         }
+        //             One: inner loop with fixed nb of iter
+        //               x Update VECTOR Qw = f(Re, grad(h))
+        //               x Update Re = f(Qw)
         if (m_Re_Q_loop) {
             int max_ite_Re = 50; 
             Real max_Re_diff = 0.0;
@@ -3221,6 +3222,11 @@ AmrHydro::timeStepFAS(Real a_dt)
                     pout() << "           ------------------------" << endl;
                 }
             } // end Qw/Re ites
+        //             Second: Solve for quad equation to get Re
+        //               x Re = f(grad(h)) at CC
+        //               x Re CC->EC
+        //               x Update EC VECTOR Qw = f(Re, grad(h))
+        //               x Qw EC->CC
         } else {
             // Solve quadratic pb. Re first, q second
             for (int lev = 0; lev <= m_finest_level; lev++) {
@@ -3243,7 +3249,7 @@ AmrHydro::timeStepFAS(Real a_dt)
                     BoxIterator bit(Re.box()); // can use gridBox? 
                     for (bit.begin(); bit.ok(); ++bit) {
                         IntVect iv = bit();
-                        // Update Re using this new Qw
+                        // Update Re using GradH at CC
                         Real sqrt_gradH_cc = std::sqrt(GradHcc(iv, 0) * GradHcc(iv, 0) + GradHcc(iv, 1) * GradHcc(iv, 1));
                         Real discr = 1.0 + 4.0 * m_suhmoParm->m_omega * (
                                      std::pow(B(iv, 0), 3) * m_suhmoParm->m_gravity * sqrt_gradH_cc) / (
@@ -3306,7 +3312,8 @@ AmrHydro::timeStepFAS(Real a_dt)
         }
 
 
-        //     Update  RHS = f(Qw, grad(zb)) -- put in levelmR for now
+        //     Update  RHS = f(Qw, grad(zb)) 
+        //     compute mR 
         //     Compute lagged adv term = f((Qw, grad(h))
         if (m_verbosity > 3) {
             pout() <<"        Update RHS(h) and adv term "<< endl;
@@ -4050,7 +4057,8 @@ AmrHydro::regrid()
             } // End verbosity
 
             // exchange is necessary to fill periodic ghost cells
-            // which aren't filled by the copyTo from oldLevelH
+            // which aren't filled by the copyTo from oldLevelH or by
+            // CF interp OR for when there are several Grids
             new_oldheadDataPtr->exchange();
             new_headDataPtr->exchange();
             new_oldgapheightDataPtr->exchange();
@@ -4075,11 +4083,35 @@ AmrHydro::regrid()
             m_bedelevation[lev]  = new_bedelevationDataPtr;
             m_overburdenpress[lev] = new_overburdenpressDataPtr;
             // 
-            m_gradhead[lev]     = new_gradheadDataPtr;
-            m_gradhead_ec[lev]  = new_gradhead_ecDataPtr;
+            m_gradhead[lev]     = new_gradheadDataPtr;     // this one aint filled
+            m_gradhead_ec[lev]  = new_gradhead_ecDataPtr;  // this one aint filled
             m_Pw[lev]       = new_PwDataPtr;
             m_qw[lev]       = new_qwDataPtr;
             m_meltRate[lev] = new_meltRateDataPtr;
+
+
+            if (m_verbosity > 20) {
+
+                pout() << " Checking data after Exchanges " << endl;
+
+                for (dit.begin(); dit.ok(); ++dit) {
+                    BoxIterator bit(head[dit].box()); 
+                    for (bit.begin(); bit.ok(); ++bit) {
+                        IntVect iv = bit(); 
+                        pout() << iv << " h: " << head[dit](iv,0) 
+                                     << ",b: " << gH[dit](iv,0)           
+                                     << ",Pw: " << Pw[dit](iv,0)           
+                                     << ",qw: " << qw[dit](iv,0)           
+                                     << ",Re: " << Re[dit](iv,0)           
+                                     << ",mdot: " << melt[dit](iv,0)           
+                                     << ",zB: " << zB[dit](iv,0)           
+                                     << ",oP: " << overP[dit](iv,0)           
+                                     << ",iceH: " << iceH[dit](iv,0) << endl;
+                    }
+                }
+
+            } // End verbosity
+
         } // end loop over currently defined levels
 
         // now ensure that any remaining levels are null pointers
