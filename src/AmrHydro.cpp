@@ -1931,18 +1931,6 @@ AmrHydro::timeStep(Real a_dt)
         }
         ExtrapGhostCells( currentRe, m_amrDomains[lev]);
 
-        // Keep DEBUG for now
-        if (lev > 0 && (m_cur_step == 406)) {
-           pout() << " Checking data in new grid after regrid in operations " << endl;
-           for (dit.begin(); dit.ok(); ++dit) {
-               BoxIterator bit(currentH[dit].box()); 
-               for (bit.begin(); bit.ok(); ++bit) {
-                   IntVect iv = bit(); 
-                   pout() << iv << " h: " << currentH[dit](iv,0) 
-                                << ",b: " << currentB[dit](iv,0) << endl;
-               }
-           }
-        }
     } // there. We should start with consistent b and h, GC BC and all ...
 
 
