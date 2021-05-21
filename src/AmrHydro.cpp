@@ -3853,15 +3853,12 @@ AmrHydro::regrid()
             LevelData<FArrayBox>* new_ReDataPtr =
                 new LevelData<FArrayBox>(newDBL, m_Re[0]->nComp(), m_Re[0]->ghostVect());
             // Ice Height
-            LevelData<FArrayBox>* old_iceheightDataPtr = m_iceheight[lev];
             LevelData<FArrayBox>* new_iceheightDataPtr    =
                 new LevelData<FArrayBox>(newDBL, m_iceheight[0]->nComp(), m_iceheight[0]->ghostVect());
             // Bed elevation
-            LevelData<FArrayBox>* old_bedelevationDataPtr = m_bedelevation[lev];
             LevelData<FArrayBox>* new_bedelevationDataPtr    =
                 new LevelData<FArrayBox>(newDBL, m_bedelevation[0]->nComp(), m_bedelevation[0]->ghostVect());
             // Pi
-            LevelData<FArrayBox>* old_overburdenpressDataPtr = m_overburdenpress[lev];
             LevelData<FArrayBox>* new_overburdenpressDataPtr    =
                 new LevelData<FArrayBox>(newDBL, m_overburdenpress[0]->nComp(), m_overburdenpress[0]->ghostVect());
 
@@ -3993,13 +3990,6 @@ AmrHydro::regrid()
                     old_gapheightDataPtr->copyTo(*new_gapheightDataPtr);
                     // Re
                     old_ReDataPtr->copyTo(*new_ReDataPtr);
-                    // Ice Height
-                    //old_iceheightDataPtr->copyTo(*new_iceheightDataPtr);
-                    // Bed elevation
-                    //old_bedelevationDataPtr->copyTo(*new_bedelevationDataPtr);
-                    // Pi
-                    //old_overburdenpressDataPtr->copyTo(*new_overburdenpressDataPtr);
-                    // 
                     // Other vars: grad / Pw / Qw / mR
                     old_gradheadDataPtr->copyTo(*new_gradheadDataPtr);  
                     old_PwDataPtr->copyTo(*new_PwDataPtr); 
@@ -4012,9 +4002,6 @@ AmrHydro::regrid()
                 delete old_oldgapheightDataPtr;
                 delete old_gapheightDataPtr;
                 delete old_ReDataPtr;
-                delete old_iceheightDataPtr;
-                delete old_bedelevationDataPtr;
-                delete old_overburdenpressDataPtr;
                 //
                 delete old_gradheadDataPtr;
                 delete old_PwDataPtr;
