@@ -2028,14 +2028,11 @@ AmrHydro::timeStep(Real a_dt)
                 FArrayBox& currH    = levelcurrentH[dit];
                 FArrayBox& zbed     = levelzBed[dit];
 
-                const Box& validBox = levelGrids.get(dit);
-
                 BoxIterator bit(Pw.box());
                 for (bit.begin(); bit.ok(); ++bit) {
                     IntVect iv = bit();
                     Pw(iv,0) = (currH(iv,0) - zbed(iv,0)) * m_suhmoParm->m_rho_w * m_suhmoParm->m_gravity;
                 }
-                //NullBCFill(levelPw[dit], validBox, m_amrDomains[lev], m_amrDx[lev][0]);
             }
         } // end loop on levs
 
