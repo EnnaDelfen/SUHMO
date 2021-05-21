@@ -259,11 +259,6 @@ void BCFill(FArrayBox& a_state,
               if ((!a_domain.domainBox().contains(ghostBoxLo)) && (a_state.box().contains(ghostBoxLo)) ) {
                   if (GlobalBCRS::s_bcLo[dir] == 0) {
                       // Diri
-                      //BoxIterator bit(ghostBoxLo);
-                      //for (bit.begin(); bit.ok(); ++bit) {
-                      //    IntVect iv = bit();
-                      //    a_state(iv, 0) = DirichletValue(dir, Side::Lo);
-                      //}
                       ghostBoxLo &= a_state.box();
                       int isign = sign(Side::Lo);
                       for (BoxIterator bit(ghostBoxLo); bit.ok(); ++bit) {
@@ -291,11 +286,6 @@ void BCFill(FArrayBox& a_state,
               if ((!a_domain.domainBox().contains(ghostBoxHi)) && (a_state.box().contains(ghostBoxHi)) ) {
                   if (GlobalBCRS::s_bcHi[dir] == 0) {
                       // Diri
-                      //BoxIterator bit(ghostBoxHi);
-                      //for (bit.begin(); bit.ok(); ++bit) {
-                      //    IntVect iv = bit();
-                      //    a_state(iv, 0) = DirichletValue(dir, Side::Hi);
-                      //}
                       ghostBoxHi &= a_state.box();
                       int isign = sign(Side::Hi);
                       for (BoxIterator bit(ghostBoxHi); bit.ok(); ++bit) {
@@ -721,15 +711,22 @@ AmrHydro::initialize()
 
     /* PARSING */
     ParmParse ppSolver("solver");
-    m_use_FAS  = false;
-    m_compute_Bcoeff = true;
+    m_use_FAS        = false;
+    m_compute_Bcoeff = false;
+    m_use_NL         = false;
+    ppSolver.query("use_fas", m_use_FAS); // use FAS scheme for head 
+    if (m_use_FAS) {
+        ppSolver.query("use_NL", m_use_NL); // use FAS formulation with NL portion 
+        if (m_use_NL) {
+            ppSolver.query("bcoeff_otf", m_compute_Bcoeff); // compute B coeffs on the fly 
+        }
+    }
 
-    ParmParse ppAmr("AmrHydro");
-    ppSolver.query("use_fas", m_use_FAS); 
-    ppSolver.query("bcoeff_otf", m_compute_Bcoeff); 
     m_time     = 0.0;  // start at t = 0
     m_cur_step = 0;    // start at dt = 0
     m_cur_PicardIte = 0;
+
+    ParmParse ppAmr("AmrHydro");
     ppAmr.get("max_level", m_max_level);  // max level
     if (m_max_level > 0) {
         m_refinement_ratios.resize(m_max_level, -1);
@@ -1157,7 +1154,11 @@ AmrHydro::run(Real a_max_time, int a_max_step)
             }
 
             /* core */
-            timeStepFAS(dt);
+            if ((m_use_FAS) && (m_use_NL)) {
+                timeStepFAS(dt);
+            } else {
+                timeStep(dt);
+            }
 
         } // end of plot_time_interval
 #ifdef CH_USE_HDF5
@@ -1234,8 +1235,6 @@ void AmrHydro::WFlx_level(LevelData<FluxBox>&          a_bcoef,
                         12.0 * m_suhmoParm->m_nu * m_suhmoParm->m_nu);  
             Re(iv, 0) = (- 1.0 + std::sqrt(discr)) / (2.0 * m_suhmoParm->m_omega) ; 
         }
-        //const Box& validBox = levelGrids.get(dit);
-        //NeumBCForHcoarse(Re, validBox, levelDomain, a_dx);
     }
     if (a_print_WFX) {
         /* custom plt here -- debug print */
@@ -1303,9 +1302,9 @@ void AmrHydro::WFlx_level(LevelData<FluxBox>&          a_bcoef,
                 Real num_q = - std::pow(BFab(iv, 0),3) * m_suhmoParm->m_gravity;
                 Real denom_q = 12.0 * m_suhmoParm->m_nu * (1 + m_suhmoParm->m_omega * ReFab(iv, 0));
                 bCFab(iv, 0) = num_q/denom_q;
-                //if ((m_cur_step == 5)  && (a_dx > 130) ){
                 if (bCFab(iv, 0) >= 0.0) {
                     pout() << " --(dx= "<< a_dx<<") cell dir Bc-EC " << iv << " " << dir << " " << bCFab(iv, 0) << "\n";
+                    //MayDay::Error("Abort");
                 }
             }
         }
@@ -1322,27 +1321,29 @@ void AmrHydro::NonLinear_level(LevelData<FArrayBox>&        a_NL,
                                LevelData<FArrayBox>&        a_zb)
 {
 
-  DataIterator levelDit = a_NL.dataIterator();
-  for (levelDit.begin(); levelDit.ok(); ++levelDit) {
+  if (m_use_NL) {
+      DataIterator levelDit = a_NL.dataIterator();
+      for (levelDit.begin(); levelDit.ok(); ++levelDit) {
 
-      FArrayBox& thisNL          = a_NL[levelDit];
-      FArrayBox& thisdNL         = a_dNL[levelDit];
-      const FArrayBox& thisU     = a_u[levelDit];
-      FArrayBox& thisB           = a_B[levelDit];
-      FArrayBox& thisPi          = a_Pi[levelDit];
-      FArrayBox& thiszb          = a_zb[levelDit];
+          FArrayBox& thisNL          = a_NL[levelDit];
+          FArrayBox& thisdNL         = a_dNL[levelDit];
+          const FArrayBox& thisU     = a_u[levelDit];
+          FArrayBox& thisB           = a_B[levelDit];
+          FArrayBox& thisPi          = a_Pi[levelDit];
+          FArrayBox& thiszb          = a_zb[levelDit];
 
-      BoxIterator bit(thisNL.box());
-      for (bit.begin(); bit.ok(); ++bit) {
-          IntVect iv = bit();
-          thisNL(iv, 0)  = - m_suhmoParm->m_A * thisB(iv,0) * 
-                           std::pow( (thisPi(iv,0) - m_suhmoParm->m_rho_w * m_suhmoParm->m_gravity *
-                           (thisU(iv,0) -thiszb(iv,0))), 3);
-          thisdNL(iv, 0) = 3.0 * m_suhmoParm->m_A * thisB(iv,0) * m_suhmoParm->m_rho_w *m_suhmoParm->m_gravity *
-                             ( std::pow( (thisPi(iv,0) - m_suhmoParm->m_rho_w * m_suhmoParm->m_gravity * 
-                             (thisU(iv,0) - thiszb(iv,0))), 2) );
-      }
-  } // end loop over grids on this level
+          BoxIterator bit(thisNL.box());
+          for (bit.begin(); bit.ok(); ++bit) {
+              IntVect iv = bit();
+              thisNL(iv, 0)  = - m_suhmoParm->m_A * thisB(iv,0) * 
+                               std::pow( (thisPi(iv,0) - m_suhmoParm->m_rho_w * m_suhmoParm->m_gravity *
+                               (thisU(iv,0) -thiszb(iv,0))), 3);
+              thisdNL(iv, 0) = 3.0 * m_suhmoParm->m_A * thisB(iv,0) * m_suhmoParm->m_rho_w *m_suhmoParm->m_gravity *
+                                 ( std::pow( (thisPi(iv,0) - m_suhmoParm->m_rho_w * m_suhmoParm->m_gravity * 
+                                 (thisU(iv,0) - thiszb(iv,0))), 2) );
+          }
+      } // end loop over grids on this level
+  }
 }
 
 void AmrHydro::NonLinear(Vector<LevelData<FArrayBox>* >        a_NL,
@@ -2886,7 +2887,7 @@ AmrHydro::timeStepFAS(Real a_dt)
     } // there. We should start with consistent b and h, GC BC and all ...
 
         /* custom plt here -- debug print */
-        if (m_PrintCustom && (m_cur_step > 96)) {
+        if (m_PrintCustom && (m_cur_step == 51)) {
             int nStuffToPlot = 12;
             Vector<std::string> vectName;
             vectName.resize(nStuffToPlot);
@@ -2973,7 +2974,7 @@ AmrHydro::timeStepFAS(Real a_dt)
                     levelZbSTP[dit].copy(levelZb[dit], 0, 0, 1);
                 }
             } // loop on levs
-            writePltCustom(nStuffToPlot, vectName, stuffToPlot, std::to_string(1000));
+            writePltCustom(nStuffToPlot, vectName, stuffToPlot, std::to_string(-1));
         } // end customPlt
 
 
@@ -3425,17 +3426,6 @@ AmrHydro::timeStepFAS(Real a_dt)
                     RHSh(iv,0) += moulinSrc(iv,0);
                 }
             }
-            // handle ghost cells on the coarse-fine interface
-            if (lev > 0) {
-                QuadCFInterp qcfi(m_amrGrids[lev], &m_amrGrids[lev-1],
-                                  m_amrDx[lev][0], m_refinement_ratios[lev-1],  
-                                  1,  // num comps
-                                  m_amrDomains[lev]);
-                qcfi.coarseFineInterp(*RHS_h[lev], *RHS_h[lev-1]);
-            }
-            // Need to fill the ghost cells of melting rate -- extrapolate on perio boundaries   
-            levelRHSh.exchange();
-            //ExtrapGhostCells( levelRHSh, m_amrDomains[lev]);
         }// loop on levs
 
 
@@ -3513,7 +3503,7 @@ AmrHydro::timeStepFAS(Real a_dt)
         }
 
         /* custom plt here -- debug print */
-        if (m_PrintCustom && (m_cur_step > 96)) {
+        if (m_PrintCustom && (m_cur_step ==51)) {
             int nStuffToPlot = 12;
             Vector<std::string> vectName;
             vectName.resize(nStuffToPlot);
