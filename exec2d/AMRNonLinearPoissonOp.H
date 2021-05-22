@@ -262,6 +262,12 @@ public:
                                 LevelData<FArrayBox>&       a_phiFine,
                                 const LevelData<FArrayBox>& a_rhsFine);
 
+  virtual void restrictResidual(LevelData<FArrayBox>&       a_resCoarse,
+                                LevelData<FArrayBox>&       a_phiFine,
+                                const LevelData<FArrayBox>* a_phiCoarse,
+                                const LevelData<FArrayBox>& a_rhsFine,
+                                bool homogeneous);
+
   virtual void restrictR(LevelData<FArrayBox>& a_phiCoarse,
                          const LevelData<FArrayBox>& a_phiFine);
   

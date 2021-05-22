@@ -327,15 +327,28 @@ void VCAMRNonLinearPoissonOp::restrictR(LevelData<FArrayBox>& a_phiCoarse,
 void VCAMRNonLinearPoissonOp::restrictResidual(LevelData<FArrayBox>&       a_resCoarse,
                                              LevelData<FArrayBox>&       a_phiFine,
                                              const LevelData<FArrayBox>& a_rhsFine) {
+{
+  // default impl
+  restrictResidual(a_resCoarse, a_phiFine, nullptr, a_rhsFine, true);
+}
+
+
+void AMRNonLinearPoissonOp::restrictResidual(LevelData<FArrayBox>&       a_resCoarse,
+                                             LevelData<FArrayBox>&       a_phiFine,
+                                             const LevelData<FArrayBox>* a_phiCoarse,
+                                             const LevelData<FArrayBox>& a_rhsFine,
+                                             bool homogeneous)
+{
   CH_TIME("VCAMRNonLinearPoissonOp::restrictResidual");
 
-  homogeneousCFInterp(a_phiFine);
+  if (a_phiCoarse != nullptr) {
+      m_interpWithCoarser.coarseFineInterp(a_phiFine, *a_phiCoarse);
+  }
+
   const DisjointBoxLayout& dblFine = a_phiFine.disjointBoxLayout();
-
-
   for (DataIterator dit = a_phiFine.dataIterator(); dit.ok(); ++dit) {
       FArrayBox& phi = a_phiFine[dit];
-      m_bc(phi, dblFine[dit()], m_domain, m_dx, true);
+      m_bc(phi, dblFine[dit()], m_domain, m_dx, homogeneous);
     }
 
   a_phiFine.exchange(a_phiFine.interval(), m_exchangeCopier);

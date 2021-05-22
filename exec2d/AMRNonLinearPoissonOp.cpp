@@ -761,53 +761,50 @@ void AMRNonLinearPoissonOp::restrictResidual(LevelData<FArrayBox>&       a_resCo
                                              LevelData<FArrayBox>&       a_phiFine,
                                              const LevelData<FArrayBox>& a_rhsFine)
 {
+  // default impl
+  restrictResidual(a_resCoarse, a_phiFine, nullptr, a_rhsFine, true);
+}
+
+
+void AMRNonLinearPoissonOp::restrictResidual(LevelData<FArrayBox>&       a_resCoarse,
+                                             LevelData<FArrayBox>&       a_phiFine,
+                                             const LevelData<FArrayBox>* a_phiCoarse,
+                                             const LevelData<FArrayBox>& a_rhsFine,
+                                             bool homogeneous)
+{
   CH_TIME("AMRNonLinearPoissonOp::restrictResidual");
 
-  homogeneousCFInterp(a_phiFine);
-
-  if (s_exchangeMode == 0)
-    a_phiFine.exchange(a_phiFine.interval(), m_exchangeCopier);
-  else if (s_exchangeMode == 1)
-    a_phiFine.exchangeNoOverlap(m_exchangeCopier);
-  else
-    MayDay::Abort("exchangeMode");
+  if (a_phiCoarse != nullptr) {
+      m_interpWithCoarser.coarseFineInterp(a_phiFine, *a_phiCoarse);
+  }
 
   const DisjointBoxLayout& dblFine = a_phiFine.disjointBoxLayout();
+  for (DataIterator dit = a_phiFine.dataIterator(); dit.ok(); ++dit) {
+      FArrayBox &phi = a_phiFine[dit];
+      m_bc(phi, dblFine[dit()], m_domain, m_dx, homogeneous);
+  }
+
+  a_phiFine.exchange(a_phiFine.interval(), m_exchangeCopier);
 
   LevelData<FArrayBox>  a_nlfunc(dblFine, 1, IntVect::Zero);
   LevelData<FArrayBox>  a_nlDfunc(dblFine, 1, IntVect::Zero);
   MEMBER_FUNC_PTR(*m_amrHydro, m_nllevel)(a_nlfunc, a_nlDfunc, a_phiFine,
                                         *m_B, *m_Pi, *m_zb);
 
-  DataIterator dit = a_phiFine.dataIterator();
-  int nbox=dit.size();
-#pragma omp parallel 
-  {
-#pragma omp for 
-      for(int ibox = 0; ibox < nbox; ibox++) {
-          FArrayBox& phi = a_phiFine[dit[ibox]];
-          m_bc(phi, dblFine[dit[ibox]], m_domain, m_dx, true);
-      }
-  }//end pragma
+  for (DataIterator dit = a_phiFine.dataIterator(); dit.ok(); ++dit) {
+      FArrayBox&       phi = a_phiFine[dit];
+      const FArrayBox& rhs = a_rhsFine[dit];
+      FArrayBox&       res = a_resCoarse[dit];
 
-#pragma omp parallel 
-  {
-#pragma omp for 
-    for(int ibox = 0; ibox < nbox; ibox++)
-      {
-        FArrayBox&       phi = a_phiFine[dit[ibox]];
-        const FArrayBox& rhs = a_rhsFine[dit[ibox]];
-        FArrayBox&       res = a_resCoarse[dit[ibox]];
-
-        FArrayBox&       nlfunc = a_nlfunc[dit[ibox]];
+      FArrayBox&       nlfunc = a_nlfunc[dit];
         
-        Box region = dblFine[dit[ibox]];
-        const IntVect& iv = region.smallEnd();
-        IntVect civ = coarsen(iv, 2);
+      Box region = dblFine[dit];
+      const IntVect& iv = region.smallEnd();
+      IntVect civ = coarsen(iv, 2);
         
-        res.setVal(0.0);
+      res.setVal(0.0);
         
-        FORT_RESTRICTRESNL(CHF_FRA_SHIFT(res, civ),
+      FORT_RESTRICTRESNL(CHF_FRA_SHIFT(res, civ),
                          CHF_CONST_FRA_SHIFT(phi, iv),
                          CHF_CONST_FRA_SHIFT(rhs, iv),
                          CHF_CONST_REAL(m_alpha),
@@ -815,8 +812,7 @@ void AMRNonLinearPoissonOp::restrictResidual(LevelData<FArrayBox>&       a_resCo
                          CHF_CONST_FRA_SHIFT(nlfunc, iv),
                          CHF_BOX_SHIFT(region, iv),
                          CHF_CONST_REAL(m_dx));
-      }
-  }//end pragma
+  }
 }
 
 // ---------------------------------------------------------
