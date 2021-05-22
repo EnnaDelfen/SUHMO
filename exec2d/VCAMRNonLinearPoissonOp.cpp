@@ -326,18 +326,18 @@ void VCAMRNonLinearPoissonOp::restrictR(LevelData<FArrayBox>& a_phiCoarse,
 
 void VCAMRNonLinearPoissonOp::restrictResidual(LevelData<FArrayBox>&       a_resCoarse,
                                              LevelData<FArrayBox>&       a_phiFine,
-                                             const LevelData<FArrayBox>& a_rhsFine) {
+                                             const LevelData<FArrayBox>& a_rhsFine) 
 {
   // default impl
   restrictResidual(a_resCoarse, a_phiFine, nullptr, a_rhsFine, true);
 }
 
 
-void AMRNonLinearPoissonOp::restrictResidual(LevelData<FArrayBox>&       a_resCoarse,
-                                             LevelData<FArrayBox>&       a_phiFine,
-                                             const LevelData<FArrayBox>* a_phiCoarse,
-                                             const LevelData<FArrayBox>& a_rhsFine,
-                                             bool homogeneous)
+void VCAMRNonLinearPoissonOp::restrictResidual(LevelData<FArrayBox>&       a_resCoarse,
+                                               LevelData<FArrayBox>&       a_phiFine,
+                                               const LevelData<FArrayBox>* a_phiCoarse,
+                                               const LevelData<FArrayBox>& a_rhsFine,
+                                               bool homogeneous)
 {
   CH_TIME("VCAMRNonLinearPoissonOp::restrictResidual");
 
