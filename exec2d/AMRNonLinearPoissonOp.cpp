@@ -398,47 +398,32 @@ void AMRNonLinearPoissonOp::applyOpI(LevelData<FArrayBox>&       a_lhs,
                                      bool                        a_homogeneous)
 {
   CH_TIME("AMRNonLinearPoissonOp::applyOpI");
-
   LevelData<FArrayBox>& phi = (LevelData<FArrayBox>&)a_phi;
-  if (s_exchangeMode == 0)
-    phi.exchange(phi.interval(), m_exchangeCopier);
-  else if (s_exchangeMode == 1)
-    phi.exchangeNoOverlap(m_exchangeCopier);
-  else
-    MayDay::Abort("exchangeMode");
-
+  Real dx = m_dx;
   const DisjointBoxLayout& dbl = a_lhs.disjointBoxLayout();
+  DataIterator dit = phi.dataIterator();
+
+  for (dit.begin(); dit.ok(); ++dit) {
+      m_bc(phi[dit], dbl[dit()], m_domain, dx, a_homogeneous);
+  }
+
+  phi.exchange(phi.interval(), m_exchangeCopier);
 
   LevelData<FArrayBox>  a_nlfunc(dbl, 1, IntVect::Zero);
   LevelData<FArrayBox>  a_nlDfunc(dbl, 1, IntVect::Zero);
   MEMBER_FUNC_PTR(*m_amrHydro, m_nllevel)(a_nlfunc, a_nlDfunc, a_phi,
                                         *m_B, *m_Pi, *m_zb);
 
-  DataIterator dit = phi.dataIterator();
-  int nbox=dit.size();
-#pragma omp parallel   default (shared)
-  {
-      CH_TIME("AMRNonLinearPoissonOp::applyOpIBC");
-#pragma omp for 
-      for (int ibox=0;ibox<nbox; ibox++) {
-          m_bc(phi[dit[ibox]], dbl[dit[ibox]], m_domain, m_dx, a_homogeneous);
-      }
-  }// end pragma
-
-#pragma omp parallel 
-  {
-#pragma omp for 
-      for (int ibox=0;ibox<nbox; ibox++) {
-        const Box& region = dbl[dit[ibox]];
-        FORT_OPERATORLAPNL(CHF_FRA(a_lhs[dit[ibox]]),
-                         CHF_CONST_FRA(phi[dit[ibox]]),
+  for (dit.begin(); dit.ok(); ++dit) {
+        const Box& region = dbl[dit];
+        FORT_OPERATORLAPNL(CHF_FRA(a_lhs[dit]),
+                         CHF_CONST_FRA(phi[dit]),
                          CHF_BOX(region),
                          CHF_CONST_REAL(m_dx),
                          CHF_CONST_REAL(m_alpha),
                          CHF_CONST_REAL(m_beta),
-                         CHF_CONST_FRA(a_nlfunc[dit[ibox]]));
-      }
-  }//end pragma
+                         CHF_CONST_FRA(a_nlfunc[dit]));
+  }
 }
 
 void AMRNonLinearPoissonOp::applyOpNoBoundary(LevelData<FArrayBox>&       a_lhs,
@@ -654,13 +639,8 @@ void AMRNonLinearPoissonOp::relaxNF(LevelData<FArrayBox>&       a_e,
                                     int                         a_depth,
                                     bool                        a_print)
 {
-  if (a_eCoarse != NULL)
-  {
+  if (a_eCoarse != NULL) {
     m_interpWithCoarser.coarseFineInterp(a_e, *a_eCoarse);
-  }
-  else
-  {
-    homogeneousCFInterp(a_e);
   }
 
   m_print = a_print;
@@ -1002,7 +982,7 @@ void AMRNonLinearPoissonOp::AMRRestrictS(LevelData<FArrayBox>&       a_resCoarse
 
   if ( !a_skip_res )
     {
-      AMRResidualNF( a_scratch, a_correction, a_coarseCorrection, a_residual, true );
+      AMRResidualNF( a_scratch, a_correction, a_coarseCorrection, a_residual, false );
     }
   else 
     {
@@ -1176,7 +1156,7 @@ void AMRNonLinearPoissonOp::AMRUpdateResidual(LevelData<FArrayBox>&       a_resi
 //   this->create(r, a_residual);
 //   this->AMRResidualNF(r, a_correction, a_coarseCorrection, a_residual, true);
 //   this->assign(a_residual, r);
-  this->AMRResidualNF(a_residual, a_correction, a_coarseCorrection, a_residual, true);
+  this->AMRResidualNF(a_residual, a_correction, a_coarseCorrection, a_residual, false);
 }
 
 // ---------------------------------------------------------

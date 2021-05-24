@@ -38,12 +38,13 @@ void VCAMRNonLinearPoissonOp::EvaluateBcoef(const LevelData<FArrayBox>&   a_phi,
                                             bool                          a_homogeneous) 
 {
   CH_TIME("VCAMRNonLinearPoissonOp::EvaluateBcoef");
+
   if(a_homogeneous) {
-      MayDay::Abort("VCAMRNonLinearPoissonOp::EvaluateBcoef");
+      MayDay::Abort("VCAMRNonLinearPoissonOp::EvaluateBcoef homogeneous");
   }
 
   LevelData<FArrayBox>& phi = (LevelData<FArrayBox>&)a_phi;
-  phi.exchangeNoOverlap(m_exchangeCopier);
+  phi.exchange(phi.interval(), m_exchangeCopier);
 
   const DisjointBoxLayout& dbl = a_phi.disjointBoxLayout();
   DataIterator dit = phi.dataIterator(); 
@@ -56,13 +57,16 @@ void VCAMRNonLinearPoissonOp::EvaluateBcoef(const LevelData<FArrayBox>&   a_phi,
                                                   *m_B, m_dx, 
                                                    false, a_AMRFASMGiter, a_depth);
 
+  // Recompute the relaxation coef after updating m_bCoef
+  m_lambdaNeedsResetting = true;
+  resetLambda();
+
 }
 
 void VCAMRNonLinearPoissonOp::AverageBcoef(const MGLevelOp<LevelData<FArrayBox> >& a_operator,
                                            int a_depth)
 {
   CH_TIME("VCAMRNonLinearPoissonOp::AverageBcoef");
-  //pout() << "VCAMRNonLinearPoissonOp::AverageBcoef on depth "<< a_depth << "\n"; 
 
   int coarsening = 1;
   for (int i = 0; i < a_depth; i++) {
@@ -84,6 +88,10 @@ void VCAMRNonLinearPoissonOp::AverageBcoef(const MGLevelOp<LevelData<FArrayBox> 
 
   // Handle inter-box ghost cells.
   bcoefCoar.exchange();
+
+  // Recompute the relaxation coef after updating m_bCoef
+  m_lambdaNeedsResetting = true;
+  resetLambda();
 }
 
 
@@ -94,18 +102,15 @@ void VCAMRNonLinearPoissonOp::residualI(LevelData<FArrayBox>&            a_lhs,
 {
   CH_TIME("VCAMRNonLinearPoissonOp::residualI");
   if (m_verbosity > 3) {
-      pout() << "VCAMRNonLinearPoissonOp::residualI\n";
+      pout() << "VCAMRNonLinearPoissonOp::residualI with homgeneous"<< a_homogeneous <<"\n";
+  }
+  if (a_homogeneous) {
+      MayDay::Abort("VCAMRNonLinearPoissonOp::residualI homogeneous");
   }
 
   LevelData<FArrayBox>& phi = (LevelData<FArrayBox>&)a_phi;
 
-  phi.exchangeNoOverlap(m_exchangeCopier);
-
   const DisjointBoxLayout& dbl = a_lhs.disjointBoxLayout();
-
-  LevelData<FArrayBox>  a_nlfunc(dbl, 1, IntVect::Zero);
-  LevelData<FArrayBox>  a_nlDfunc(dbl, 1, IntVect::Zero);
-
   DataIterator dit = phi.dataIterator();
   {
     CH_TIME("VCAMRNonLinearPoissonOp::residualIBC");
@@ -116,8 +121,13 @@ void VCAMRNonLinearPoissonOp::residualI(LevelData<FArrayBox>&            a_lhs,
     }
   }
 
+  phi.exchange(phi.interval(), m_exchangeCopier);
+
+  LevelData<FArrayBox>  a_nlfunc(dbl, 1, IntVect::Zero);
+  LevelData<FArrayBox>  a_nlDfunc(dbl, 1, IntVect::Zero);
   MEMBER_FUNC_PTR(*m_amrHydro, m_nllevel)(a_nlfunc, a_nlDfunc, a_phi,
                                           *m_B, *m_Pi, *m_zb);
+
   for (dit.begin(); dit.ok(); ++dit)
     {
       const Box& region = dbl[dit()];
@@ -205,8 +215,7 @@ void VCAMRNonLinearPoissonOp::applyOpMg(LevelData<FArrayBox>& a_lhs,
   CH_TIME("VCAMRNonLinearPoissonOp::applyOpMg");
 
   // Do CF stuff if we have a coarser level that's not just a single grid cell
-   if (a_phiCoarse != NULL)
-   {
+   if (a_phiCoarse != NULL) {
      const ProblemDomain& probDomain = a_phiCoarse->disjointBoxLayout().physDomain();
      const Box& domBox = probDomain.domainBox();
      //    IntVect hi = domBox.b
@@ -249,16 +258,15 @@ void VCAMRNonLinearPoissonOp::applyOpNoBoundary(LevelData<FArrayBox>&       a_lh
   LevelData<FArrayBox>& phi = (LevelData<FArrayBox>&)a_phi;
 
   const DisjointBoxLayout& dbl = a_lhs.disjointBoxLayout();
-
-  LevelData<FArrayBox>  a_nlfunc(dbl, 1, IntVect::Zero);
-  LevelData<FArrayBox>  a_nlDfunc(dbl, 1, IntVect::Zero);
+  DataIterator dit = phi.dataIterator();
 
   phi.exchange(phi.interval(), m_exchangeCopier);
 
+  LevelData<FArrayBox>  a_nlfunc(dbl, 1, IntVect::Zero);
+  LevelData<FArrayBox>  a_nlDfunc(dbl, 1, IntVect::Zero);
   MEMBER_FUNC_PTR(*m_amrHydro, m_nllevel)(a_nlfunc, a_nlDfunc, a_phi,
                                           *m_B, *m_Pi, *m_zb);
 
-  DataIterator dit = phi.dataIterator();
   for (dit.begin(); dit.ok(); ++dit)
     {
       const Box& region = dbl[dit()];
@@ -298,7 +306,6 @@ void VCAMRNonLinearPoissonOp::applyOpNoBoundary(LevelData<FArrayBox>&       a_lh
 void VCAMRNonLinearPoissonOp::restrictR(LevelData<FArrayBox>& a_phiCoarse,
                                         const LevelData<FArrayBox>& a_phiFine)
 {
-  //    a_phiFine.exchange(a_phiFine.interval(), m_exchangeCopier);
   if (m_verbosity > 3) {
       pout() << "VCAMRNonLinearPoissonOp::restrictR\n"; 
   }
@@ -340,6 +347,9 @@ void VCAMRNonLinearPoissonOp::restrictResidual(LevelData<FArrayBox>&       a_res
                                                bool homogeneous)
 {
   CH_TIME("VCAMRNonLinearPoissonOp::restrictResidual");
+  if(homogeneous) {
+      MayDay::Abort("VCAMRNonLinearPoissonOp::restrictResidual homogeneous");
+  }
 
   if (a_phiCoarse != nullptr) {
       m_interpWithCoarser.coarseFineInterp(a_phiFine, *a_phiCoarse);
@@ -349,7 +359,7 @@ void VCAMRNonLinearPoissonOp::restrictResidual(LevelData<FArrayBox>&       a_res
   for (DataIterator dit = a_phiFine.dataIterator(); dit.ok(); ++dit) {
       FArrayBox& phi = a_phiFine[dit];
       m_bc(phi, dblFine[dit()], m_domain, m_dx, homogeneous);
-    }
+  }
 
   a_phiFine.exchange(a_phiFine.interval(), m_exchangeCopier);
 
@@ -626,7 +636,7 @@ void VCAMRNonLinearPoissonOp::levelGSRB(LevelData<FArrayBox>&       a_phi,
         for (dit.begin(); dit.ok(); ++dit)
           {
             // invoke physical BC's where necessary
-            m_bc(a_phi[dit], dbl[dit()], m_domain, m_dx, true);
+            m_bc(a_phi[dit], dbl[dit()], m_domain, m_dx, false);
           }
       }
 
