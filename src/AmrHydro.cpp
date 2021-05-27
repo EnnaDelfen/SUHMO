@@ -1876,13 +1876,16 @@ AmrHydro::timeStep(Real a_dt)
 
         // handle ghost cells on the coarse-fine interface
         if (lev > 0) {
-            QuadCFInterp qcfi(m_amrGrids[lev], &m_amrGrids[lev-1],
-                              m_amrDx[lev][0], m_refinement_ratios[lev-1],  
-                              1,  // ncomps
-                              m_amrDomains[lev]);
-            qcfi.coarseFineInterp(*m_head[lev], *m_head[lev-1]);
-            qcfi.coarseFineInterp(*m_gapheight[lev], *m_gapheight[lev-1]);
-            qcfi.coarseFineInterp(*m_Re[lev], *m_Re[lev-1]);
+            int nGhost = currentRe.ghostVect()[0];
+            PiecewiseLinearFillPatch headFiller(m_amrGrids[lev],
+                                                m_amrGrids[lev - 1],
+                                                1, // ncomps
+                                                m_amrDomains[lev - 1],
+                                                m_refinement_ratios[lev - 1],
+                                                nGhost);
+            headFiller.fillInterp(*m_head[lev], *m_head[lev-1], *m_head[lev-1], 0.0, 0, 0, 1);
+            headFiller.fillInterp(*m_gapheight[lev], *m_gapheight[lev-1], *m_gapheight[lev-1], 0.0, 0, 0, 1);
+            headFiller.fillInterp(*m_Re[lev], *m_Re[lev-1], *m_Re[lev-1], 0.0, 0, 0, 1);
         }
 
         // fill perio boundaries
@@ -1966,13 +1969,16 @@ AmrHydro::timeStep(Real a_dt)
 
             // deal with c-f interf if any
             if (lev > 0) {
-                QuadCFInterp qcfi(m_amrGrids[lev], &m_amrGrids[lev-1],
-                                  m_amrDx[lev][0], m_refinement_ratios[lev-1],  
-                                  1,  // ncomps
-                                  m_amrDomains[lev]);
-                qcfi.coarseFineInterp(*m_head[lev], *m_head[lev-1]);
-                qcfi.coarseFineInterp(*m_gapheight[lev], *m_gapheight[lev-1]);
-                qcfi.coarseFineInterp(*m_Re[lev], *m_Re[lev-1]);
+                int nGhost = levelcurRe.ghostVect()[0];
+                PiecewiseLinearFillPatch headFiller(m_amrGrids[lev],
+                                                    m_amrGrids[lev - 1],
+                                                    1, // ncomps
+                                                    m_amrDomains[lev - 1],
+                                                    m_refinement_ratios[lev - 1],
+                                                    nGhost);
+                headFiller.fillInterp(*m_head[lev], *m_head[lev-1], *m_head[lev-1], 0.0, 0, 0, 1);
+                headFiller.fillInterp(*m_gapheight[lev], *m_gapheight[lev-1], *m_gapheight[lev-1], 0.0, 0, 0, 1);
+                headFiller.fillInterp(*m_Re[lev], *m_Re[lev-1], *m_Re[lev-1], 0.0, 0, 0, 1);
             }
 
 
@@ -2164,11 +2170,14 @@ AmrHydro::timeStep(Real a_dt)
                 EdgeToCell(levelQw_ec, levelQw); 
                 // handle ghost cells on the coarse-fine interface
                 if (lev > 0) {
-                    QuadCFInterp qcfi(m_amrGrids[lev], &m_amrGrids[lev-1],
-                                      m_amrDx[lev][0], m_refinement_ratios[lev-1],  
-                                      2,  // num comps
-                                      m_amrDomains[lev]);
-                    qcfi.coarseFineInterp(*m_qw[lev], *m_qw[lev-1]);
+                    int nGhost = levelQw.ghostVect()[0];
+                    PiecewiseLinearFillPatch headFiller(m_amrGrids[lev],
+                                                        m_amrGrids[lev - 1],
+                                                        2, // ncomps
+                                                        m_amrDomains[lev - 1],
+                                                        m_refinement_ratios[lev - 1],
+                                                        nGhost);
+                    headFiller.fillInterp(*m_qw[lev], *m_qw[lev-1], *m_qw[lev-1], 0.0, 0, 0, 1);
                 }
                 // Need to fill the ghost cells -- extrapolate on perio boundaries   
                 levelQw.exchange();
@@ -2196,11 +2205,14 @@ AmrHydro::timeStep(Real a_dt)
                 }
                 // handle ghost cells on the coarse-fine interface
                 if (lev > 0) {
-                    QuadCFInterp qcfi(m_amrGrids[lev], &m_amrGrids[lev-1],
-                                      m_amrDx[lev][0], m_refinement_ratios[lev-1],  
-                                      1,  // num comps
-                                      m_amrDomains[lev]);
-                    qcfi.coarseFineInterp(*m_Re[lev], *m_Re[lev-1]);
+                    int nGhost = levelRe.ghostVect()[0];
+                    PiecewiseLinearFillPatch headFiller(m_amrGrids[lev],
+                                                        m_amrGrids[lev - 1],
+                                                        1, // ncomps
+                                                        m_amrDomains[lev - 1],
+                                                        m_refinement_ratios[lev - 1],
+                                                        nGhost);
+                    headFiller.fillInterp(*m_Re[lev], *m_Re[lev-1], *m_Re[lev-1], 0.0, 0, 0, 1);
                 }
                 // Need to fill the ghost cells of Re -- extrapolate on perio boundaries   
                 levelRe.exchange();
@@ -2284,11 +2296,14 @@ AmrHydro::timeStep(Real a_dt)
             }
             // handle ghost cells on the coarse-fine interface
             if (lev > 0) {
-                QuadCFInterp qcfi(m_amrGrids[lev], &m_amrGrids[lev-1],
-                                  m_amrDx[lev][0], m_refinement_ratios[lev-1],  
-                                  1,  // num comps
-                                  m_amrDomains[lev]);
-                qcfi.coarseFineInterp(*m_meltRate[lev], *m_meltRate[lev-1]);
+                int nGhost = levelmR.ghostVect()[0];
+                PiecewiseLinearFillPatch headFiller(m_amrGrids[lev],
+                                                    m_amrGrids[lev - 1],
+                                                    1, // ncomps
+                                                    m_amrDomains[lev - 1],
+                                                    m_refinement_ratios[lev - 1],
+                                                    nGhost);
+                headFiller.fillInterp(*m_meltRate[lev], *m_meltRate[lev-1], *m_meltRate[lev-1], 0.0, 0, 0, 1);
             }
             // Need to fill the ghost cells of melting rate -- extrapolate on perio boundaries   
             levelmR.exchange();
@@ -2436,7 +2451,6 @@ AmrHydro::timeStep(Real a_dt)
                               1,  // num comps
                               m_amrDomains[lev]);
             qcfi.coarseFineInterp(*m_head[lev], *m_head[lev-1]);
-            //qcfi.coarseFineInterp(*m_gapheight[lev], *m_gapheight[lev-1]);
         }
 
         /* CONVERGENCE TESTS with LAGGED quantities */
@@ -2485,7 +2499,7 @@ AmrHydro::timeStep(Real a_dt)
         }
      
         /* custom plt here -- debug print */
-        if (m_PrintCustom && (m_cur_step == 51)) {
+        if (m_PrintCustom && (m_cur_step == 301)) {
             int nStuffToPlot = 17;
             Vector<std::string> vectName;
             vectName.resize(nStuffToPlot);
@@ -2669,11 +2683,14 @@ AmrHydro::timeStep(Real a_dt)
     }
     // handle ghost cells on the coarse-fine interface
     for (int lev = 1; lev <= m_finest_level; lev++) {
-        QuadCFInterp qcfi(m_amrGrids[lev], &m_amrGrids[lev-1],
-                          m_amrDx[lev][0], m_refinement_ratios[lev-1],  
-                          1,  // num comps
-                          m_amrDomains[lev]);
-        qcfi.coarseFineInterp(*m_gapheight[lev], *m_gapheight[lev-1]);
+        int nGhost = (*m_gapheight[lev]).ghostVect()[0];
+        PiecewiseLinearFillPatch headFiller(m_amrGrids[lev],
+                                            m_amrGrids[lev - 1],
+                                            1, // ncomps
+                                            m_amrDomains[lev - 1],
+                                            m_refinement_ratios[lev - 1],
+                                            nGhost);
+        headFiller.fillInterp(*m_gapheight[lev], *m_gapheight[lev-1], *m_gapheight[lev-1], 0.0, 0, 0, 1);
     }
 
     /* Temporal probe ... very ugly */
@@ -2805,6 +2822,64 @@ AmrHydro::timeStepFAS(Real a_dt)
         pout() <<"   ...Copy current into old & take care of ghost cells and BCs "<< endl;
     }
 
+        /* custom plt here -- debug print */
+        if (m_PrintCustom && (m_cur_step == 301)) {
+            int nStuffToPlot = 6;
+            Vector<std::string> vectName;
+            vectName.resize(nStuffToPlot);
+            vectName[0]="head";
+            vectName[1]="gapHeight";
+            vectName[2]="Pwater";
+            vectName[3]="metingRate";
+            vectName[4]="Reynolds";
+            vectName[5]="Zbed";
+
+            Vector<Vector<LevelData<FArrayBox>*>> stuffToPlot;
+            stuffToPlot.resize(nStuffToPlot);
+            for (int zz = 0; zz < nStuffToPlot; zz++) {
+                stuffToPlot[zz].resize(m_max_level + 1, NULL);
+            }
+
+            for (int lev = 0; lev <= m_finest_level; lev++) {
+                stuffToPlot[0][lev]  = new LevelData<FArrayBox>(m_amrGrids[lev], 1, HeadGhostVect);
+                stuffToPlot[1][lev]  = new LevelData<FArrayBox>(m_amrGrids[lev], 1, HeadGhostVect);
+                stuffToPlot[2][lev]  = new LevelData<FArrayBox>(m_amrGrids[lev], 1, HeadGhostVect);
+                stuffToPlot[3][lev]  = new LevelData<FArrayBox>(m_amrGrids[lev], 1, HeadGhostVect);
+                stuffToPlot[4][lev]  = new LevelData<FArrayBox>(m_amrGrids[lev], 1, HeadGhostVect);
+                stuffToPlot[5][lev]  = new LevelData<FArrayBox>(m_amrGrids[lev], 1, HeadGhostVect);
+
+                LevelData<FArrayBox>& levelHead      = *m_head[lev];
+                LevelData<FArrayBox>& levelHeadSTP   = *stuffToPlot[0][lev];
+
+                LevelData<FArrayBox>& levelGap       = *m_gapheight[lev];    
+                LevelData<FArrayBox>& levelGapSTP    = *stuffToPlot[1][lev];
+
+                LevelData<FArrayBox>& levelPw        = *m_Pw[lev];
+                LevelData<FArrayBox>& levelPwSTP     = *stuffToPlot[2][lev];
+
+                LevelData<FArrayBox>& levelMR        = *m_meltRate[lev];
+                LevelData<FArrayBox>& levelMRSTP     = *stuffToPlot[3][lev];
+
+                LevelData<FArrayBox>& levelRe        = *m_Re[lev];
+                LevelData<FArrayBox>& levelReSTP     = *stuffToPlot[4][lev];
+
+                LevelData<FArrayBox>& levelZb        = *m_bedelevation[lev];
+                LevelData<FArrayBox>& levelZbSTP     = *stuffToPlot[5][lev];
+
+                DataIterator dit = levelHead.dataIterator();
+                for (dit.begin(); dit.ok(); ++dit) {
+                    levelHeadSTP[dit].copy(levelHead[dit], 0, 0, 1);
+                    levelGapSTP[dit].copy(levelGap[dit], 0, 0, 1);
+                    levelPwSTP[dit].copy(levelPw[dit], 0, 0, 1);
+                    levelMRSTP[dit].copy(levelMR[dit], 0, 0, 1);
+                    levelReSTP[dit].copy(levelRe[dit], 0, 0, 1);
+                    levelZbSTP[dit].copy(levelZb[dit], 0, 0, 1);
+                }
+            } // loop on levs
+            writePltCustom(nStuffToPlot, vectName, stuffToPlot, std::to_string(-10));
+        } // end customPlt
+
+
     for (int lev = 0; lev <= m_finest_level; lev++) {
         LevelData<FArrayBox>& oldH       = *m_old_head[lev];
         LevelData<FArrayBox>& currentH   = *m_head[lev];
@@ -2815,14 +2890,18 @@ AmrHydro::timeStepFAS(Real a_dt)
         LevelData<FArrayBox>& currentRe  = *m_Re[lev];
 
         // handle ghost cells on the coarse-fine interface
+        // Linear interp better
         if (lev > 0) {
-            QuadCFInterp qcfi(m_amrGrids[lev], &m_amrGrids[lev-1],
-                              m_amrDx[lev][0], m_refinement_ratios[lev-1],  
-                              1,  // ncomps
-                              m_amrDomains[lev]);
-            qcfi.coarseFineInterp(*m_head[lev], *m_head[lev-1]);
-            qcfi.coarseFineInterp(*m_gapheight[lev], *m_gapheight[lev-1]);
-            qcfi.coarseFineInterp(*m_Re[lev], *m_Re[lev-1]);
+            int nGhost = currentRe.ghostVect()[0];
+            PiecewiseLinearFillPatch headFiller(m_amrGrids[lev],
+                                                m_amrGrids[lev - 1],
+                                                1, // ncomps
+                                                m_amrDomains[lev - 1],
+                                                m_refinement_ratios[lev - 1],
+                                                nGhost);
+            headFiller.fillInterp(*m_head[lev], *m_head[lev-1], *m_head[lev-1], 0.0, 0, 0, 1);
+            headFiller.fillInterp(*m_gapheight[lev], *m_gapheight[lev-1], *m_gapheight[lev-1], 0.0, 0, 0, 1);
+            headFiller.fillInterp(*m_Re[lev], *m_Re[lev-1], *m_Re[lev-1], 0.0, 0, 0, 1);
         }
 
         // fill perio boundaries
@@ -2868,98 +2947,6 @@ AmrHydro::timeStepFAS(Real a_dt)
 
     } // there. We should start with consistent b and h, GC BC and all ...
 
-        /* custom plt here -- debug print */
-        if (m_PrintCustom && (m_cur_step == 51)) {
-            int nStuffToPlot = 12;
-            Vector<std::string> vectName;
-            vectName.resize(nStuffToPlot);
-            vectName[0]="head";
-            vectName[1]="gapHeight";
-            vectName[2]="head_residual";
-            vectName[3]="RHS_head";
-            vectName[4]="RHS_b";
-            vectName[5]="Qw_X";
-            vectName[6]="Qw_Y";
-            vectName[7]="sourceMoulin";
-            vectName[8]="Pwater";
-            vectName[9]="metingRate";
-            vectName[10]="Reynolds";
-            vectName[11]="Zbed";
-
-            Vector<Vector<LevelData<FArrayBox>*>> stuffToPlot;
-            stuffToPlot.resize(nStuffToPlot);
-            for (int zz = 0; zz < nStuffToPlot; zz++) {
-                stuffToPlot[zz].resize(m_max_level + 1, NULL);
-            }
-
-            for (int lev = 0; lev <= m_finest_level; lev++) {
-                stuffToPlot[0][lev]  = new LevelData<FArrayBox>(m_amrGrids[lev], 1, IntVect::Zero);
-                stuffToPlot[1][lev]  = new LevelData<FArrayBox>(m_amrGrids[lev], 1, IntVect::Zero);
-                stuffToPlot[2][lev]  = new LevelData<FArrayBox>(m_amrGrids[lev], 1, IntVect::Zero);
-                stuffToPlot[3][lev]  = new LevelData<FArrayBox>(m_amrGrids[lev], 1, IntVect::Zero);
-                stuffToPlot[4][lev]  = new LevelData<FArrayBox>(m_amrGrids[lev], 1, IntVect::Zero);
-                stuffToPlot[5][lev]  = new LevelData<FArrayBox>(m_amrGrids[lev], 1, IntVect::Zero);
-                stuffToPlot[6][lev]  = new LevelData<FArrayBox>(m_amrGrids[lev], 1, IntVect::Zero);
-                stuffToPlot[7][lev]  = new LevelData<FArrayBox>(m_amrGrids[lev], 1, IntVect::Zero);
-                stuffToPlot[8][lev]  = new LevelData<FArrayBox>(m_amrGrids[lev], 1, IntVect::Zero);
-                stuffToPlot[9][lev]  = new LevelData<FArrayBox>(m_amrGrids[lev], 1, IntVect::Zero);
-                stuffToPlot[10][lev]  = new LevelData<FArrayBox>(m_amrGrids[lev], 1, IntVect::Zero);
-                stuffToPlot[11][lev]  = new LevelData<FArrayBox>(m_amrGrids[lev], 1, IntVect::Zero);
-
-                LevelData<FArrayBox>& levelHead      = *m_head[lev];
-                LevelData<FArrayBox>& levelHeadSTP   = *stuffToPlot[0][lev];
-
-                LevelData<FArrayBox>& levelGap       = *m_gapheight[lev];    
-                LevelData<FArrayBox>& levelGapSTP    = *stuffToPlot[1][lev];
-
-                LevelData<FArrayBox>& levelRes       = *a_head_lagged[lev];
-                LevelData<FArrayBox>& levelResSTP    = *stuffToPlot[2][lev];
-
-                LevelData<FArrayBox>& levelRHS       = *RHS_h[lev];
-                LevelData<FArrayBox>& levelRHSSTP    = *stuffToPlot[3][lev];
-
-                LevelData<FArrayBox>& levelRHSB       = *RHS_b[lev];
-                LevelData<FArrayBox>& levelRHSBSTP    = *stuffToPlot[4][lev];
-
-                LevelData<FArrayBox>& levelQw         = *m_qw[lev];
-                LevelData<FArrayBox>& levelQwXSTP     = *stuffToPlot[5][lev];
-                LevelData<FArrayBox>& levelQwYSTP     = *stuffToPlot[6][lev];
-
-                LevelData<FArrayBox>& levelSourceM    = *moulin_source_term[lev];
-                LevelData<FArrayBox>& levelSourceMSTP = *stuffToPlot[7][lev];
-
-                LevelData<FArrayBox>& levelPw        = *m_Pw[lev];
-                LevelData<FArrayBox>& levelPwSTP     = *stuffToPlot[8][lev];
-
-                LevelData<FArrayBox>& levelMR        = *m_meltRate[lev];
-                LevelData<FArrayBox>& levelMRSTP     = *stuffToPlot[9][lev];
-
-                LevelData<FArrayBox>& levelRe        = *m_Re[lev];
-                LevelData<FArrayBox>& levelReSTP     = *stuffToPlot[10][lev];
-
-                LevelData<FArrayBox>& levelZb        = *m_bedelevation[lev];
-                LevelData<FArrayBox>& levelZbSTP     = *stuffToPlot[11][lev];
-
-                DataIterator dit = levelHead.dataIterator();
-                for (dit.begin(); dit.ok(); ++dit) {
-                    levelHeadSTP[dit].copy(levelHead[dit], 0, 0, 1);
-                    levelGapSTP[dit].copy(levelGap[dit], 0, 0, 1);
-                    levelResSTP[dit].copy(levelRes[dit], 0, 0, 1);
-                    levelRHSSTP[dit].copy(levelRHS[dit], 0, 0, 1);
-                    levelRHSBSTP[dit].copy(levelRHSB[dit], 0, 0, 1);
-                    levelQwXSTP[dit].copy(levelQw[dit], 0, 0, 1);
-                    levelQwYSTP[dit].copy(levelQw[dit], 1, 0, 1);
-                    levelSourceMSTP[dit].copy(levelSourceM[dit], 0, 0, 1);
-                    levelPwSTP[dit].copy(levelPw[dit], 0, 0, 1);
-                    levelMRSTP[dit].copy(levelMR[dit], 0, 0, 1);
-                    levelReSTP[dit].copy(levelRe[dit], 0, 0, 1);
-                    levelZbSTP[dit].copy(levelZb[dit], 0, 0, 1);
-                }
-            } // loop on levs
-            writePltCustom(nStuffToPlot, vectName, stuffToPlot, std::to_string(-1));
-        } // end customPlt
-
-
     /* II h calc */
 
     if (m_verbosity > 3) {
@@ -2988,13 +2975,16 @@ AmrHydro::timeStepFAS(Real a_dt)
 
             // deal with c-f interf if any
             if (lev > 0) {
-                QuadCFInterp qcfi(m_amrGrids[lev], &m_amrGrids[lev-1],
-                                  m_amrDx[lev][0], m_refinement_ratios[lev-1],  
-                                  1,  // ncomps
-                                  m_amrDomains[lev]);
-                qcfi.coarseFineInterp(*m_head[lev], *m_head[lev-1]);
-                qcfi.coarseFineInterp(*m_gapheight[lev], *m_gapheight[lev-1]);
-                qcfi.coarseFineInterp(*m_Re[lev], *m_Re[lev-1]);
+                int nGhost = levelcurH.ghostVect()[0];
+                PiecewiseLinearFillPatch headFiller(m_amrGrids[lev],
+                                                    m_amrGrids[lev - 1],
+                                                    1, // ncomps
+                                                    m_amrDomains[lev - 1],
+                                                    m_refinement_ratios[lev - 1],
+                                                    nGhost);
+                headFiller.fillInterp(*m_head[lev], *m_head[lev-1], *m_head[lev-1], 0.0, 0, 0, 1);
+                headFiller.fillInterp(*m_gapheight[lev], *m_gapheight[lev-1], *m_gapheight[lev-1], 0.0, 0, 0, 1);
+                headFiller.fillInterp(*m_Re[lev], *m_Re[lev-1], *m_Re[lev-1], 0.0, 0, 0, 1);
             }
 
             // fill perio boundaries
@@ -3161,11 +3151,14 @@ AmrHydro::timeStepFAS(Real a_dt)
                     EdgeToCell(levelQw_ec, levelQw); 
                     // handle ghost cells on the coarse-fine interface
                     if (lev > 0) {
-                        QuadCFInterp qcfi(m_amrGrids[lev], &m_amrGrids[lev-1],
-                                          m_amrDx[lev][0], m_refinement_ratios[lev-1],  
-                                          2,  // num comps
-                                          m_amrDomains[lev]);
-                        qcfi.coarseFineInterp(*m_qw[lev], *m_qw[lev-1]);
+                        int nGhost = levelQw.ghostVect()[0];
+                        PiecewiseLinearFillPatch headFiller(m_amrGrids[lev],
+                                                            m_amrGrids[lev - 1],
+                                                            2, // ncomps
+                                                            m_amrDomains[lev - 1],
+                                                            m_refinement_ratios[lev - 1],
+                                                            nGhost);
+                        headFiller.fillInterp(*m_qw[lev], *m_qw[lev-1], *m_qw[lev-1], 0.0, 0, 0, 1);
                     }
                     // Need to fill the ghost cells -- extrapolate on perio boundaries   
                     levelQw.exchange();
@@ -3193,11 +3186,14 @@ AmrHydro::timeStepFAS(Real a_dt)
                     }
                     // handle ghost cells on the coarse-fine interface
                     if (lev > 0) {
-                        QuadCFInterp qcfi(m_amrGrids[lev], &m_amrGrids[lev-1],
-                                          m_amrDx[lev][0], m_refinement_ratios[lev-1],  
-                                          1,  // num comps
-                                          m_amrDomains[lev]);
-                        qcfi.coarseFineInterp(*m_Re[lev], *m_Re[lev-1]);
+                        int nGhost = levelRe.ghostVect()[0];
+                        PiecewiseLinearFillPatch headFiller(m_amrGrids[lev],
+                                                            m_amrGrids[lev - 1],
+                                                            1, // ncomps
+                                                            m_amrDomains[lev - 1],
+                                                            m_refinement_ratios[lev - 1],
+                                                            nGhost);
+                        headFiller.fillInterp(*m_Re[lev], *m_Re[lev-1], *m_Re[lev-1], 0.0, 0, 0, 1);
                     }
                     // Need to fill the ghost cells of Re -- extrapolate on perio boundaries   
                     levelRe.exchange();
@@ -3280,11 +3276,14 @@ AmrHydro::timeStepFAS(Real a_dt)
                 EdgeToCell(levelQw_ec, levelQw); 
                 // handle ghost cells on the coarse-fine interface
                 if (lev > 0) {
-                    QuadCFInterp qcfi(m_amrGrids[lev], &m_amrGrids[lev-1],
-                                      m_amrDx[lev][0], m_refinement_ratios[lev-1],  
-                                      2,  // num comps
-                                      m_amrDomains[lev]);
-                    qcfi.coarseFineInterp(*m_qw[lev], *m_qw[lev-1]);
+                    int nGhost = levelQw.ghostVect()[0];
+                    PiecewiseLinearFillPatch headFiller(m_amrGrids[lev],
+                                                        m_amrGrids[lev - 1],
+                                                        2, // ncomps
+                                                        m_amrDomains[lev - 1],
+                                                        m_refinement_ratios[lev - 1],
+                                                        nGhost);
+                    headFiller.fillInterp(*m_qw[lev], *m_qw[lev-1], *m_qw[lev-1], 0.0, 0, 0, 1);
                 }
                 // Need to fill the ghost cells -- extrapolate on boundaries   
                 levelQw.exchange();
@@ -3483,7 +3482,7 @@ AmrHydro::timeStepFAS(Real a_dt)
         }
 
         /* custom plt here -- debug print */
-        if (m_PrintCustom && (m_cur_step == 51)) {
+        if (m_PrintCustom && (m_cur_step == 301)) {
             int nStuffToPlot = 12;
             Vector<std::string> vectName;
             vectName.resize(nStuffToPlot);
@@ -3664,11 +3663,13 @@ AmrHydro::timeStepFAS(Real a_dt)
     }
     // handle ghost cells on the coarse-fine interface
     for (int lev = 1; lev <= m_finest_level; lev++) {
-        QuadCFInterp qcfi(m_amrGrids[lev], &m_amrGrids[lev-1],
-                          m_amrDx[lev][0], m_refinement_ratios[lev-1],  
-                          1,  // num comps
-                          m_amrDomains[lev]);
-        qcfi.coarseFineInterp(*m_gapheight[lev], *m_gapheight[lev-1]);
+        PiecewiseLinearFillPatch headFiller(m_amrGrids[lev],
+                                            m_amrGrids[lev - 1],
+                                            1, // ncomps
+                                            m_amrDomains[lev - 1],
+                                            m_refinement_ratios[lev - 1],
+                                            1);
+        headFiller.fillInterp(*m_gapheight[lev], *m_gapheight[lev-1], *m_gapheight[lev-1], 0.0, 0, 0, 1);
     }
 
     /* CONVERGENCE TESTS with LAGGED quantities */
@@ -3723,7 +3724,6 @@ AmrHydro::timeStepFAS(Real a_dt)
         }
         pout() << endl;
     }
-
 }
 
 
@@ -3933,8 +3933,8 @@ AmrHydro::regrid()
                 FineInterp interpolator(newDBL, 1, m_refinement_ratios[lev - 1], m_amrDomains[lev]);
                 FineInterp interpolatorGrad(newDBL, SpaceDim, m_refinement_ratios[lev - 1], m_amrDomains[lev]);
 
-                interpolator.m_boundary_limit_type     = 1;
-                interpolatorGrad.m_boundary_limit_type = 1;
+                interpolator.m_boundary_limit_type     = 3;
+                interpolatorGrad.m_boundary_limit_type = 3;
 
                 // HEAD
                 interpolator.interpToFine(*new_oldheadDataPtr, *m_old_head[lev - 1]);
