@@ -1368,9 +1368,13 @@ void AmrHydro::NonLinear_level(LevelData<FArrayBox>&        a_NL,
               thisNL(iv, 0)  = - m_suhmoParm->m_A * thisB(iv,0) * 
                                std::pow( (thisPi(iv,0) - m_suhmoParm->m_rho_w * m_suhmoParm->m_gravity *
                                (thisU(iv,0) -thiszb(iv,0))), 3);
+              // Correction Colin 03/18
+              thisNL(iv, 0)  = thisNL(iv, 0) * (1.0 - (m_suhmoParm->m_br - thisB(iv,0)) / m_suhmoParm->m_br );
               thisdNL(iv, 0) = 3.0 * m_suhmoParm->m_A * thisB(iv,0) * m_suhmoParm->m_rho_w *m_suhmoParm->m_gravity *
                                  ( std::pow( (thisPi(iv,0) - m_suhmoParm->m_rho_w * m_suhmoParm->m_gravity * 
                                  (thisU(iv,0) - thiszb(iv,0))), 2) );
+              // Correction Colin 03/18
+              thisdNL(iv, 0) = thisdNL(iv, 0) * thisB(iv,0) /  m_suhmoParm->m_br;
           }
       } // end loop over grids on this level
   }
