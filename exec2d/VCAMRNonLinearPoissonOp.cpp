@@ -323,7 +323,7 @@ void VCAMRNonLinearPoissonOp::restrictR(LevelData<FArrayBox>& a_phiCoarse,
 
     phiCoarse.setVal(0.0);
 
-    FORT_RESTRICT(CHF_FRA_SHIFT(phiCoarse, civ),
+    FORT_RESTRICTVCNL(CHF_FRA_SHIFT(phiCoarse, civ),
                   CHF_CONST_FRA_SHIFT(phiFine, iv),
                   CHF_BOX_SHIFT(region, iv),
                   CHF_CONST_REAL(m_dx));
