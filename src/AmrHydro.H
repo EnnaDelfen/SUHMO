@@ -412,6 +412,7 @@ protected:
     Real m_stable_dt;   // most recent stable timestep (> m_dt if we took a step just to hit a plot interval)
 
     int m_cur_PicardIte;     // current Picard It
+    Real m_eps_PicardIte;     // limit residual for picard It
 
     Real m_cfl;         // timestep scaling
 

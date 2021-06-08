@@ -485,7 +485,7 @@ AmrHydro::SolveForHead_nl(const Vector<DisjointBoxLayout>&               a_grids
     int maxIter   = 100; // max number of v cycles
     Real eps        =  1.0e-10;  // solution tolerance
     Real hang       =  0.01;      // next rnorm should be < (1-m_hang)*norm_last 
-    Real normThresh =  1.0e-16;  // abs tol
+    Real normThresh =  1.0e-12;  // abs tol
     amrSolver->setSolverParameters(numSmooth, numSmooth, numBottom,
                                    numMG, maxIter, 
                                    eps, hang, normThresh);
@@ -721,6 +721,8 @@ AmrHydro::initialize()
             ppSolver.query("bcoeff_otf", m_compute_Bcoeff); // compute B coeffs on the fly 
         }
     }
+    m_eps_PicardIte = 1.0e-6;
+    ppSolver.query("eps_PicardIte", m_eps_PicardIte);  
 
     m_time     = 0.0;  // start at t = 0
     m_cur_step = 0;    // start at dt = 0
@@ -3583,7 +3585,7 @@ AmrHydro::timeStepFAS(Real a_dt)
             }
             MayDay::Error("Abort");
         } else {
-            if (max_resH < 1.0e-6){
+            if (max_resH < m_eps_PicardIte){
                 if (m_verbosity > 0) {
                     pout() <<"        converged( it = "<< ite_idx << ", x(h) = " <<max_resH<< ")."<< endl;
                 }
