@@ -119,6 +119,8 @@ public:
 
     void Calc_moulin_source_term(LevelData<FArrayBox>& levelMoulinSrc);
 
+    void Calc_moulin_source_term_distributed(LevelData<FArrayBox>& levelMoulinSrc);
+
     void CalcRHS_gapHeightFAS(LevelData<FArrayBox>& levelRHS_b, 
                               LevelData<FArrayBox>& levelPi, 
                               LevelData<FArrayBox>& levelPw, 

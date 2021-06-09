@@ -485,7 +485,7 @@ AmrHydro::SolveForHead_nl(const Vector<DisjointBoxLayout>&               a_grids
     int maxIter   = 100; // max number of v cycles
     Real eps        =  1.0e-10;  // solution tolerance
     Real hang       =  0.01;      // next rnorm should be < (1-m_hang)*norm_last 
-    Real normThresh =  1.0e-12;  // abs tol
+    Real normThresh =  1.0e-16;  // abs tol
     amrSolver->setSolverParameters(numSmooth, numSmooth, numBottom,
                                    numMG, maxIter, 
                                    eps, hang, normThresh);
@@ -1491,6 +1491,75 @@ AmrHydro::aCoeff_bCoeff_CC(LevelData<FArrayBox>&  levelacoef,
             bC_cc(iv, 0) = num_q/denom_q;
         }
     }
+}
+
+void 
+AmrHydro::Calc_moulin_source_term_distributed (LevelData<FArrayBox>& levelMoulinSrc) 
+{
+   // WOrk on coarser level
+   int curr_level = 0;
+
+   // keep track of each moulin contrib separately
+   LevelData<FArrayBox> levelMoulinSrcTmp(m_amrGrids[curr_level], m_suhmoParm->m_n_moulins, IntVect::Zero);
+   std::vector<Real> a_moulinsInteg;    // m.s-1 Sliding velocity
+   a_moulinsInteg.resize(m_suhmoParm->m_n_moulins, 0.0);
+
+   // Loop over points and moulins to get influx at each location
+   DataIterator dit = levelMoulinSrcTmp.dataIterator();
+   for (dit.begin(); dit.ok(); ++dit) {
+       FArrayBox& moulinSrcTmp   = levelMoulinSrcTmp[dit];
+
+       moulinSrcTmp.setVal(0.0);
+
+       BoxIterator bit(moulinSrcTmp.box());
+       for (bit.begin(); bit.ok(); ++bit) {
+           IntVect iv = bit();
+           // Position of centroid
+           Real x_loc = (iv[0]+0.5)*m_amrDx[curr_level][0];
+           Real y_loc = (iv[1]+0.5)*m_amrDx[curr_level][1];
+           // Loop over all moulins
+           for (int m = 0; m<m_suhmoParm->m_n_moulins; m++) {
+               // Radius
+               //Real rad_loc = (x_loc - m_suhmoParm->m_moulin_position[m*2 + 0])**2 + (y_loc - m_suhmoParm->m_moulin_position[m*2 + 1])**2;
+               moulinSrcTmp(iv, m) = 1.0 /( m_suhmoParm->m_sigma[m] * std::sqrt(2.0 * 3.14) )  * 
+                                                 std::exp(- 1.0 / (2.0 * m_suhmoParm->m_sigma[m] * m_suhmoParm->m_sigma[m]) * ( 
+                                                 std::pow(x_loc - m_suhmoParm->m_moulin_position[m*2 + 0], 2)
+                                              +  std::pow(y_loc - m_suhmoParm->m_moulin_position[m*2 + 1], 2) ) );
+               if (moulinSrcTmp(iv, m) < 1.0e-09) {
+                   moulinSrcTmp(iv, m) = 0.0;
+               }
+               a_moulinsInteg[m] += moulinSrcTmp(iv,m) * m_amrDx[curr_level][0] * m_amrDx[curr_level][1]; 
+           }
+       }
+   }
+ 
+   //pout() << "whats the integration value ? " << a_moulinsInteg[0] << " flux to reach ? " << m_suhmoParm->m_moulin_flux[0] <<"\n\n\n"; 
+
+   // Rescale each moulins
+   std::vector<Real> a_moulinsIntegFinal;    // m.s-1 Sliding velocity
+   a_moulinsIntegFinal.resize(m_suhmoParm->m_n_moulins, 0.0);
+   for (dit.begin(); dit.ok(); ++dit) {
+       FArrayBox& moulinSrc      = levelMoulinSrc[dit];
+       FArrayBox& moulinSrcTmp   = levelMoulinSrcTmp[dit];
+
+       moulinSrc.setVal(0.0);
+
+       BoxIterator bit(moulinSrc.box());
+       for (bit.begin(); bit.ok(); ++bit) {
+           IntVect iv = bit();
+           for (int m = 0; m<m_suhmoParm->m_n_moulins; m++) {
+               moulinSrc(iv,0) += moulinSrcTmp(iv,m) / a_moulinsInteg[m] *  m_suhmoParm->m_moulin_flux[m] ; 
+               a_moulinsIntegFinal[m] += moulinSrc(iv,0) * m_amrDx[curr_level][0] * m_amrDx[curr_level][1]; 
+           }
+       }
+   }
+
+   // Check
+   for (int m = 0; m<m_suhmoParm->m_n_moulins; m++) {
+       if (m_verbosity > 3) {
+           pout() << "level is: " << curr_level << ", Integral of moulin number " << m <<" is (vol. rate): " << a_moulinsIntegFinal[m] << endl; 
+       } 
+   }
 }
 
 void 
@@ -3333,7 +3402,7 @@ AmrHydro::timeStepFAS(Real a_dt)
             LevelData<FArrayBox> leveltmp2_cc(levelGrids, 1*SpaceDim, HeadGhostVect);
 
             if (lev == 0) {
-                Calc_moulin_source_term(levelmoulin_source_term);
+                Calc_moulin_source_term_distributed(levelmoulin_source_term);
             } else {
                 FineInterp interpolator(m_amrGrids[lev], 1, m_refinement_ratios[lev - 1], m_amrDomains[lev]);
                 interpolator.interpToFine(*moulin_source_term[lev], *moulin_source_term[lev - 1]);
@@ -3488,7 +3557,7 @@ AmrHydro::timeStepFAS(Real a_dt)
         }
 
         /* custom plt here -- debug print */
-        if (m_PrintCustom && (m_cur_step == 301)) {
+        if (m_PrintCustom ) {
             int nStuffToPlot = 12;
             Vector<std::string> vectName;
             vectName.resize(nStuffToPlot);
