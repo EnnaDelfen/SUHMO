@@ -59,6 +59,8 @@ void suhmo_params::readInputs()
     ppParams.getarr("moulin_position", m_moulin_position, 0, m_n_moulins*SpaceDim);
     m_moulin_flux.resize(m_n_moulins,0.0);
     ppParams.getarr("moulin_flux", m_moulin_flux, 0, m_n_moulins);
+    m_sigma.resize(m_n_moulins,0.0);
+    ppParams.getarr("moulin_sigma", m_sigma, 0, m_n_moulins);
 
     // need to include verbose
     ParmParse ppAmr("AmrHydro");
