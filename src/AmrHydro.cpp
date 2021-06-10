@@ -485,7 +485,7 @@ AmrHydro::SolveForHead_nl(const Vector<DisjointBoxLayout>&               a_grids
     int maxIter   = 100; // max number of v cycles
     Real eps        =  1.0e-10;  // solution tolerance
     Real hang       =  0.01;      // next rnorm should be < (1-m_hang)*norm_last 
-    Real normThresh =  1.0e-16;  // abs tol
+    Real normThresh =  1.0e-12;  // abs tol
     amrSolver->setSolverParameters(numSmooth, numSmooth, numBottom,
                                    numMG, maxIter, 
                                    eps, hang, normThresh);
@@ -572,6 +572,7 @@ AmrHydro::setDefaults()
 
     // set some bogus values as defaults
     m_PrintCustom = false;
+    m_post_proc   = false;
     m_is_defined = false;
     m_verbosity = 4;
     m_max_level = -1;
@@ -590,8 +591,7 @@ AmrHydro::setDefaults()
     m_regrid_lbase = 0;
     m_nesting_radius = 1;
     m_tag_defined = false;
-    m_tag_var = "none";
-    m_tagging_val = 1.0;
+    m_n_tag_var = 0;
     m_tags_grow = 0;
     m_tags_grow_dir = IntVect::Zero;
 
@@ -738,6 +738,7 @@ AmrHydro::initialize()
         m_refinement_ratios[0] = -1;
     }
     ppAmr.query("PrintCustom", m_PrintCustom); // To plot after each Picard ite -- debug mode
+    ppAmr.query("post_proc", m_post_proc); // To print some post-proc analysis-- debug mode
     ppAmr.query("verbosity", m_verbosity);
     ppAmr.query("block_factor", m_block_factor);
     ppAmr.query("regrid_lbase", m_regrid_lbase);  // smaller lev subject to regridding
@@ -783,10 +784,12 @@ AmrHydro::initialize()
             m_tags_grow_dir[dir] = tgd[dir];
         }
     }
-    ppAmr.query("tag_variable", m_tag_var);
-    // if we set this to be true, require that we also provide the threshold
-    if (m_tag_var.compare("none") != 0) {
-        ppAmr.query("tagging_val", m_tagging_val);
+    ppAmr.query("n_tag_variables", m_n_tag_var); // how many variables are we using to tag ?
+    if (m_n_tag_var != 0) {
+        m_tag_var.resize(m_n_tag_var,0.0); 
+        ppParams.getarr("tag_variables", m_tag_var, 0, m_n_tag_var);
+        m_tagging_val.resize(m_n_tag_var,0.0); 
+        ppParams.getarr("tagging_values", m_tagging_val, 0, m_n_tag_var);
         m_tag_defined = true;
     } else {
         if (m_max_level > 0) {
@@ -1532,9 +1535,16 @@ AmrHydro::Calc_moulin_source_term_distributed (LevelData<FArrayBox>& levelMoulin
            }
        }
    }
- 
-   //pout() << "whats the integration value ? " << a_moulinsInteg[0] << " flux to reach ? " << m_suhmoParm->m_moulin_flux[0] <<"\n\n\n"; 
 
+#ifdef CH_MPI
+   Real recv;
+   for (int m = 0; m<m_suhmoParm->m_n_moulins; m++) {
+       int result = MPI_Allreduce(&a_moulinsInteg[m], &recv, 1, MPI_CH_REAL,
+                                  MPI_SUM, Chombo_MPI::comm);
+       a_moulinsInteg[m] = recv;
+   }
+#endif
+ 
    // Rescale each moulins
    std::vector<Real> a_moulinsIntegFinal;    // m.s-1 Sliding velocity
    a_moulinsIntegFinal.resize(m_suhmoParm->m_n_moulins, 0.0);
@@ -1552,14 +1562,14 @@ AmrHydro::Calc_moulin_source_term_distributed (LevelData<FArrayBox>& levelMoulin
                a_moulinsIntegFinal[m] += moulinSrc(iv,0) * m_amrDx[curr_level][0] * m_amrDx[curr_level][1]; 
            }
        }
+       // Check
+       for (int m = 0; m<m_suhmoParm->m_n_moulins; m++) {
+           if (m_verbosity > 3) {
+               pout() << "level is: " << curr_level << ", Integral of moulin number " << m <<" is (vol. rate): " << a_moulinsIntegFinal[m] << endl; 
+           } 
+       }
    }
 
-   // Check
-   for (int m = 0; m<m_suhmoParm->m_n_moulins; m++) {
-       if (m_verbosity > 3) {
-           pout() << "level is: " << curr_level << ", Integral of moulin number " << m <<" is (vol. rate): " << a_moulinsIntegFinal[m] << endl; 
-       } 
-   }
 }
 
 void 
@@ -3728,6 +3738,78 @@ AmrHydro::timeStepFAS(Real a_dt)
         }
     }  // loop on levs
 
+
+    /* POST PROC   */
+    if (m_post_proc) {
+        Real out_water_flux_x; 
+        Real max_water_flux_x_loc = -1000.;
+        //for (int lev = 0; lev <= m_finest_level; lev++) {
+            DisjointBoxLayout&    levelGrids = m_amrGrids[0];
+            LevelData<FluxBox>&   levelQw_ec = *a_Qw_ec[0]; 
+            DataIterator dit                 = levelGrids.dataIterator();
+            for (dit.begin(); dit.ok(); ++dit) {
+                FluxBox& Qwater_ec = levelQw_ec[dit];
+                // loop over directions
+                //for (int dir = 0; dir<SpaceDim; dir++) {
+                    FArrayBox& Qwater_ecFab = Qwater_ec[0];
+                    BoxIterator bitEC(Qwater_ecFab.box()); 
+                    for (bitEC.begin(); bitEC.ok(); ++bitEC) {
+                        IntVect iv = bitEC();
+                        if (iv[0] == 0) {
+                            out_water_flux_x += Qwater_ecFab(iv, 0) * m_amrDx[0][0];
+                            max_water_flux_x_loc = std::max( std::abs(Qwater_ecFab(iv, 0) * m_amrDx[0][0]), max_water_flux_x_loc);
+                        }
+                    }
+                //}
+            } 
+        //} 
+
+#ifdef CH_MPI
+       Real recv;
+       int result = MPI_Allreduce(&out_water_flux_x, &recv, 1, MPI_CH_REAL,
+                                  MPI_SUM, Chombo_MPI::comm);
+       if (result != MPI_SUCCESS)
+       {
+           MayDay::Error("communication error on MPI_SUM");
+       }
+       out_water_flux_x = recv;
+
+       result = MPI_Allreduce(&max_water_flux_x_loc, &recv, 1, MPI_CH_REAL,
+                              MPI_MAX, Chombo_MPI::comm);
+       if (result != MPI_SUCCESS)
+       {
+           MayDay::Error("communication error on MPI_MAX");
+       }
+       max_water_flux_x_loc = recv;
+#endif
+
+        Real channel_water_flux_x; 
+        Real distrib_water_flux_x; 
+        for (dit.begin(); dit.ok(); ++dit) {
+            FluxBox& Qwater_ec = levelQw_ec[dit];
+            FArrayBox& Qwater_ecFab = Qwater_ec[0];
+            BoxIterator bitEC(Qwater_ecFab.box()); 
+            for (bitEC.begin(); bitEC.ok(); ++bitEC) {
+                IntVect iv = bitEC();
+                if (iv[0] == 0) {
+                    Real abs_loc_val = std::abs(Qwater_ecFab(iv, 0) * m_amrDx[0][0]);
+                    if (abs_loc_val > 0.5 * max_water_flux_x_loc) {
+                        channel_water_flux_x += Qwater_ecFab(iv, 0) * m_amrDx[0][0];
+                    } else { 
+                        distrib_water_flux_x += Qwater_ecFab(iv, 0) * m_amrDx[0][0];
+                    }
+                }
+            }
+        } 
+
+        pout() << "\n\n\n";
+        pout() <<"oo POST PROC analysis oo "<< endl;
+        pout() <<" - Y integrated water flux in X dir is = "<< out_water_flux_x << endl;
+        pout() <<" -          contrib from CHANNEL (%)   = "<< channel_water_flux_x << " (" << channel_water_flux_x/out_water_flux_x * 100. << ")"<< endl;
+        pout() <<" -          contrib from DISTRIB (%)   = "<< distrib_water_flux_x << " (" << distrib_water_flux_x/out_water_flux_x * 100. << ")"<< endl;
+        pout() << "\n\n\n";
+    }
+
     /* Averaging down and fill in ghost cells */
     if (m_verbosity > 3) {
         pout() <<"   ...Average down "<< endl;
@@ -4314,35 +4396,38 @@ AmrHydro::tagCellsLevel(IntVectSet& a_tags, int a_level)
     // first stab -- don't do BC's; just do one-sided
     // stencils at box edges (hopefully good enough),
     // since doing BC's properly is somewhat expensive.
-    
-    if (m_tag_var == "meltingRate") { 
-        DataIterator dit = m_meltRate[a_level]->dataIterator();
-        LevelData<FArrayBox>& levelPhi = *m_meltRate[a_level];
-        const DisjointBoxLayout& levelGrids = m_amrGrids[a_level];
+    for (int m = 0; m < m_n_tag_var; m++)
+        if (m_tag_var[m] == "meltingRate") { 
+            DataIterator dit = m_meltRate[a_level]->dataIterator();
+            LevelData<FArrayBox>& levelPhi = *m_meltRate[a_level];
+            const DisjointBoxLayout& levelGrids = m_amrGrids[a_level];
 
-        // need to ensure that ghost cells are set properly
-        levelPhi.exchange(levelPhi.interval());
+            // need to ensure that ghost cells are set properly
+            levelPhi.exchange(levelPhi.interval());
 
-        IntVectSet local_tags;
-        for (dit.begin(); dit.ok(); ++dit) {
-            FArrayBox& phi   = levelPhi[dit];
-            // now tag cells based on values
-            BoxIterator bit(levelGrids[dit()]);
-            for (bit.begin(); bit.ok(); ++bit) {
-                const IntVect& iv = bit();
-                if (fabs(phi(iv, 0)) > m_tagging_val) local_tags |= iv;
-            } // end loop over cells
-        }         // end loop over grids
+            IntVectSet local_tags;
+            for (dit.begin(); dit.ok(); ++dit) {
+                FArrayBox& phi   = levelPhi[dit];
+                // now tag cells based on values
+                BoxIterator bit(levelGrids[dit()]);
+                for (bit.begin(); bit.ok(); ++bit) {
+                    const IntVect& iv = bit();
+                    if (fabs(phi(iv, 0)) > m_tagging_val[m]) local_tags |= iv;
+                } // end loop over cells
+            }         // end loop over grids
 
-        // now buffer tags
-        local_tags.grow(m_tags_grow);
-        for (int dir = 0; dir < SpaceDim; dir++) {
-            if (m_tags_grow_dir[dir] > m_tags_grow) local_tags.grow(dir, std::max(0, m_tags_grow_dir[dir] - m_tags_grow));
+            // now buffer tags
+            local_tags.grow(m_tags_grow);
+            for (int dir = 0; dir < SpaceDim; dir++) {
+                if (m_tags_grow_dir[dir] > m_tags_grow) local_tags.grow(dir, std::max(0, m_tags_grow_dir[dir] - m_tags_grow));
+            }
+            local_tags &= m_amrDomains[a_level];
+            a_tags = local_tags;
+        } else if (m_tag_var[m] == "someother") {
+            /* to do */
+        } else {
+            MayDay::Error(" Wrong tagging value ... ");
         }
-        local_tags &= m_amrDomains[a_level];
-        a_tags = local_tags;
-    } else {
-        MayDay::Error(" Wrong tagging value ... ");
     }
 
 }

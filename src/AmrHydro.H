@@ -370,8 +370,10 @@ protected:
 
     /* tag variable */
     bool m_tag_defined;                  // did we define a m_tag_var
-    string m_tag_var;
-    Real m_tagging_val;                  // tagging value
+    int m_n_tag_var;
+    Vector<string> m_tag_var;
+    Vector<Real> m_tagging_val;          // tagging value
+
     Vector<IntVectSet> m_vectTags;       // stores tags from previous regrids 
     IntVectSet m_tag_subset;             // only allow tagging within a subset of the coarse domain 
     Vector<IntVectSet> m_vectTagSubset;
@@ -424,6 +426,9 @@ protected:
 
     // debug 
     bool m_PrintCustom;
+   
+    // Post proc
+    bool m_post_proc;
 
     /** Model outputs include spatio temporal fields of Hydraulic head,  effective  Pressure,  
         subglacial  gap  height  (the  effective  geometry  representative  of  an  entire  element),  
