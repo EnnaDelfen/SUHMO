@@ -286,7 +286,7 @@ protected:
     void tagCells(Vector<IntVectSet>& a_tags);
 
     /// compute tags for the level a_level
-    void tagCellsLevel(IntVectSet& a_tags, int a_level);
+    void tagCellsLevel(IntVectSet& a_tags, int a_level, int a_tag);
 
     /// compute tags at initial time
     void tagCellsInit(Vector<IntVectSet>& a_tags);
@@ -343,9 +343,6 @@ protected:
     /// regridding lbase -- generally (and by default) this will be 0
     int m_regrid_lbase;
 
-    /// maximum level at which refinement tags are computed
-    int m_tag_cap;
-
     /// blocking factor
     int m_block_factor;
 
@@ -370,9 +367,12 @@ protected:
 
     /* tag variable */
     bool m_tag_defined;                  // did we define a m_tag_var
-    int m_n_tag_var;
-    Vector<string> m_tag_var;
-    Vector<Real> m_tagging_val;          // tagging value
+    int m_n_tag_var;                     // number of tag variables
+    Vector<string> m_tag_var;            // tag variables identification
+    Vector<int> m_tag_min;               // min level concerned by tag var - one per tag var
+    Vector<int> m_tag_cap;               // max level concerned by tag var - one per tag var
+
+    Vector<Real> m_tagging_val;          // tagging value - one per tag var
 
     Vector<IntVectSet> m_vectTags;       // stores tags from previous regrids 
     IntVectSet m_tag_subset;             // only allow tagging within a subset of the coarse domain 

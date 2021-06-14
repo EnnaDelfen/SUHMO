@@ -577,7 +577,6 @@ AmrHydro::setDefaults()
     m_verbosity = 4;
     m_max_level = -1;
     m_finest_level = -1;
-    m_tag_cap = 100;
     m_block_factor = -1;
     m_max_box_size = 32;
     m_max_base_grid_size = 32;
@@ -743,7 +742,6 @@ AmrHydro::initialize()
     ppAmr.query("block_factor", m_block_factor);
     ppAmr.query("regrid_lbase", m_regrid_lbase);  // smaller lev subject to regridding
     ppAmr.query("regrid_interval", m_regrid_interval);
-    ppAmr.query("tagCap", m_tag_cap);               // no idea yet
     ppAmr.query("block_factor", m_block_factor);
     ppAmr.query("max_box_size", m_max_box_size);
     m_max_base_grid_size = m_max_box_size;
@@ -786,10 +784,19 @@ AmrHydro::initialize()
     }
     ppAmr.query("n_tag_variables", m_n_tag_var); // how many variables are we using to tag ?
     if (m_n_tag_var != 0) {
-        m_tag_var.resize(m_n_tag_var,0.0); 
-        ppParams.getarr("tag_variables", m_tag_var, 0, m_n_tag_var);
+        //
+        m_tag_var.resize(m_n_tag_var); 
+        ppAmr.getarr("tag_variables", m_tag_var, 0, m_n_tag_var);
+        //
+        m_tag_min.resize(m_n_tag_var,0.0); 
+        ppAmr.getarr("tagging_mins", m_tag_min, 0, m_n_tag_var);
+        //
+        m_tag_cap.resize(m_n_tag_var,0.0); 
+        ppAmr.getarr("tagging_caps", m_tag_cap, 0, m_n_tag_var);
+        //
         m_tagging_val.resize(m_n_tag_var,0.0); 
-        ppParams.getarr("tagging_values", m_tagging_val, 0, m_n_tag_var);
+        ppAmr.getarr("tagging_values", m_tagging_val, 0, m_n_tag_var);
+        //
         m_tag_defined = true;
     } else {
         if (m_max_level > 0) {
@@ -3567,7 +3574,7 @@ AmrHydro::timeStepFAS(Real a_dt)
         }
 
         /* custom plt here -- debug print */
-        if (m_PrintCustom ) {
+        if (m_PrintCustom && (m_cur_step > 1444)) {
             int nStuffToPlot = 12;
             Vector<std::string> vectName;
             vectName.resize(nStuffToPlot);
@@ -4356,15 +4363,18 @@ AmrHydro::tagCells(Vector<IntVectSet>& a_tags)
         pout() << "AmrHydro::tagCells" << endl;
     }
 
-    int top_level = a_tags.size();
-    top_level = min(m_tag_cap, min(top_level - 1, m_finest_level));
-    // loop over levels
-    for (int lev = 0; lev <= top_level; lev++) {
-        IntVectSet& levelTags = a_tags[lev];
-        tagCellsLevel(levelTags, lev);
-        IntVectSet& tagSubset = m_vectTagSubset[lev];
-        if (tagSubset.numPts() > 0) {
-            levelTags &= tagSubset;
+    for (int m = 0; m < m_n_tag_var; m++) {
+        int top_level = a_tags.size();
+        top_level = min(m_tag_cap[m], min(top_level - 1, m_finest_level));
+        int min_level = max(m_tag_min[m], 0);
+        // loop over levels
+        for (int lev = min_level; lev <= top_level; lev++) {
+            IntVectSet& levelTags = a_tags[lev];
+            tagCellsLevel(levelTags, lev, m);
+            IntVectSet& tagSubset = m_vectTagSubset[lev];
+            if (tagSubset.numPts() > 0) {
+                levelTags &= tagSubset;
+            }
         }
     }
 
@@ -4387,7 +4397,7 @@ AmrHydro::tagCells(Vector<IntVectSet>& a_tags)
 }
 
 void
-AmrHydro::tagCellsLevel(IntVectSet& a_tags, int a_level)
+AmrHydro::tagCellsLevel(IntVectSet& a_tags, int a_level, int a_tag)
 {
     if (m_verbosity > 4) {
         pout() << "AmrHydro::tagCellsLevel " << a_level << endl;
@@ -4396,8 +4406,7 @@ AmrHydro::tagCellsLevel(IntVectSet& a_tags, int a_level)
     // first stab -- don't do BC's; just do one-sided
     // stencils at box edges (hopefully good enough),
     // since doing BC's properly is somewhat expensive.
-    for (int m = 0; m < m_n_tag_var; m++)
-        if (m_tag_var[m] == "meltingRate") { 
+        if (m_tag_var[a_tag] == "meltingRate") { 
             DataIterator dit = m_meltRate[a_level]->dataIterator();
             LevelData<FArrayBox>& levelPhi = *m_meltRate[a_level];
             const DisjointBoxLayout& levelGrids = m_amrGrids[a_level];
@@ -4412,7 +4421,7 @@ AmrHydro::tagCellsLevel(IntVectSet& a_tags, int a_level)
                 BoxIterator bit(levelGrids[dit()]);
                 for (bit.begin(); bit.ok(); ++bit) {
                     const IntVect& iv = bit();
-                    if (fabs(phi(iv, 0)) > m_tagging_val[m]) local_tags |= iv;
+                    if (fabs(phi(iv, 0)) > m_tagging_val[a_tag]) local_tags |= iv;
                 } // end loop over cells
             }         // end loop over grids
 
@@ -4422,13 +4431,16 @@ AmrHydro::tagCellsLevel(IntVectSet& a_tags, int a_level)
                 if (m_tags_grow_dir[dir] > m_tags_grow) local_tags.grow(dir, std::max(0, m_tags_grow_dir[dir] - m_tags_grow));
             }
             local_tags &= m_amrDomains[a_level];
-            a_tags = local_tags;
-        } else if (m_tag_var[m] == "someother") {
+            if (a_tags.isEmpty()) {
+                a_tags = local_tags;
+            } else {
+                a_tags |= local_tags;
+            }
+        } else if (m_tag_var[a_tag] == "someother") {
             /* to do */
         } else {
             MayDay::Error(" Wrong tagging value ... ");
         }
-    }
 
 }
 
@@ -4519,7 +4531,7 @@ AmrHydro::initGrids(int a_finest_level) {
             oldBoxes = newBoxes;
 
             // now see if we need another pass through grid generation
-            if ((top_level < m_max_level) && (top_level > old_top_level) && (new_finest_level <= m_tag_cap)) {
+            if ((top_level < m_max_level) && (top_level > old_top_level)) {
                 moreLevels = true;
             }
         } else {
