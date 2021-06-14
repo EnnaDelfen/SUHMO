@@ -12,7 +12,7 @@ WHO := $(shell whoami)
 # make this a relative path so it will find the Chombo 
 # on same level as this checkout
 ifeq ($(AMR_HOME),)
-AMR_HOME=/home/lake/users/amfelden/ANAG/0_CODES/AMR_DRIVER_DIR/
+AMR_HOME=/home/amfelden/ANAG/0_CODES/AMR_DRIVER_DIR/
 endif
 
 ifeq ($(CHOMBO_HOME),)
