@@ -98,13 +98,25 @@ public:
                    Vector<LevelData<FArrayBox>* >        a_dNL, 
                    const Vector<LevelData<FArrayBox>* >  a_u,
                    int a_finestLevel);
- 
-    void aCoeff_bCoeff(LevelData<FArrayBox>&  levelacoef, 
-                       LevelData<FluxBox>&  levelbcoef, 
-                       LevelData<FluxBox>&  levelRe, 
-                       LevelData<FluxBox>&  levelB);
 
-    void aCoeff_bCoeff_CC(LevelData<FArrayBox>&  levelacoef, 
+    void compute_grad_zb_ec(int                 lev,
+                            LevelData<FluxBox>& a_levelgradZb_ec);
+ 
+    void compute_grad_head(int lev);
+
+    void evaluate_Qw_ec(int lev, 
+                        LevelData<FluxBox>& levelQw_ec, 
+                        LevelData<FluxBox>& levelB_ec,
+                        LevelData<FluxBox>& levelRe_ec);
+
+    void evaluate_Re_quadratic(int lev, bool computeGrad);
+
+    void aCoeff_bCoeff(LevelData<FArrayBox>&  levelacoef, 
+                       LevelData<FluxBox>&    levelbcoef, 
+                       LevelData<FluxBox>&    levelRe, 
+                       LevelData<FluxBox>&    levelB);
+
+    void aCoeff_bCoeff_CC(LevelData<FArrayBox>&   levelacoef, 
                            LevelData<FArrayBox>&  levelbcoef_cc, 
                            LevelData<FArrayBox>&  levelRe, 
                            LevelData<FArrayBox>&  levelB);
@@ -154,7 +166,7 @@ public:
                       Vector<LevelData<FArrayBox>*>& a_head, 
                       Vector<LevelData<FArrayBox>*>& a_RHS);
 
-    void SolveForHead_nl(const Vector<DisjointBoxLayout>&               a_grids,
+    void SolveForHead_nl(const Vector<DisjointBoxLayout>&                a_grids,
                           Vector<RefCountedPtr<LevelData<FArrayBox> > >& a_aCoef,
                           Vector<RefCountedPtr<LevelData<FluxBox> > >&   a_bCoef,
                           Vector<ProblemDomain>& a_domains,
