@@ -266,14 +266,20 @@ void AMRNonLinearPoissonOp::residualNF(LevelData<FArrayBox>&                a_lh
 
 
 // ---------------------------------------------------------
-void AMRNonLinearPoissonOp::EvaluateBcoef(const LevelData<FArrayBox>&   a_phi, 
+void AMRNonLinearPoissonOp::UpdateOperator(const LevelData<FArrayBox>&   a_phi, 
                                           const LevelData<FArrayBox>*   a_phicoarsePtr, 
                                           int                           a_depth,
                                           int                           a_AMRFASMGiter,
                                           bool                          a_homogeneous)
 {
-    pout() << "AMRNonLinearPoissonOp::EvaluateBcoef does nothing \n";
+    pout() << "AMRNonLinearPoissonOp::UpdateOperator does nothing \n";
 } 
+
+void AMRNonLinearPoissonOp::AverageOperator(const MGLevelOp<LevelData<FArrayBox> >& a_operator,
+                                            int a_depth) 
+{
+    pout() <<"No AverageOperator in AMRNonLinearPoissonOp \n";
+}
 
 void AMRNonLinearPoissonOp::residualI(LevelData<FArrayBox>&       a_lhs,
                                       const LevelData<FArrayBox>& a_phi,
@@ -2123,11 +2129,6 @@ AMRNonLinearPoissonOp::finerOperatorChanged(const MGLevelOp<LevelData<FArrayBox>
   notifyObserversOfChange();
 }
 
-void AMRNonLinearPoissonOp::AverageBcoef(const MGLevelOp<LevelData<FArrayBox> >& a_operator,
-                                         int a_depth) 
-{
-    pout() <<"No AverageBcoef in AMRNonLinearPoissonOp \n";
-}
 //-----------------------------------------------------------------------
 
 // ---------------------------------------------------------

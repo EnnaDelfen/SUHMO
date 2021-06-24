@@ -31,16 +31,16 @@
 
 // Func to call after before the start of each VCycle on finer level. 
 // to follow with averaging on subsequent levels
-void VCAMRNonLinearPoissonOp::EvaluateBcoef(const LevelData<FArrayBox>&   a_phi,
-                                            const LevelData<FArrayBox>*   a_phicoarsePtr, 
-                                            int                           a_depth,
-                                            int                           a_AMRFASMGiter,
-                                            bool                          a_homogeneous) 
+void VCAMRNonLinearPoissonOp::UpdateOperator(const LevelData<FArrayBox>&   a_phi,
+                                             const LevelData<FArrayBox>*   a_phicoarsePtr, 
+                                             int                           a_depth,
+                                             int                           a_AMRFASMGiter,
+                                             bool                          a_homogeneous) 
 {
-  CH_TIME("VCAMRNonLinearPoissonOp::EvaluateBcoef");
+  CH_TIME("VCAMRNonLinearPoissonOp::UpdateOperator");
 
   if(a_homogeneous) {
-      MayDay::Abort("VCAMRNonLinearPoissonOp::EvaluateBcoef homogeneous");
+      MayDay::Abort("VCAMRNonLinearPoissonOp::UpdateOperator homogeneous");
   }
 
   LevelData<FArrayBox>& phi = (LevelData<FArrayBox>&)a_phi;
@@ -63,10 +63,10 @@ void VCAMRNonLinearPoissonOp::EvaluateBcoef(const LevelData<FArrayBox>&   a_phi,
 
 }
 
-void VCAMRNonLinearPoissonOp::AverageBcoef(const MGLevelOp<LevelData<FArrayBox> >& a_operator,
-                                           int a_depth)
+void VCAMRNonLinearPoissonOp::AverageOperator(const MGLevelOp<LevelData<FArrayBox> >& a_operator,
+                                              int a_depth)
 {
-  CH_TIME("VCAMRNonLinearPoissonOp::AverageBcoef");
+  CH_TIME("VCAMRNonLinearPoissonOp::AverageOperator");
 
   int coarsening = 1;
   for (int i = 0; i < a_depth; i++) {
@@ -428,9 +428,9 @@ void VCAMRNonLinearPoissonOp::setAlphaAndBeta(const Real& a_alpha,
   m_lambdaNeedsResetting = true;
 }
 
-void VCAMRNonLinearPoissonOp::computeCoeffsOTF(bool a_compute_Bcoeff)
+void VCAMRNonLinearPoissonOp::computeCoeffsOTF(bool a_update_operator)
 {
-  m_compute_Bcoeff = a_compute_Bcoeff;
+  m_update_operator = a_update_operator;
 }
 
 
@@ -822,7 +822,7 @@ void VCAMRNonLinearPoissonOpFactory::define(const ProblemDomain&         a_coars
                                             Vector<RefCountedPtr<LevelData<FArrayBox> > >& a_B,
                                             Vector<RefCountedPtr<LevelData<FArrayBox> > >& a_Pi,
                                             Vector<RefCountedPtr<LevelData<FArrayBox> > >& a_zb,
-                                            bool a_compute_Bcoeff)
+                                            bool a_update_operator)
 {
   CH_TIME("VCAMRNonLinearPoissonOpFactory::define");
 
@@ -871,7 +871,7 @@ void VCAMRNonLinearPoissonOpFactory::define(const ProblemDomain&         a_coars
   m_waterFluxlevel = a_wFlvl;
 
   m_verbosity = 3;
-  m_compute_Bcoeff = a_compute_Bcoeff;
+  m_update_operator = a_update_operator;
 
   m_B  = a_B;  // Gap Height
   m_Pi = a_Pi; // Overb Press  
@@ -995,7 +995,7 @@ MGLevelOp<LevelData<FArrayBox> >* VCAMRNonLinearPoissonOpFactory::MGnewOp(const 
   newOp->m_alpha       = m_alpha;
   newOp->m_beta        = m_beta;
 
-  newOp->m_compute_Bcoeff = m_compute_Bcoeff;
+  newOp->m_update_operator = m_update_operator;
   newOp->m_verbosity      = m_verbosity;
 
   newOp->m_amrHydro    = m_amrHydro; 
@@ -1164,7 +1164,7 @@ AMRLevelOp<LevelData<FArrayBox> >* VCAMRNonLinearPoissonOpFactory::AMRnewOp(cons
   newOp->m_alpha = m_alpha;
   newOp->m_beta  = m_beta;
 
-  newOp->m_compute_Bcoeff = m_compute_Bcoeff;
+  newOp->m_update_operator = m_update_operator;
   newOp->m_verbosity      = m_verbosity;
 
   newOp->m_aCoef = m_aCoef[ref];

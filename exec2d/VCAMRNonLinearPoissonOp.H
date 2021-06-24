@@ -45,11 +45,14 @@ public:
   {
   }
 
-  virtual void EvaluateBcoef(const LevelData<FArrayBox>&   a_phi, 
-                             const LevelData<FArrayBox>*   a_phicoarsePtr, 
-                             int                           a_depth,
-                             int                           a_AMRFASMGiter,
-                             bool                          a_homogeneous); 
+  virtual void UpdateOperator(const LevelData<FArrayBox>&   a_phi, 
+                              const LevelData<FArrayBox>*   a_phicoarsePtr, 
+                              int                           a_depth,
+                              int                           a_AMRFASMGiter,
+                              bool                          a_homogeneous); 
+
+  virtual void AverageOperator(const MGLevelOp<LevelData<FArrayBox> >& a_operator,
+                               int a_depth);
 
   ///
   virtual void residualI(LevelData<FArrayBox>&       a_lhs,
@@ -137,9 +140,6 @@ public:
   //! are altered.
   void finerOperatorChanged(const MGLevelOp<LevelData<FArrayBox> >& a_operator,
                             int a_coarseningFactor);
-
-  void AverageBcoef(const MGLevelOp<LevelData<FArrayBox> >& a_operator,
-                    int a_depth);
 
   //! Returns identity coefficient data.
   LevelData<FArrayBox>& identityCoef()
