@@ -35,7 +35,7 @@ public:
   {
     m_lambdaNeedsResetting = true;
     m_verbosity = 3;
-    m_compute_Bcoeff = true;
+    m_update_operator = true;
   }
 
   ///
@@ -368,7 +368,7 @@ private:
   Real m_beta;
 
   Real m_verbosity;
-  bool m_compute_Bcoeff;
+  bool m_update_operator;
  
   Vector<RefCountedPtr<LevelData<FArrayBox> > > m_aCoef;
   Vector<RefCountedPtr<LevelData<FluxBox> > >   m_bCoef;
