@@ -265,7 +265,6 @@ void BCFill(FArrayBox& a_state,
                           IntVect ivTo = bit();
                           IntVect ivClose = ivTo -   isign*BASISV(dir);
                           IntVect ivFar   = ivTo - 2*isign*BASISV(dir);
-                          //pout() << "iv ivclose ivFar" << ivTo << " " << ivClose << " " << ivFar <<endl;
                           Real nearVal = a_state(ivClose, 0);
                           Real farVal  = a_state(ivFar,   0);
                           Real inhomogVal = DirichletValue(dir, Side::Lo);
@@ -479,8 +478,8 @@ AmrHydro::SolveForHead_nl(const Vector<DisjointBoxLayout>&               a_grids
     amrSolver->define(a_domains[0], opFactoryPtr,
                       &bottomSolver, numLevels);
 
-    int numSmooth = 6;  // number of relax before averaging
-    int numBottom = 10;  // num of bottom smoothings
+    int numSmooth = 4;  // number of relax before averaging
+    int numBottom = 8;  // num of bottom smoothings
     int numMG     = 1;  // Vcycle selected
     int maxIter   = 100; // max number of v cycles
     Real eps        =  1.0e-8;  // solution tolerance
@@ -1346,7 +1345,6 @@ void AmrHydro::WFlx_level(LevelData<FluxBox>&          a_bcoef,
                 bCFab(iv, 0) = num_q/denom_q;
                 if (bCFab(iv, 0) >= 0.0) {
                     pout() << " --(dx= "<< a_dx<<") cell dir Bc-EC " << iv << " " << dir << " " << bCFab(iv, 0) << "\n";
-                    //MayDay::Error("Abort");
                 }
             }
         }
@@ -1382,11 +1380,14 @@ void AmrHydro::NonLinear_level(LevelData<FArrayBox>&        a_NL,
                                (thisU(iv,0) -thiszb(iv,0))), 3);
               // Correction Colin 03/18
               thisNL(iv, 0)  = thisNL(iv, 0) * (1.0 - (m_suhmoParm->m_br - thisB(iv,0)) / m_suhmoParm->m_br );
+              //thisNL(iv, 0) = thisNL(iv, 0)  * std::tanh( std::pow(thisB(iv,0),3) / std::pow(m_suhmoParm->m_br,3) );
+              
               thisdNL(iv, 0) = 3.0 * m_suhmoParm->m_A * thisB(iv,0) * m_suhmoParm->m_rho_w *m_suhmoParm->m_gravity *
                                  ( std::pow( (thisPi(iv,0) - m_suhmoParm->m_rho_w * m_suhmoParm->m_gravity * 
                                  (thisU(iv,0) - thiszb(iv,0))), 2) );
               // Correction Colin 03/18
               thisdNL(iv, 0) = thisdNL(iv, 0) * thisB(iv,0) /  m_suhmoParm->m_br;
+              //thisdNL(iv, 0) = thisdNL(iv, 0) * std::tanh( std::pow(thisB(iv,0),3) / std::pow(m_suhmoParm->m_br,3) );
           }
       } // end loop over grids on this level
   }
@@ -1750,12 +1751,20 @@ AmrHydro::Calc_moulin_source_term_distributed (LevelData<FArrayBox>& levelMoulin
                a_moulinsIntegFinal[m] += moulinSrc(iv,0) * m_amrDx[curr_level][0] * m_amrDx[curr_level][1]; 
            }
        }
-       // Check
-       for (int m = 0; m<m_suhmoParm->m_n_moulins; m++) {
-           if (m_verbosity > 3) {
-               pout() << "level is: " << curr_level << ", Integral of moulin number " << m <<" is (vol. rate): " << a_moulinsIntegFinal[m] << endl; 
-           } 
-       }
+   }
+
+#ifdef CH_MPI
+   for (int m = 0; m<m_suhmoParm->m_n_moulins; m++) {
+       int result = MPI_Allreduce(&a_moulinsIntegFinal[m], &recv, 1, MPI_CH_REAL,
+                                  MPI_SUM, Chombo_MPI::comm);
+       a_moulinsIntegFinal[m] = recv;
+   }
+#endif
+   // Check
+   for (int m = 0; m<m_suhmoParm->m_n_moulins; m++) {
+       if (m_verbosity > 3) {
+           pout() << "level is: " << curr_level << ", Integral of moulin number " << m <<" is (vol. rate): " << a_moulinsIntegFinal[m] << endl; 
+       } 
    }
 
 }
@@ -1905,58 +1914,6 @@ AmrHydro::CalcRHS_head(int curr_level,
    }
 }
 
-void
-AmrHydro::CalcRHS_gapHeight_semiExpl(LevelData<FArrayBox>& levelRHS_b, 
-                                     LevelData<FArrayBox>& levelDENOM_b, 
-                                     LevelData<FArrayBox>& levelPi, 
-                                     LevelData<FArrayBox>& levelPw, 
-                                     LevelData<FArrayBox>& levelmR, 
-                                     LevelData<FArrayBox>& levelB,
-                                     Real a_dt,
-                                     LevelData<FArrayBox>& levelRHS_b_A)
-{
-
-   DataIterator dit = levelRHS_b.dataIterator();
-   for (dit.begin(); dit.ok(); ++dit) {
-
-       FArrayBox& B       = levelB[dit];
-       FArrayBox& RHS     = levelRHS_b[dit];
-       FArrayBox& DENOM   = levelDENOM_b[dit];
-
-       FArrayBox& RHS_A   = levelRHS_b_A[dit];
-
-       FArrayBox& Pressi  = levelPi[dit];
-       FArrayBox& Pw      = levelPw[dit];
-       FArrayBox& meltR   = levelmR[dit];
-
-       // initialize RHS for h
-       RHS.setVal(0.0);
-       DENOM.setVal(0.0);
-       RHS_A.setVal(0.0);
-
-       // first term
-       RHS.copy(meltR, 0, 0, 1);
-       RHS *= 1.0 / m_suhmoParm->m_rho_i;
-
-       // third term ...
-       Real ub_norm = std::sqrt(  m_suhmoParm->m_ub[0]*m_suhmoParm->m_ub[0] 
-                                + m_suhmoParm->m_ub[1]*m_suhmoParm->m_ub[1]) / m_suhmoParm->m_lr;
-       BoxIterator bit(RHS.box()); // can use gridBox? 
-       for (bit.begin(); bit.ok(); ++bit) {
-           IntVect iv = bit();
-           if ( B(iv,0) < m_suhmoParm->m_br) {
-               RHS(iv,0) += ub_norm * (m_suhmoParm->m_br - B(iv,0));
-           }
-           RHS(iv,0) = B(iv,0) + RHS(iv,0) * a_dt;
-           // second term ... assume  n = 3 !!
-           Real PimPw = (Pressi(iv,0) - Pw(iv,0));
-           Real AbsPimPw = std::abs(PimPw);
-           DENOM(iv,0) = 1.0 + a_dt * m_suhmoParm->m_A * std::pow(AbsPimPw, 2) * PimPw;
-           RHS_A(iv,0) = 1.0 + a_dt * m_suhmoParm->m_A * std::pow(AbsPimPw, 2) * PimPw;
-       }
-   }
-}  
-
 
 void
 AmrHydro::CalcRHS_gapHeightFAS(LevelData<FArrayBox>& levelRHS_b, 
@@ -1993,7 +1950,7 @@ AmrHydro::CalcRHS_gapHeightFAS(LevelData<FArrayBox>& levelRHS_b,
            // second term ... assume  n = 3 !!
            Real PimPw = (Pressi(iv,0) - Pw(iv,0));
            Real AbsPimPw = std::abs(PimPw);
-           RHS(iv,0) -= m_suhmoParm->m_A * std::pow(AbsPimPw, 2) * PimPw * B(iv,0);
+           RHS(iv,0) -= m_suhmoParm->m_A * std::pow(AbsPimPw, 2) * PimPw * B(iv,0) * (1.0 - (m_suhmoParm->m_br - B(iv,0)) / m_suhmoParm->m_br );// * std::tanh( std::pow(B(iv,0),3) / std::pow(m_suhmoParm->m_br,3) );
        }
    }
 }
@@ -2669,10 +2626,6 @@ AmrHydro::timeStep(Real a_dt)
         //                      levelPw, levelmR, 
         //                      levelB, 
         //                      levelRHS_b_A, levelRHS_b_B, levelRHS_b_C);
-        //    //CalcRHS_gapHeight_semiExpl(levelRHS_b, levelDENOM_b, 
-        //    //                           levelPi, levelPw, levelmR, 
-        //    //                           levelB, a_dt, 
-        //    //                           levelRHS_b_A);    
         //}  // loop on levs
 
         //     Solve for b using Forward Euler simple scheme -- use OLD b here
@@ -3491,6 +3444,10 @@ AmrHydro::timeStepFAS(Real a_dt)
             LevelData<FArrayBox>& levelB                  = *m_gapheight[lev];    
             LevelData<FArrayBox>& levelRHSh               = *RHS_h[lev];
             LevelData<FArrayBox>& levelmoulin_source_term = *moulin_source_term[lev];
+            LevelData<FArrayBox>& levelPi                 = *m_overburdenpress[lev];
+            LevelData<FArrayBox>& levelPw                 = *m_Pw[lev];
+            LevelData<FArrayBox>& levelZb                 = *m_bedelevation[lev];
+            LevelData<FArrayBox>& levelH                  = *m_head[lev];
 
             // EC quantities
             LevelData<FluxBox>&   levelQw_ec     = *a_Qw_ec[lev]; 
@@ -3564,6 +3521,10 @@ AmrHydro::timeStepFAS(Real a_dt)
                 FArrayBox& RHSh    = levelRHSh[dit];
                 FArrayBox& tmp_cc  = leveltmp_cc[dit];
                 FArrayBox& tmp2_cc = leveltmp2_cc[dit];
+                FArrayBox& Pressi  = levelPi[dit];
+                FArrayBox& Pressw  = levelPw[dit];
+                FArrayBox& zb      = levelZb[dit];
+                FArrayBox& currH  = levelH[dit];
 
                 FArrayBox& moulinSrc = levelmoulin_source_term[dit];
 
@@ -3586,6 +3547,11 @@ AmrHydro::timeStepFAS(Real a_dt)
                     RHSh(iv,0) -= rho_coef / m_suhmoParm->m_L * m_suhmoParm->m_rho_w * m_suhmoParm->m_gravity * (1.0 
                                   + m_suhmoParm->m_ct * m_suhmoParm->m_cw * m_suhmoParm->m_rho_w) * 
                                   (tmp_cc(iv, 0) + tmp_cc(iv, 1));
+
+                    // Add sliding term 
+                    Pressw(iv,0) = m_suhmoParm->m_gravity * m_suhmoParm->m_rho_w * (currH(iv,0) - zb(iv,0));
+                    Real sca_prod = 20. * 20. * m_suhmoParm->m_ub[0] * std::abs(Pressi(iv,0) - Pressw(iv,0)) * m_suhmoParm->m_ub[0];
+                    RHSh(iv,0) += sca_prod * rho_coef / m_suhmoParm->m_L ;
 
                     // Add moulin 
                     RHSh(iv,0) += moulinSrc(iv,0);
@@ -3643,6 +3609,7 @@ AmrHydro::timeStepFAS(Real a_dt)
                               m_amrDomains[lev]);
             qcfi.coarseFineInterp(*m_head[lev], *m_head[lev-1]);
         }
+
 
 
         /* CONVERGENCE TESTS with LAGGED quantities */
@@ -3788,8 +3755,34 @@ AmrHydro::timeStepFAS(Real a_dt)
        pout() <<"   ...Solve for b ! "<< endl;
        pout() <<"        Update gap height with expl Euler scheme"<< endl;
     }
+
     //int gh_method = 0; // 0: backward Euler, 1:...
     for (int lev = 0; lev <= m_finest_level; lev++) {
+        /* Make sure head GC are properly filled*/
+        LevelData<FArrayBox>& levelH   = *m_head[lev];
+        // handle ghost cells on the coarse-fine interface
+        if (lev > 0) {
+            int nGhost = levelH.ghostVect()[0];
+            PiecewiseLinearFillPatch headFiller(m_amrGrids[lev],
+                                                m_amrGrids[lev - 1],
+                                                1, // ncomps
+                                                m_amrDomains[lev - 1],
+                                                m_refinement_ratios[lev - 1],
+                                                nGhost);
+            headFiller.fillInterp(*m_head[lev], *m_head[lev-1], *m_head[lev-1], 0.0, 0, 0, 1);
+        }
+        // Need to fill the ghost cells of H -- use BC function 
+        levelH.exchange();
+        const DisjointBoxLayout& levelGrids = m_amrGrids[lev];
+        DataIterator dit = levelGrids.dataIterator();
+        for (dit.begin(); dit.ok(); ++dit) {
+            // get the validBox
+            const Box& validBox = levelGrids.get(dit);
+
+            // Fill BC ghost cells of h and b
+            BCFill(levelH[dit], validBox, m_amrDomains[lev], m_amrDx[lev][0]);
+        }
+
         /* Re evaluate Re with fresh h */
         // CC quantities
         LevelData<FArrayBox>& levelRe       = *m_Re[lev]; 
@@ -3807,7 +3800,7 @@ AmrHydro::timeStepFAS(Real a_dt)
                                                 nGhost);
             headFiller.fillInterp(*m_Re[lev], *m_Re[lev-1], *m_Re[lev-1], 0.0, 0, 0, 1);
         }
-        // Need to fill the ghost cells of Re -- extrapolate on perio boundaries   
+        // Need to fill the ghost cells of Re -- extrapolate on boundaries   
         levelRe.exchange();
         ExtrapGhostCells( levelRe, m_amrDomains[lev]);
         CellToEdge(levelRe, levelRe_ec);
@@ -3843,14 +3836,14 @@ AmrHydro::timeStepFAS(Real a_dt)
         /* Reconstruct mR for RHS of B */
         LevelData<FluxBox>&   levelgradH_ec  = *m_gradhead_ec[lev];
         LevelData<FluxBox>&   levelgradZb_ec = *a_gradZb_ec[lev];
-        DisjointBoxLayout&    levelGrids     = m_amrGrids[lev];
+        //DisjointBoxLayout&    levelGrids     = m_amrGrids[lev];
         // tmp arrays for vect operations
         LevelData<FluxBox>   leveltmp_ec(levelGrids, 1, IntVect::Zero);
         LevelData<FArrayBox> leveltmp_cc(levelGrids, 1*SpaceDim, HeadGhostVect);
         LevelData<FluxBox>   leveltmp2_ec(levelGrids, 1, IntVect::Zero);
         LevelData<FArrayBox> leveltmp2_cc(levelGrids, 1*SpaceDim, HeadGhostVect);
 
-        DataIterator dit = levelGrids.dataIterator();
+        //DataIterator dit = levelGrids.dataIterator();
         for (dit.begin(); dit.ok(); ++dit) {
             // EC quantities
             FluxBox& Qwater_ec = levelQw_ec[dit];
@@ -3881,13 +3874,14 @@ AmrHydro::timeStepFAS(Real a_dt)
         // Qw gradZb
         EdgeToCell(leveltmp2_ec, leveltmp2_cc);
 
-        LevelData<FArrayBox>& levelH     = *m_head[lev];
         LevelData<FArrayBox>& levelPw    = *m_Pw[lev];
+        LevelData<FArrayBox>& levelPi    = *m_overburdenpress[lev];
         LevelData<FArrayBox>& levelZb    = *m_bedelevation[lev];
         LevelData<FArrayBox>& levelmR    = *m_meltRate[lev];
         for (dit.begin(); dit.ok(); ++dit) {
             FArrayBox& newH    = levelH[dit];
             FArrayBox& Pressw  = levelPw[dit];
+            FArrayBox& Pressi  = levelPi[dit];
             FArrayBox& zb      = levelZb[dit];
             FArrayBox& mR      = levelmR[dit];
             FArrayBox& tmp_cc  = leveltmp_cc[dit];
@@ -3896,21 +3890,21 @@ AmrHydro::timeStepFAS(Real a_dt)
             BoxIterator bit(Pressw.box()); 
             for (bit.begin(); bit.ok(); ++bit) {
                 IntVect iv = bit(); 
+                //Pw
+                Pressw(iv,0) = m_suhmoParm->m_gravity * m_suhmoParm->m_rho_w * (newH(iv,0) - zb(iv,0));
                 // mR
-                mR(iv,0)   = m_suhmoParm->m_G - 
-                             // missing term in ub tau
-                             m_suhmoParm->m_ct * m_suhmoParm->m_cw * m_suhmoParm->m_rho_w * m_suhmoParm->m_rho_w * m_suhmoParm->m_gravity *
+                Real sca_prod = 20. * 20. * m_suhmoParm->m_ub[0] * std::abs(Pressi(iv,0) - Pressw(iv,0)) * m_suhmoParm->m_ub[0];
+                mR(iv,0)   = m_suhmoParm->m_G + 
+                             sca_prod
+                             - m_suhmoParm->m_ct * m_suhmoParm->m_cw * m_suhmoParm->m_rho_w * m_suhmoParm->m_rho_w * m_suhmoParm->m_gravity *
                              (tmp_cc(iv, 0) + tmp_cc(iv, 1) - tmp2_cc(iv, 0) - tmp2_cc(iv, 1)) -
                              m_suhmoParm->m_rho_w * m_suhmoParm->m_gravity * (tmp_cc(iv, 0) + tmp_cc(iv, 1));
                 mR(iv,0)   = mR(iv,0) / m_suhmoParm->m_L;
-                //Pw
-                Pressw(iv,0) = m_suhmoParm->m_gravity * m_suhmoParm->m_rho_w * (newH(iv,0) - zb(iv,0));
             }
         }
 
         // 2. a : Get the RHS of gh eqs:
         LevelData<FArrayBox>& levelRHS_b = *RHS_b[lev];
-        LevelData<FArrayBox>& levelPi    = *m_overburdenpress[lev];
         LevelData<FArrayBox>& levelB     = *m_gapheight[lev];    
         CalcRHS_gapHeightFAS(levelRHS_b, levelPi, 
                              levelPw, levelmR, 
@@ -3929,7 +3923,8 @@ AmrHydro::timeStepFAS(Real a_dt)
             BoxIterator bit(RHS.box()); 
             for (bit.begin(); bit.ok(); ++bit) {
                 IntVect iv = bit(); 
-                //newB(iv,0) = std::max(RHS(iv,0) * a_dt + oldB(iv,0), 1.0e-6);
+                // does not work
+                //newB(iv,0) = std::max(RHS(iv,0) * a_dt + oldB(iv,0), 1.0e-12);
                 newB(iv,0) = RHS(iv,0) * a_dt + oldB(iv,0);
             }
         }
@@ -4028,8 +4023,9 @@ AmrHydro::timeStepFAS(Real a_dt)
 
     /* CONVERGENCE TESTS with LAGGED quantities */
     Real maxGap = computeMax(m_gapheight, m_refinement_ratios, Interval(0,0), 0);
+    Real minGap = computeMin(m_gapheight, m_refinement_ratios, Interval(0,0), 0);
     if (m_verbosity > 3) {
-        pout() <<"        Check for convergence of b (max is "<< maxGap<<" )"<<endl;
+        pout() <<"        Check for convergence of b (max = "<< maxGap<<", min = " << minGap << ")"<<endl;
     }
     for (int lev = 0; lev <= m_finest_level; lev++) {
         LevelData<FArrayBox>& levelnewB_lag  = *a_gapheight_lagged[lev]; // should be the same as the OLD
@@ -4287,6 +4283,10 @@ AmrHydro::regrid()
                 FineInterp interpolator(newDBL, 1, m_refinement_ratios[lev - 1], m_amrDomains[lev]);
                 FineInterp interpolatorGrad(newDBL, SpaceDim, m_refinement_ratios[lev - 1], m_amrDomains[lev]);
 
+                //limitSlopes          =  0,
+                //noSlopeLimiting      =  1,   XXXXXXXXX
+                //PCInterp             =  2,
+                //limitTangentialOnly  =  3,
                 interpolator.m_boundary_limit_type     = 3;
                 interpolatorGrad.m_boundary_limit_type = 3;
 
@@ -4322,12 +4322,12 @@ AmrHydro::regrid()
                         IntVect iv = bit(); 
                         pout() << iv << " h: " << head[dit](iv,0) 
                                      << ",b: " << gH[dit](iv,0)           
-                                     << ",Pw: " << Pw[dit](iv,0)           
-                                     << ",qw: " << qw[dit](iv,0)           
+                                     //<< ",Pw: " << Pw[dit](iv,0)           
+                                     //<< ",qw: " << qw[dit](iv,0)           
                                      << ",Re: " << Re[dit](iv,0)           
-                                     << ",mdot: " << melt[dit](iv,0)           
-                                     << ",zB: " << zB[dit](iv,0)           
-                                     << ",oP: " << overP[dit](iv,0)           
+                                     //<< ",mdot: " << melt[dit](iv,0)           
+                                     //<< ",zB: " << zB[dit](iv,0)           
+                                     //<< ",oP: " << overP[dit](iv,0)           
                                      << ",iceH: " << iceH[dit](iv,0) << endl;
                     }
                 }
