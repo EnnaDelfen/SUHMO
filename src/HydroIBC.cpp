@@ -71,7 +71,9 @@ HydroIBC::initializeData(RealVect& a_dx,
                          LevelData<FArrayBox>& a_meltRate,
                          LevelData<FArrayBox>& a_zbed,
                          LevelData<FArrayBox>& a_Pi,
-                         LevelData<FArrayBox>& a_iceHeight)
+                         LevelData<FArrayBox>& a_iceHeight,
+                         LevelData<FArrayBox>& a_bumpHeight,
+                         LevelData<FArrayBox>& a_bumpSpacing)
 {
     
     if (Params.m_verbosity > 3) {
@@ -92,14 +94,17 @@ HydroIBC::initializeData(RealVect& a_dx,
         FArrayBox& thiszbed      = a_zbed[dit];
         FArrayBox& thispi        = a_Pi[dit];
         FArrayBox& thisiceHeight = a_iceHeight[dit];
+        FArrayBox& thisbumpHeight    = a_bumpHeight[dit];
+        FArrayBox& thisbumpSpacing   = a_bumpSpacing[dit];
+
 
         BoxIterator bit(thisHead.box()); // Default .box() have ghostcells ?
         for (bit.begin(); bit.ok(); ++bit) {
             IntVect iv = bit();
             Real x_loc = (iv[0]+0.5)*a_dx[0];
-            //Real y_loc = (iv[1]+0.5)*a_dx[1];
+            Real y_loc = (iv[1]+0.5)*a_dx[1];
 
-            // bed topography
+            /* bed topography */
             //thiszbed(iv, 0)      = std::max(Params.m_slope*x_loc, 0.0);
             thiszbed(iv, 0)      = Params.m_slope*x_loc;
             //thisGradzbed(iv, 0)  = Params.m_slope;
@@ -107,12 +112,12 @@ HydroIBC::initializeData(RealVect& a_dx,
             //thiszbed(iv, 0)      = Params.m_slope*std::sqrt(x_loc*x_loc + y_loc*y_loc);
             //thisGradzbed(iv, 0)  = Params.m_slope*Params.m_slope*x_loc / thiszbed(iv, 0);
             //thisGradzbed(iv, 1)  = Params.m_slope*Params.m_slope*y_loc / thiszbed(iv, 0);
-            // initial gap height
+            /* initial gap height */
             thisGapHeight(iv, 0) = Params.m_gapInit;
-            // Ice height (should be ice only, so surface - (bed + gap))
-            //thisiceHeight(iv, 0) = 6.0 * (std::sqrt(x_loc + Params.m_H) - std::sqrt(Params.m_H)) + 1.0;
-            thisiceHeight(iv, 0) = Params.m_H;
-            // Ice overburden pressure : rho_i * g * H
+            /* Ice height (should be ice only, so surface - (bed + gap)) */
+            thisiceHeight(iv, 0) = 6.0 * (std::sqrt(x_loc + Params.m_H) - std::sqrt(Params.m_H)) + 1.0;
+            //thisiceHeight(iv, 0) = Params.m_H;
+            /* Ice overburden pressure : rho_i * g * H */
             thispi(iv, 0)        = Params.m_rho_i * Params.m_gravity * thisiceHeight(iv, 0);
             
             /* option 1: guess Pw, find head */
@@ -123,11 +128,14 @@ HydroIBC::initializeData(RealVect& a_dx,
             Real Fact            = 1./(Params.m_rho_w * Params.m_gravity);
             thisHead(iv, 0)      = thisPw(iv, 0) * Fact + thiszbed(iv, 0) ;
             /* option 3: fix head constant to 0 */
-            //thisHead(iv, 0)      = 20.0;
+            //thisHead(iv, 0)      = 0.0;
             //thisPw(iv, 0)        = ( thisHead(iv, 0) - thiszbed(iv, 0) ) * (Params.m_rho_w * Params.m_gravity) ;
-            
 
-            // dummy stuff 
+            /* Bed randomization */
+            thisbumpHeight(iv, 0)      = Params.m_br;
+            thisbumpSpacing(iv, 0)     = Params.m_lr;
+
+            /* dummy stuff  */
             thisRe(iv, 0)        = Params.m_ReInit;
             Real denom_q         = 12.0 * Params.m_nu * (1 + Params.m_omega * Params.m_ReInit);
             // grad head = slope for now
@@ -135,9 +143,6 @@ HydroIBC::initializeData(RealVect& a_dx,
             thisqw(iv, 0)        = num_q/denom_q; 
             thisqw(iv, 1)        = 0.0;
             thismeltRate(iv, 0)  = (Params.m_G/Params.m_L); // - Params.m_gravity * Params.m_rho_w * thisqw(iv, 0) * Params.m_slope)/ Params.m_L;
-            //if ((iv[0] == 14) && (iv[1] == 14)){
-            //    thismeltRate(iv, 0)  += 0.05; 
-            //}
         } // end loop over cells
     }     // end loop over boxes
 

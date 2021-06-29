@@ -108,7 +108,9 @@ public:
                                 LevelData<FArrayBox>& a_meltRate,
                                 LevelData<FArrayBox>& a_zbed,
                                 LevelData<FArrayBox>& a_Pi,
-                                LevelData<FArrayBox>& a_iceHeight);
+                                LevelData<FArrayBox>& a_iceHeight,
+                                LevelData<FArrayBox>& a_bumpHeight,
+                                LevelData<FArrayBox>& a_bumpSpacing);
 
 
     virtual void BCData(RealVect& a_dx,

@@ -686,6 +686,17 @@ AmrHydro::~AmrHydro()
             delete m_overburdenpress[lev];
             m_overburdenpress[lev] = NULL;
         }
+        // Bed randomization
+        if (m_bumpHeight[lev] != NULL)
+        {
+            delete m_bumpHeight[lev];
+            m_bumpHeight[lev] = NULL;
+        }
+        if (m_bumpSpacing[lev] != NULL)
+        {
+            delete m_bumpSpacing[lev];
+            m_bumpSpacing[lev] = NULL;
+        }
     }
 
     delete m_suhmoParm;
@@ -975,6 +986,10 @@ AmrHydro::initialize()
         m_bedelevation.resize(m_max_level + 1, NULL);
         m_overburdenpress.resize(m_max_level + 1, NULL);
 
+        // Bed randomization
+        m_bumpSpacing.resize(m_max_level + 1, NULL);
+        m_bumpHeight.resize(m_max_level + 1, NULL);
+
         //-------------------------------------------------
         // For each level, define a collection of FArray/FluxBox
         //-------------------------------------------------
@@ -996,6 +1011,9 @@ AmrHydro::initialize()
 
             m_bedelevation[lev] = new LevelData<FArrayBox>;
             m_overburdenpress[lev] = new LevelData<FArrayBox>;
+
+            m_bumpHeight[lev] = new LevelData<FArrayBox>;
+            m_bumpSpacing[lev] = new LevelData<FArrayBox>;
         }
 
 
@@ -1027,6 +1045,9 @@ AmrHydro::initialize()
 
             m_bedelevation[lev]    = NULL;
             m_overburdenpress[lev] = NULL;
+
+            m_bumpHeight[lev] = NULL;
+            m_bumpSpacing[lev] = NULL;
         }
 
 
@@ -1920,7 +1941,9 @@ AmrHydro::CalcRHS_gapHeightFAS(LevelData<FArrayBox>& levelRHS_b,
                                LevelData<FArrayBox>& levelPi, 
                                LevelData<FArrayBox>& levelPw, 
                                LevelData<FArrayBox>& levelmR, 
-                               LevelData<FArrayBox>& levelB)
+                               LevelData<FArrayBox>& levelB,
+                               LevelData<FArrayBox>& levelbumpHeight,
+                               LevelData<FArrayBox>& levelbumpSpacing)
 {
    DataIterator dit = levelRHS_b.dataIterator();
    for (dit.begin(); dit.ok(); ++dit) {
@@ -1931,6 +1954,8 @@ AmrHydro::CalcRHS_gapHeightFAS(LevelData<FArrayBox>& levelRHS_b,
        FArrayBox& Pressi  = levelPi[dit];
        FArrayBox& Pw      = levelPw[dit];
        FArrayBox& meltR   = levelmR[dit];
+       FArrayBox& BH      = levelbumpHeight[dit];
+       FArrayBox& BL      = levelbumpSpacing[dit];
        
        // initialize RHS for h
        RHS.setVal(0.0);
@@ -1940,12 +1965,12 @@ AmrHydro::CalcRHS_gapHeightFAS(LevelData<FArrayBox>& levelRHS_b,
        RHS *= 1.0 / m_suhmoParm->m_rho_i;
        // third term ...
        Real ub_norm = std::sqrt(  m_suhmoParm->m_ub[0]*m_suhmoParm->m_ub[0] 
-                                + m_suhmoParm->m_ub[1]*m_suhmoParm->m_ub[1]) / m_suhmoParm->m_lr;
+                                + m_suhmoParm->m_ub[1]*m_suhmoParm->m_ub[1]); // / BL(iv,0);
        BoxIterator bit(RHS.box()); // can use gridBox? 
        for (bit.begin(); bit.ok(); ++bit) {
            IntVect iv = bit();
-           if ( B(iv,0) < m_suhmoParm->m_br) {
-               RHS(iv,0) += ub_norm * (m_suhmoParm->m_br - B(iv,0));
+           if ( B(iv,0) < BH(iv,0)) {
+               RHS(iv,0) += ub_norm * (BH(iv,0) - B(iv,0)) / BL(iv,0);
            }
            // second term ... assume  n = 3 !!
            Real PimPw = (Pressi(iv,0) - Pw(iv,0));
@@ -3448,6 +3473,8 @@ AmrHydro::timeStepFAS(Real a_dt)
             LevelData<FArrayBox>& levelPw                 = *m_Pw[lev];
             LevelData<FArrayBox>& levelZb                 = *m_bedelevation[lev];
             LevelData<FArrayBox>& levelH                  = *m_head[lev];
+            LevelData<FArrayBox>& levelBH                 = *m_bumpHeight[lev];
+            LevelData<FArrayBox>& levelBL                 = *m_bumpSpacing[lev];
 
             // EC quantities
             LevelData<FluxBox>&   levelQw_ec     = *a_Qw_ec[lev]; 
@@ -3514,7 +3541,7 @@ AmrHydro::timeStepFAS(Real a_dt)
 
             Real rho_coef = (1.0 /  m_suhmoParm->m_rho_w - 1.0 / m_suhmoParm->m_rho_i);
             Real ub_norm = std::sqrt(  m_suhmoParm->m_ub[0]*m_suhmoParm->m_ub[0] 
-                           + m_suhmoParm->m_ub[1]*m_suhmoParm->m_ub[1]) / m_suhmoParm->m_lr;
+                           + m_suhmoParm->m_ub[1]*m_suhmoParm->m_ub[1]); // / m_suhmoParm->m_lr;
             for (dit.begin(); dit.ok(); ++dit) {
                 // CC
                 FArrayBox& B       = levelB[dit];
@@ -3524,7 +3551,9 @@ AmrHydro::timeStepFAS(Real a_dt)
                 FArrayBox& Pressi  = levelPi[dit];
                 FArrayBox& Pressw  = levelPw[dit];
                 FArrayBox& zb      = levelZb[dit];
-                FArrayBox& currH  = levelH[dit];
+                FArrayBox& currH   = levelH[dit];
+                FArrayBox& bumpHeight   = levelBH[dit];
+                FArrayBox& bumpSpacing  = levelBL[dit];
 
                 FArrayBox& moulinSrc = levelmoulin_source_term[dit];
 
@@ -3532,11 +3561,11 @@ AmrHydro::timeStepFAS(Real a_dt)
                 for (bit.begin(); bit.ok(); ++bit) {
                     IntVect iv = bit();
                     // Actual RHS
-                    if ( B(iv,0) < m_suhmoParm->m_br) {
+                    if ( B(iv,0) < bumpHeight(iv,0)) {
                         RHSh(iv,0) = rho_coef / m_suhmoParm->m_L * (  m_suhmoParm->m_G 
                                      + m_suhmoParm->m_ct * m_suhmoParm->m_cw * m_suhmoParm->m_rho_w * m_suhmoParm->m_rho_w * m_suhmoParm->m_gravity *
                                       (tmp2_cc(iv, 0) + tmp2_cc(iv, 1)) )  
-                                     - ub_norm * (m_suhmoParm->m_br - B(iv,0));
+                                     - ub_norm * (bumpHeight(iv,0) - B(iv,0)) / bumpSpacing(iv,0);
                     } else {
                         RHSh(iv,0) = rho_coef / m_suhmoParm->m_L * (  m_suhmoParm->m_G 
                                      + m_suhmoParm->m_ct * m_suhmoParm->m_cw * m_suhmoParm->m_rho_w * m_suhmoParm->m_rho_w * m_suhmoParm->m_gravity *
@@ -3906,9 +3935,11 @@ AmrHydro::timeStepFAS(Real a_dt)
         // 2. a : Get the RHS of gh eqs:
         LevelData<FArrayBox>& levelRHS_b = *RHS_b[lev];
         LevelData<FArrayBox>& levelB     = *m_gapheight[lev];    
+        LevelData<FArrayBox>& levelBH    = *m_bumpHeight[lev];    
+        LevelData<FArrayBox>& levelBL    = *m_bumpSpacing[lev];    
         CalcRHS_gapHeightFAS(levelRHS_b, levelPi, 
                              levelPw, levelmR, 
-                             levelB); 
+                             levelB, levelBH, levelBL); 
 
         LevelData<FArrayBox>& leveloldB  = *m_old_gapheight[lev];    
 
@@ -4182,6 +4213,9 @@ AmrHydro::regrid()
                 m_Pw[lev]            = new LevelData<FArrayBox>;
                 m_qw[lev]            = new LevelData<FArrayBox>;
                 m_meltRate[lev]      = new LevelData<FArrayBox>;
+
+                m_bumpHeight[lev]    = new LevelData<FArrayBox>;
+                m_bumpSpacing[lev]    = new LevelData<FArrayBox>;
             }
 
             // HEAD
@@ -4229,6 +4263,12 @@ AmrHydro::regrid()
             LevelData<FArrayBox>* new_meltRateDataPtr =
                 new LevelData<FArrayBox>(newDBL, m_meltRate[0]->nComp(), m_meltRate[0]->ghostVect());
 
+            // Bed randomization
+            LevelData<FArrayBox>* new_bumpHeightDataPtr    =
+                new LevelData<FArrayBox>(newDBL, m_bumpHeight[0]->nComp(), m_bumpHeight[0]->ghostVect());
+            LevelData<FArrayBox>* new_bumpSpacingDataPtr    =
+                new LevelData<FArrayBox>(newDBL, m_bumpSpacing[0]->nComp(), m_bumpSpacing[0]->ghostVect());
+
             //call initData to take care of BC and initialize the levels... 
             initDataRegrid(lev,
                            *new_headDataPtr,
@@ -4239,7 +4279,9 @@ AmrHydro::regrid()
                            *new_meltRateDataPtr,
                            *new_bedelevationDataPtr,
                            *new_overburdenpressDataPtr,
-                           *new_iceheightDataPtr);
+                           *new_iceheightDataPtr,
+                           *new_bumpHeightDataPtr,
+                           *new_bumpSpacingDataPtr);
             //BCDataRegrid(lev, *new_bedelevationDataPtr, *new_overburdenpressDataPtr,*new_iceheightDataPtr);
 
             LevelData<FArrayBox>& head  = *new_headDataPtr;
@@ -4401,6 +4443,9 @@ AmrHydro::regrid()
             new_PwDataPtr->exchange();
             new_qwDataPtr->exchange();
             new_meltRateDataPtr->exchange();
+            //
+            new_bumpHeightDataPtr->exchange();
+            new_bumpSpacingDataPtr->exchange();
 
             // now place new holders into multilevel arrays
             m_old_head[lev]      = new_oldheadDataPtr;
@@ -4414,9 +4459,12 @@ AmrHydro::regrid()
             // 
             m_gradhead[lev]     = new_gradheadDataPtr;     // this one aint filled
             m_gradhead_ec[lev]  = new_gradhead_ecDataPtr;  // this one aint filled
-            m_Pw[lev]       = new_PwDataPtr;
-            m_qw[lev]       = new_qwDataPtr;
-            m_meltRate[lev] = new_meltRateDataPtr;
+            m_Pw[lev]           = new_PwDataPtr;
+            m_qw[lev]           = new_qwDataPtr;
+            m_meltRate[lev]     = new_meltRateDataPtr;
+            // 
+            m_bumpHeight[lev]  = new_bumpHeightDataPtr;
+            m_bumpSpacing[lev] = new_bumpSpacingDataPtr;
 
 
             if (m_verbosity > 20) {
@@ -4498,6 +4546,14 @@ AmrHydro::regrid()
             if (m_overburdenpress[lev] != NULL) {
                 delete m_overburdenpress[lev];
                 m_overburdenpress[lev] = NULL;
+            }
+            if (m_bumpHeight[lev] != NULL) {
+                delete m_bumpHeight[lev];
+                m_bumpHeight[lev] = NULL;
+            }
+            if (m_bumpSpacing[lev] != NULL) {
+                delete m_bumpSpacing[lev];
+                m_bumpSpacing[lev] = NULL;
             }
 
             DisjointBoxLayout emptyDBL;
@@ -4897,6 +4953,8 @@ AmrHydro::levelSetup(int a_level, const DisjointBoxLayout& a_grids)
     m_iceheight[a_level]    = new LevelData<FArrayBox>(a_grids, nPhiComp, HeadGhostVect);
     m_bedelevation[a_level]    = new LevelData<FArrayBox>(a_grids, nPhiComp, HeadGhostVect);
     m_overburdenpress[a_level] = new LevelData<FArrayBox>(a_grids, nPhiComp, HeadGhostVect);
+    m_bumpHeight[a_level]      = new LevelData<FArrayBox>(a_grids, nPhiComp, HeadGhostVect);
+    m_bumpSpacing[a_level]      = new LevelData<FArrayBox>(a_grids, nPhiComp, HeadGhostVect);
 }
 
 void
@@ -4919,6 +4977,8 @@ AmrHydro::initData(Vector<LevelData<FArrayBox>*>& a_head)
         LevelData<FArrayBox>& levelIceHeight = *m_iceheight[lev];
         LevelData<FArrayBox>& levelzBed      = *m_bedelevation[lev];
         LevelData<FArrayBox>& levelPi        = *m_overburdenpress[lev];
+        LevelData<FArrayBox>& levelbumpHeight   = *m_bumpHeight[lev];
+        LevelData<FArrayBox>& levelbumpSpacing  = *m_bumpSpacing[lev];
         //if (lev > 0) {
         //    // fill the ghost cells of a_vectCoordSys[lev]->getH();
         //    // m_head
@@ -4954,7 +5014,8 @@ AmrHydro::initData(Vector<LevelData<FArrayBox>*>& a_head)
                                  levelPw, levelqw,
                                  levelRe, levelmR,
                                  levelzBed, levelPi,
-                                 levelIceHeight); //, levelgradzBed);
+                                 levelIceHeight,
+                                 levelbumpHeight, levelbumpSpacing); 
 
         // initialize old h and b to be the current value
         levelHead.copyTo(*m_old_head[lev]);
@@ -4983,14 +5044,14 @@ AmrHydro::initDataRegrid(int a_level,
                          LevelData<FArrayBox>& a_levmR,
                          LevelData<FArrayBox>& a_levzBed,
                          LevelData<FArrayBox>& a_levPi,
-                         LevelData<FArrayBox>& a_levIceHeight)
+                         LevelData<FArrayBox>& a_levIceHeight,
+                         LevelData<FArrayBox>& a_bumpHeight,
+                         LevelData<FArrayBox>& a_bumpSpacing)
 {
     if (m_verbosity > 3) {
         pout() << "AmrHydro::initDataRegrid" << endl;
         pout()<<  "  .. lev " << a_level << endl;
-
     }
-
 
     RealVect levelDx = m_amrDx[a_level] * RealVect::Unit;
     m_IBCPtr->initializeData(levelDx, 
@@ -4999,7 +5060,8 @@ AmrHydro::initDataRegrid(int a_level,
                              a_levPw, a_levqw,
                              a_levRe, a_levmR,
                              a_levzBed, a_levPi,
-                             a_levIceHeight);
+                             a_levIceHeight,
+                             a_bumpHeight, a_bumpSpacing);
 }
 
 
@@ -5224,7 +5286,7 @@ AmrHydro::writePlotFile()
     }
 
     // plot comps: head + gapHeight + bedelevation + overburdenPress
-    int numPlotComps = 11;
+    int numPlotComps = 12;
 
     // generate data names
     string headName("head");
@@ -5238,6 +5300,7 @@ AmrHydro::writePlotFile()
     string meltRateName("meltRate"); 
     string xGradName("GradHead_x");
     string yGradName("GradHead_y");
+    string BumpHeight("bumpHeight");
 
     Vector<string> vectName(numPlotComps);
     vectName[0] = headName;
@@ -5251,6 +5314,7 @@ AmrHydro::writePlotFile()
     vectName[8] = meltRateName;
     vectName[9] = xGradName;
     vectName[10] = yGradName;
+    vectName[11] = BumpHeight;
 
     Box domain = m_amrDomains[0].domainBox();
     Real dt = 1.;
@@ -5279,6 +5343,7 @@ AmrHydro::writePlotFile()
         const LevelData<FArrayBox>& levelqw        = *m_qw[lev];
         const LevelData<FArrayBox>& levelRe        = *m_Re[lev];
         const LevelData<FArrayBox>& levelmR        = *m_meltRate[lev];
+        const LevelData<FArrayBox>& levelBH        = *m_bumpHeight[lev];
         //LevelData<FArrayBox> levelGradPhi;
         //if (m_write_gradPhi)
         //{
@@ -5318,6 +5383,7 @@ AmrHydro::writePlotFile()
             const FArrayBox& thisqw         = levelqw[dit];
             const FArrayBox& thisRe         = levelRe[dit];
             const FArrayBox& thismR         = levelmR[dit];
+            const FArrayBox& thisBH         = levelBH[dit];
 
             thisPlotData.copy(thisHead, 0, comp, 1);
             comp++;
@@ -5341,6 +5407,7 @@ AmrHydro::writePlotFile()
             comp++;
             thisPlotData.copy(thisGradHead, 1, comp, 1);
             comp++;
+            thisPlotData.copy(thisBH, 0, comp, 1);
 
         } // end loop over boxes on this level
 

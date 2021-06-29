@@ -137,7 +137,9 @@ public:
                               LevelData<FArrayBox>& levelPi, 
                               LevelData<FArrayBox>& levelPw, 
                               LevelData<FArrayBox>& levelmR, 
-                              LevelData<FArrayBox>& levelB);
+                              LevelData<FArrayBox>& levelB,
+                              LevelData<FArrayBox>& levelBH, 
+                              LevelData<FArrayBox>& levelBL);
 
     void CalcRHS_gapHeight(LevelData<FArrayBox>& levelRHS_b, 
                            LevelData<FArrayBox>& levelPi, 
@@ -316,7 +318,9 @@ protected:
                         LevelData<FArrayBox>& a_levmR,
                         LevelData<FArrayBox>& a_levzBed,
                         LevelData<FArrayBox>& a_levPi,
-                        LevelData<FArrayBox>& a_levIceHeight);
+                        LevelData<FArrayBox>& a_levIceHeight,
+                        LevelData<FArrayBox>& a_bumpHeight,
+                        LevelData<FArrayBox>& a_bumpSpacing);
 
     void BCDataRegrid(int a_level,
                       LevelData<FArrayBox>& a_levzBed,
@@ -464,6 +468,11 @@ protected:
     /* Time-constant parameters */
     Vector<LevelData<FArrayBox>*> m_bedelevation;           //
     Vector<LevelData<FArrayBox>*> m_overburdenpress;        // rhoi*g*H
+
+    /* Bed randomization */
+    Vector<LevelData<FArrayBox>*> m_bumpHeight;            // typical ground bump height
+    Vector<LevelData<FArrayBox>*> m_bumpSpacing;           // typical ground bump spacing
+   
 
     //Vector<LevelData<FArrayBox>*> m_gradZb;      
 
