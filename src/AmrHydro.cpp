@@ -1399,16 +1399,18 @@ void AmrHydro::NonLinear_level(LevelData<FArrayBox>&        a_NL,
               thisNL(iv, 0)  = - m_suhmoParm->m_A * thisB(iv,0) * 
                                std::pow( (thisPi(iv,0) - m_suhmoParm->m_rho_w * m_suhmoParm->m_gravity *
                                (thisU(iv,0) -thiszb(iv,0))), 3);
-              // Correction Colin 03/18
-              thisNL(iv, 0)  = thisNL(iv, 0) * (1.0 - (m_suhmoParm->m_br - thisB(iv,0)) / m_suhmoParm->m_br );
-              //thisNL(iv, 0) = thisNL(iv, 0)  * std::tanh( std::pow(thisB(iv,0),3) / std::pow(m_suhmoParm->m_br,3) );
               
               thisdNL(iv, 0) = 3.0 * m_suhmoParm->m_A * thisB(iv,0) * m_suhmoParm->m_rho_w *m_suhmoParm->m_gravity *
                                  ( std::pow( (thisPi(iv,0) - m_suhmoParm->m_rho_w * m_suhmoParm->m_gravity * 
                                  (thisU(iv,0) - thiszb(iv,0))), 2) );
+
               // Correction Colin 03/18
-              thisdNL(iv, 0) = thisdNL(iv, 0) * thisB(iv,0) /  m_suhmoParm->m_br;
-              //thisdNL(iv, 0) = thisdNL(iv, 0) * std::tanh( std::pow(thisB(iv,0),3) / std::pow(m_suhmoParm->m_br,3) );
+              if ( m_suhmoParm->m_br > thisB(iv,0) ) {
+                  thisNL(iv, 0)  = thisNL(iv, 0) * (1.0 - (m_suhmoParm->m_br - thisB(iv,0)) / m_suhmoParm->m_br );
+                  //thisNL(iv, 0) = thisNL(iv, 0)  * std::tanh( std::pow(thisB(iv,0),3) / std::pow(m_suhmoParm->m_br,3) );
+                  thisdNL(iv, 0) = thisdNL(iv, 0) * thisB(iv,0) /  m_suhmoParm->m_br;
+                  //thisdNL(iv, 0) = thisdNL(iv, 0) * std::tanh( std::pow(thisB(iv,0),3) / std::pow(m_suhmoParm->m_br,3) );
+              }
           }
       } // end loop over grids on this level
   }
@@ -1975,7 +1977,11 @@ AmrHydro::CalcRHS_gapHeightFAS(LevelData<FArrayBox>& levelRHS_b,
            // second term ... assume  n = 3 !!
            Real PimPw = (Pressi(iv,0) - Pw(iv,0));
            Real AbsPimPw = std::abs(PimPw);
-           RHS(iv,0) -= m_suhmoParm->m_A * std::pow(AbsPimPw, 2) * PimPw * B(iv,0) * (1.0 - (m_suhmoParm->m_br - B(iv,0)) / m_suhmoParm->m_br );// * std::tanh( std::pow(B(iv,0),3) / std::pow(m_suhmoParm->m_br,3) );
+           RHS(iv,0) -= m_suhmoParm->m_A * std::pow(AbsPimPw, 2) * PimPw * B(iv,0); 
+           if ( m_suhmoParm->m_br > B(iv,0) ) {
+               RHS(iv,0) *= ( 1.0 - (m_suhmoParm->m_br - B(iv,0)) / m_suhmoParm->m_br );
+               //RHS(iv,0) *= std::tanh( std::pow(B(iv,0),3) / std::pow(m_suhmoParm->m_br,3) );
+           }
        }
    }
 }
