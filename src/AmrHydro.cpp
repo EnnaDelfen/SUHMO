@@ -1050,12 +1050,14 @@ AmrHydro::initialize()
             m_bumpSpacing[lev] = NULL;
         }
 
+        m_suhmoParm->m_compute_bump_param = false;
 
     } else {
         // we're restarting from a checkpoint file
         string restart_file;
         ppAmr.get("restart_file", restart_file);
         m_do_restart = true;
+        m_suhmoParm->m_compute_bump_param =  false;
 #ifdef CH_USE_HDF5
         restart(restart_file);
 #endif
@@ -1118,7 +1120,6 @@ AmrHydro::initialize()
     if (m_verbosity > 3) {
         pout() << "Done with AmrHydro::initialize\n" << endl;
     }
-    //MayDay::Error("STOP");
 }
 
 // set BC for head ?
@@ -5511,7 +5512,7 @@ AmrHydro::writeCheckpointFile() const
     header.m_int["current_step"] = m_cur_step;
     header.m_real["time"] = m_time;
     header.m_real["dt"] = m_dt;
-    header.m_int["num_comps"] = 6; // H/B/Pice/Zb/Re/Hice
+    header.m_int["num_comps"] = 7; // H/B/Pice/Zb/Re/Hice/BH
     header.m_real["cfl"] = m_cfl;
 
     // periodicity info
@@ -5538,6 +5539,7 @@ AmrHydro::writeCheckpointFile() const
     string zbedName("bedelevation");
     string ReName("Re"); 
     string IceHeightName("iceHeight"); 
+    string bumpHeightName("bumpHeight"); 
 
     int nComp = 0;
     char compStr[30];
@@ -5564,6 +5566,10 @@ AmrHydro::writeCheckpointFile() const
     // Hice
     sprintf(compStr, "component_%04d", nComp);
     header.m_string[compStr] = IceHeightName;
+    nComp++;
+    // Bump Height (BH)
+    sprintf(compStr, "component_%04d", nComp);
+    header.m_string[compStr] = bumpHeightName;
 
     header.writeToFile(handle);
 
@@ -5599,6 +5605,7 @@ AmrHydro::writeCheckpointFile() const
             write(handle, *m_bedelevation[lev], "bedelevationData", m_bedelevation[lev]->ghostVect());
             write(handle, *m_Re[lev], "ReData", m_Re[lev]->ghostVect());
             write(handle, *m_iceheight[lev], "iceHeightData", m_iceheight[lev]->ghostVect());
+            write(handle, *m_bumpHeight[lev], "bumpHeightData", m_bumpHeight[lev]->ghostVect());
         } // end loop over levels
     }
 
@@ -5747,6 +5754,8 @@ AmrHydro::readCheckpointFile(HDF5Handle& a_handle)
     m_iceheight.resize(m_max_level + 1, NULL);
     m_bedelevation.resize(m_max_level + 1, NULL);
     m_overburdenpress.resize(m_max_level + 1, NULL);
+    m_bumpHeight.resize(m_max_level + 1, NULL);
+    m_bumpSpacing.resize(m_max_level + 1, NULL);
 
     // now read in level-by-level data -- go to Max lev of checkfile
     for (int lev = 0; lev <= max_level_check; lev++) {
@@ -5830,7 +5839,9 @@ AmrHydro::readCheckpointFile(HDF5Handle& a_handle)
             m_meltRate[lev]      = new LevelData<FArrayBox>(levelDBL, nPhiComp, nGhost);
             m_iceheight[lev]     = new LevelData<FArrayBox>(levelDBL, nPhiComp, nGhost);
             m_bedelevation[lev]  = new LevelData<FArrayBox>(levelDBL, nPhiComp, nGhost);
-            m_overburdenpress[lev] = new LevelData<FArrayBox>(levelDBL, nPhiComp, nGhost);
+            m_overburdenpress[lev]   = new LevelData<FArrayBox>(levelDBL, nPhiComp, nGhost);
+            m_bumpHeight[lev] = new LevelData<FArrayBox>(levelDBL, nPhiComp, nGhost); 
+            m_bumpSpacing[lev] = new LevelData<FArrayBox>(levelDBL, nPhiComp, nGhost); 
 
             // read this level's data
             /* HEAD */
@@ -5895,6 +5906,16 @@ AmrHydro::readCheckpointFile(HDF5Handle& a_handle)
             }
             for (DataIterator dit(levelDBL); dit.ok(); ++dit) {
                 (*m_bedelevation[lev])[dit].copy(tmpZb[dit]);
+            }
+            /* Bump characteristic length scales */
+            LevelData<FArrayBox> tmpBH;
+            tmpBH.define(old_head);
+            dataStatus = read<FArrayBox>(a_handle, tmpBH, "bumpHeightData", levelDBL);
+            if (dataStatus != 0) {
+                MayDay::Error("checkpoint file does not contain Bump Height data");
+            }
+            for (DataIterator dit(levelDBL); dit.ok(); ++dit) {
+                (*m_bumpHeight[lev])[dit].copy(tmpBH[dit]);
             }
 
         } // end if this level is defined

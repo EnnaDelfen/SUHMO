@@ -20,6 +20,7 @@ void suhmo_params::setDefaults()
     m_br = 0.0 ;
     m_lr = 0.0;
     m_A = 0.0;
+    m_compute_bump_param = true;
     // Initialization 
     m_slope = 0.0;
     m_gapInit = 0.0;

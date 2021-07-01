@@ -12,6 +12,7 @@
 #include "ParmParse.H"
 #include "FluxBox.H"
 //#include "AmrHydro.H"
+#include <random>
 
 #include "NamespaceHeader.H"
 
@@ -80,6 +81,12 @@ HydroIBC::initializeData(RealVect& a_dx,
         pout() << "HydroIBC::initializeData" << endl;
     }
 
+    // randomization
+    const double mean = 0.0;
+    const double stddev = 0.01;
+    std::default_random_engine generator;
+    std::normal_distribution<double> dist(mean, stddev);
+
     IntVect regionLo = m_domain.domainBox().bigEnd();
     IntVect regionHi = m_domain.domainBox().bigEnd();
 
@@ -115,8 +122,8 @@ HydroIBC::initializeData(RealVect& a_dx,
             /* initial gap height */
             thisGapHeight(iv, 0) = Params.m_gapInit;
             /* Ice height (should be ice only, so surface - (bed + gap)) */
-            thisiceHeight(iv, 0) = 6.0 * (std::sqrt(x_loc + Params.m_H) - std::sqrt(Params.m_H)) + 1.0;
-            //thisiceHeight(iv, 0) = Params.m_H;
+            //thisiceHeight(iv, 0) = 6.0 * (std::sqrt(x_loc + Params.m_H) - std::sqrt(Params.m_H)) + 1.0;
+            thisiceHeight(iv, 0) = Params.m_H;
             /* Ice overburden pressure : rho_i * g * H */
             thispi(iv, 0)        = Params.m_rho_i * Params.m_gravity * thisiceHeight(iv, 0);
             
@@ -132,7 +139,9 @@ HydroIBC::initializeData(RealVect& a_dx,
             //thisPw(iv, 0)        = ( thisHead(iv, 0) - thiszbed(iv, 0) ) * (Params.m_rho_w * Params.m_gravity) ;
 
             /* Bed randomization */
-            thisbumpHeight(iv, 0)      = Params.m_br;
+            if (Params.m_compute_bump_param = true ) {
+                thisbumpHeight(iv, 0)      = Params.m_br; // + dist(generator);//Params.m_br*std::sin(y_loc)/10.0 + Params.m_br; 
+            }
             thisbumpSpacing(iv, 0)     = Params.m_lr;
 
             /* dummy stuff  */
