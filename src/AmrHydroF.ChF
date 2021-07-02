@@ -1,0 +1,55 @@
+C      _______              __  
+C     / ___/ /  ___  __ _  / /  ___ 
+C    / /__/ _ \/ _ \/  V \/ _ \/ _ \ 
+C    \___/_//_/\___/_/_/_/_.__/\___/
+C    Please refer to Copyright.txt, in Chombo's root directory.
+
+#include "CONSTANTS.H"
+
+C     --------------------------------------------------------------
+
+C     -----------------------------------------------------------------
+C     subroutine COMPUTENONLINEARTERMS
+C     computes the NL and dNL pieces
+C
+C     INPUTS/OUTPUTS:
+C     NL        =>  NL piece
+C     dNL       =>  derivative of NL piece
+C     phi       =>  phi 
+C     aB        =>  Gap Height 
+C     aPi       =>  Ice Pressure 
+C     aZb       =>  Bed  Height
+C     ------------------------------------------------------------------
+      subroutine COMPUTENONLINEARTERMS(
+     &     CHF_CONST_FRA[phi],
+     &     CHF_CONST_FRA[aB],
+     &     CHF_CONST_FRA[aPi],
+     &     CHF_CONST_FRA[aZb],
+     &     CHF_BOX[region],
+     &     CHF_CONST_FRA[nlfunc], 
+     &     CHF_CONST_FRA[dnlfunc],
+     &     CHF_CONST_REAL[Aparam],
+     &     CHF_CONST_REAL[brparam]) 
+    
+      integer CHF_DDECL[i;j;k]
+
+      CHF_MULTIDO[region; i; j; k]
+         nlfunc(CHF_IX[i;j;k],0) = - Aparam * aB(CHF_IX[i;j  ;k  ],0) * 
+     &                            (aPi(CHF_IX[i;j  ;k  ],0) - 1000.0 * 9.8 * (phi(CHF_IX[i;j  ;k  ],0) - aZb(CHF_IX[i;j  ;k  ],0)))  *
+     &                            (aPi(CHF_IX[i;j  ;k  ],0) - 1000.0 * 9.8 * (phi(CHF_IX[i;j  ;k  ],0) - aZb(CHF_IX[i;j  ;k  ],0)))  *
+     &                            (aPi(CHF_IX[i;j  ;k  ],0) - 1000.0 * 9.8 * (phi(CHF_IX[i;j  ;k  ],0) - aZb(CHF_IX[i;j  ;k  ],0)))  
+
+         dnlfunc(CHF_IX[i;j;k],0) = 3.0 * Aparam * aB(CHF_IX[i;j  ;k  ],0) * 
+     &                            1000.0 * 9.8 * 
+     &                            (aPi(CHF_IX[i;j  ;k  ],0) - 1000.0 * 9.8 * (phi(CHF_IX[i;j  ;k  ],0) - aZb(CHF_IX[i;j  ;k  ],0)))  *
+     &                            (aPi(CHF_IX[i;j  ;k  ],0) - 1000.0 * 9.8 * (phi(CHF_IX[i;j  ;k  ],0) - aZb(CHF_IX[i;j  ;k  ],0)))  
+
+         if ( brparam > aB(CHF_IX[i;j  ;k  ],0) ) then
+             nlfunc(CHF_IX[i;j;k],0)  = nlfunc(CHF_IX[i;j;k],0) * (1.0 - (brparam - aB(CHF_IX[i;j  ;k  ],0)) / brparam )
+             dnlfunc(CHF_IX[i;j;k],0) = dnlfunc(CHF_IX[i;j;k],0) * aB(CHF_IX[i;j  ;k  ],0) /  brparam 
+         endif
+
+      CHF_ENDDO
+
+      return
+      end

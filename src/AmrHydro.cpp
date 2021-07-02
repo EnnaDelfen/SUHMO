@@ -23,7 +23,9 @@ using std::cerr;
 using std::endl;
 using std::string;
 
+#include "FORT_PROTO.H"
 #include "AmrHydro.H"
+#include "AmrHydroF_F.H"
 
 #include "Box.H"
 #include "Vector.H"
@@ -1384,35 +1386,29 @@ void AmrHydro::NonLinear_level(LevelData<FArrayBox>&        a_NL,
 {
 
   if (m_use_NL) {
+
       DataIterator levelDit = a_NL.dataIterator();
+      const DisjointBoxLayout& dbl = a_NL.disjointBoxLayout();
+
       for (levelDit.begin(); levelDit.ok(); ++levelDit) {
 
-          FArrayBox& thisNL          = a_NL[levelDit];
-          FArrayBox& thisdNL         = a_dNL[levelDit];
-          const FArrayBox& thisU     = a_u[levelDit];
-          FArrayBox& thisB           = a_B[levelDit];
-          FArrayBox& thisPi          = a_Pi[levelDit];
-          FArrayBox& thiszb          = a_zb[levelDit];
+          const Box& region = dbl[levelDit];
 
-          BoxIterator bit(thisNL.box());
-          for (bit.begin(); bit.ok(); ++bit) {
-              IntVect iv = bit();
-              thisNL(iv, 0)  = - m_suhmoParm->m_A * thisB(iv,0) * 
-                               std::pow( (thisPi(iv,0) - m_suhmoParm->m_rho_w * m_suhmoParm->m_gravity *
-                               (thisU(iv,0) -thiszb(iv,0))), 3);
-              
-              thisdNL(iv, 0) = 3.0 * m_suhmoParm->m_A * thisB(iv,0) * m_suhmoParm->m_rho_w *m_suhmoParm->m_gravity *
-                                 ( std::pow( (thisPi(iv,0) - m_suhmoParm->m_rho_w * m_suhmoParm->m_gravity * 
-                                 (thisU(iv,0) - thiszb(iv,0))), 2) );
+          FORT_COMPUTENONLINEARTERMS( CHF_FRA(a_u[levelDit]),
+                                      CHF_FRA(a_B[levelDit]),
+                                      CHF_FRA(a_Pi[levelDit]),
+                                      CHF_FRA(a_zb[levelDit]),
+                                      CHF_BOX(region),
+                                      CHF_FRA(a_NL[levelDit]),
+                                      CHF_FRA(a_dNL[levelDit]),
+                                      CHF_CONST_REAL(m_suhmoParm->m_A),
+                                      CHF_CONST_REAL(m_suhmoParm->m_br) );
 
-              // Correction Colin 03/18
-              if ( m_suhmoParm->m_br > thisB(iv,0) ) {
-                  thisNL(iv, 0)  = thisNL(iv, 0) * (1.0 - (m_suhmoParm->m_br - thisB(iv,0)) / m_suhmoParm->m_br );
-                  //thisNL(iv, 0) = thisNL(iv, 0)  * std::tanh( std::pow(thisB(iv,0),3) / std::pow(m_suhmoParm->m_br,3) );
-                  thisdNL(iv, 0) = thisdNL(iv, 0) * thisB(iv,0) /  m_suhmoParm->m_br;
-                  //thisdNL(iv, 0) = thisdNL(iv, 0) * std::tanh( std::pow(thisB(iv,0),3) / std::pow(m_suhmoParm->m_br,3) );
-              }
-          }
+          //    // Correction Colin 03/18
+          //    if ( m_suhmoParm->m_br > thisB(iv,0) ) {
+          //        //thisNL(iv, 0) = thisNL(iv, 0)  * std::tanh( std::pow(thisB(iv,0),3) / std::pow(m_suhmoParm->m_br,3) );
+          //        //thisdNL(iv, 0) = thisdNL(iv, 0) * std::tanh( std::pow(thisB(iv,0),3) / std::pow(m_suhmoParm->m_br,3) );
+          //    }
       } // end loop over grids on this level
   }
 }
