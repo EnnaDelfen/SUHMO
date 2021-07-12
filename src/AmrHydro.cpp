@@ -61,6 +61,9 @@ using std::string;
 // small parameter defining when a norm is "zero"
 #define TINY_NORM 1.0e-8
 
+
+/* BC FOR HEAD */
+
 std::vector<int>  GlobalBCRS::s_bcLo = std::vector<int>();
 std::vector<int>  GlobalBCRS::s_bcHi = std::vector<int>();
 bool              GlobalBCRS::s_areBCsParsed= false;
@@ -73,8 +76,8 @@ Real              GlobalBCRS::s_xhi_neum= -1000;
 Real              GlobalBCRS::s_ylo_neum= -1000;
 Real              GlobalBCRS::s_yhi_neum= -1000;
 
-void
-ParseBC() 
+/* Parse boundary conditions and values in input file -- only once */
+void ParseBC() 
 {
     ParmParse ppBC("bc");
     ppBC.getarr("lo_bc", GlobalBCRS::s_bcLo, 0, CH_SPACEDIM);
@@ -117,10 +120,11 @@ ParseBC()
 }
 
 
+/* Return Neumann boundary val -- based on parsed value */
 void NeumannValue(Real* pos,
-                       int* dir, 
-                       Side::LoHiSide* side, 
-                       Real* a_values)
+                  int* dir, 
+                  Side::LoHiSide* side, 
+                  Real* a_values)
 {
     ParmParse pp;
     Real bcVal = 0.0;
@@ -161,6 +165,7 @@ Real DirichletValue(int dir,
     return bcVal;
 }
 
+/* Return Dirichlet boundary val -- based on parsed value */
 void DirichletValue(Real* pos,
                     int* dir, 
                     Side::LoHiSide* side, 
@@ -169,160 +174,14 @@ void DirichletValue(Real* pos,
     a_values[0] = DirichletValue(*dir, *side);
 }
 
-// could be same as below
-void NeumBCForHcoarse(FArrayBox& a_state,
-                      const Box& a_valid,
-                      const ProblemDomain& a_domain,
-                      Real a_dx)
+
+/* Return BC val -- based on parsed values and specified type */
+void mixBCValues(FArrayBox& a_state,
+                 const Box& a_valid,
+                 const ProblemDomain& a_domain,
+                 Real a_dx,
+                 bool a_homogeneous)
 {
-  // If box is outside of domain bounds ?
-  if(!a_domain.domainBox().contains(a_state.box())) {
-      for(int dir=0; dir<CH_SPACEDIM; ++dir) {
-          // don't do anything if periodic -- should be perio in y dir 1
-          if (!a_domain.isPeriodic(dir)) {
-              Box ghostBoxLo = adjCellBox(a_valid, dir, Side::Lo, 1);
-              Box ghostBoxHi = adjCellBox(a_valid, dir, Side::Hi, 1);
-
-              if ((!a_domain.domainBox().contains(ghostBoxLo)) && (a_state.box().contains(ghostBoxLo)) ) {
-                  // Neum
-                  Box fromRegion = ghostBoxLo;
-                  int isign = sign(Side::Lo);
-                  fromRegion.shift(dir, -isign);
-                  a_state.copy(a_state, fromRegion, 0, ghostBoxLo, 0, a_state.nComp());
-              } // End ghostBoxLo in dir
-
-              if ((!a_domain.domainBox().contains(ghostBoxHi)) && (a_state.box().contains(ghostBoxHi)) ) {
-                  // Neum
-                  Box fromRegion = ghostBoxHi;
-                  int isign = sign(Side::Hi);
-                  fromRegion.shift(dir, -isign);
-                  a_state.copy(a_state, fromRegion, 0, ghostBoxHi, 0, a_state.nComp());
-              } // End ghostBoxHi in dir
-
-          } // end if is not periodic in ith direction
-      } // end dir loop
-  }
-}
-
-
-void FixedNeumBCFill(FArrayBox& a_state,
-            const Box& a_valid,
-            const ProblemDomain& a_domain,
-            Real a_dx)
-{
-  // If box is outside of domain bounds ?
-  if(!a_domain.domainBox().contains(a_state.box())) {
-      for(int dir=0; dir<CH_SPACEDIM; ++dir) {
-          // don't do anything if periodic -- should be perio in y dir 1
-          if (!a_domain.isPeriodic(dir)) {
-              Box ghostBoxLo = adjCellBox(a_valid, dir, Side::Lo, 1);
-              Box ghostBoxHi = adjCellBox(a_valid, dir, Side::Hi, 1);
-
-              if ((!a_domain.domainBox().contains(ghostBoxLo)) && (a_state.box().contains(ghostBoxLo)) ) {
-                  // Neum
-                  Box fromRegion = ghostBoxLo;
-                  int isign = sign(Side::Lo);
-                  fromRegion.shift(dir, -isign);
-                  a_state.copy(a_state, fromRegion, 0, ghostBoxLo, 0, a_state.nComp());
-              } // End ghostBoxLo in dir
-
-              if ((!a_domain.domainBox().contains(ghostBoxHi)) && (a_state.box().contains(ghostBoxHi)) ) {
-                  // Neum
-                  Box fromRegion = ghostBoxHi;
-                  int isign = sign(Side::Hi);
-                  fromRegion.shift(dir, -isign);
-                  a_state.copy(a_state, fromRegion, 0, ghostBoxHi, 0, a_state.nComp());
-              } // End ghostBoxHi in dir
-
-          } // end if is not periodic in ith direction
-      } // end dir loop
-  }
-}
-
-
-void BCFill(FArrayBox& a_state,
-            const Box& a_valid,
-            const ProblemDomain& a_domain,
-            Real a_dx)
-{
-  // If box is outside of domain bounds ?
-  if(!a_domain.domainBox().contains(a_state.box())) {
-
-      if (!GlobalBCRS::s_areBCsParsed) {
-          ParseBC();
-      }
-
-      for(int dir=0; dir<CH_SPACEDIM; ++dir) {
-          // don't do anything if periodic -- should be perio in y dir 1
-          if (!a_domain.isPeriodic(dir)) {
-              Box ghostBoxLo = adjCellBox(a_valid, dir, Side::Lo, 1);
-              Box ghostBoxHi = adjCellBox(a_valid, dir, Side::Hi, 1);
-
-              if ((!a_domain.domainBox().contains(ghostBoxLo)) && (a_state.box().contains(ghostBoxLo)) ) {
-                  if (GlobalBCRS::s_bcLo[dir] == 0) {
-                      // Diri
-                      ghostBoxLo &= a_state.box();
-                      int isign = sign(Side::Lo);
-                      for (BoxIterator bit(ghostBoxLo); bit.ok(); ++bit) {
-                          IntVect ivTo = bit();
-                          IntVect ivClose = ivTo -   isign*BASISV(dir);
-                          IntVect ivFar   = ivTo - 2*isign*BASISV(dir);
-                          Real nearVal = a_state(ivClose, 0);
-                          Real farVal  = a_state(ivFar,   0);
-                          Real inhomogVal = DirichletValue(dir, Side::Lo);
-                          // linear or quad
-                          //Real ghostVal =  2.0 * inhomogVal - nearVal;
-                          Real ghostVal =  (8.0 / 3.0) * inhomogVal + (1.0 / 3.0) * farVal - 2.0 * nearVal;
-                          a_state(ivTo, 0) = ghostVal;
-                      }
-                  } else if (GlobalBCRS::s_bcLo[dir] == 1) {
-                      // Neum
-                      Box fromRegion = ghostBoxLo;
-                      int isign = sign(Side::Lo);
-                      fromRegion.shift(dir, -isign);
-                      a_state.copy(a_state, fromRegion, 0, ghostBoxLo, 0, a_state.nComp());
-                  } // End BC options
-              } // End ghostBoxLo in dir
-
-              if ((!a_domain.domainBox().contains(ghostBoxHi)) && (a_state.box().contains(ghostBoxHi)) ) {
-                  if (GlobalBCRS::s_bcHi[dir] == 0) {
-                      // Diri
-                      ghostBoxHi &= a_state.box();
-                      int isign = sign(Side::Hi);
-                      for (BoxIterator bit(ghostBoxHi); bit.ok(); ++bit) {
-                          IntVect ivTo = bit();
-                          IntVect ivClose = ivTo -   isign*BASISV(dir);
-                          IntVect ivFar   = ivTo - 2*isign*BASISV(dir);
-                          Real nearVal = a_state(ivClose, 0);
-                          Real farVal  = a_state(ivFar,   0);
-                          Real inhomogVal = DirichletValue(dir, Side::Hi);
-                          // linear or quad
-                          //Real ghostVal =  2.0 * inhomogVal - nearVal;
-                          Real ghostVal =  (8.0 / 3.0) * inhomogVal + (1.0 / 3.0) * farVal - 2.0 * nearVal;
-                          a_state(ivTo, 0) = ghostVal;
-                      }
-                  } else if (GlobalBCRS::s_bcHi[dir] == 1) {
-                      // Neum
-                      Box fromRegion = ghostBoxHi;
-                      int isign = sign(Side::Hi);
-                      fromRegion.shift(dir, -isign);
-                      a_state.copy(a_state, fromRegion, 0, ghostBoxHi, 0, a_state.nComp());
-                  } // End BC options
-              } // End ghostBoxHi in dir
-
-          } // end if is not periodic in ith direction
-      } // end dir loop
-  }
-}
-
-void 
-mixBCValues(FArrayBox& a_state,
-            const Box& a_valid,
-            const ProblemDomain& a_domain,
-            Real a_dx,
-            bool a_homogeneous)
-{
-  // If box is outside of domain bounds ?
   if(!a_domain.domainBox().contains(a_state.box())) {
 
       if (!GlobalBCRS::s_areBCsParsed) {
@@ -379,6 +238,42 @@ mixBCValues(FArrayBox& a_state,
       } // end dir loop
   }
 }
+
+void FixedNeumBCFill(FArrayBox& a_state,
+            const Box& a_valid,
+            const ProblemDomain& a_domain,
+            Real a_dx)
+{
+  if(!a_domain.domainBox().contains(a_state.box())) {
+      for(int dir=0; dir<CH_SPACEDIM; ++dir) {
+          // don't do anything if periodic -- should be perio in y dir 1
+          if (!a_domain.isPeriodic(dir)) {
+              Box ghostBoxLo = adjCellBox(a_valid, dir, Side::Lo, 1);
+              Box ghostBoxHi = adjCellBox(a_valid, dir, Side::Hi, 1);
+
+              if ((!a_domain.domainBox().contains(ghostBoxLo)) && (a_state.box().contains(ghostBoxLo)) ) {
+                  // Neum
+                  Box fromRegion = ghostBoxLo;
+                  int isign = sign(Side::Lo);
+                  fromRegion.shift(dir, -isign);
+                  a_state.copy(a_state, fromRegion, 0, ghostBoxLo, 0, a_state.nComp());
+              } // End ghostBoxLo in dir
+
+              if ((!a_domain.domainBox().contains(ghostBoxHi)) && (a_state.box().contains(ghostBoxHi)) ) {
+                  // Neum
+                  Box fromRegion = ghostBoxHi;
+                  int isign = sign(Side::Hi);
+                  fromRegion.shift(dir, -isign);
+                  a_state.copy(a_state, fromRegion, 0, ghostBoxHi, 0, a_state.nComp());
+              } // End ghostBoxHi in dir
+
+          } // end if is not periodic in ith direction
+      } // end dir loop
+  }
+}
+
+
+
 
 
 /* This function forces the ghost cells on the domain boundaries of a_state to be 0 -- no linear interpolation */ 
@@ -2183,7 +2078,7 @@ AmrHydro::timeStep(Real a_dt)
             const Box& validBox = levelGrids.get(dit);
 
             // Fill BC ghost cells of h and b
-            BCFill(currentH[dit], validBox, m_amrDomains[lev], m_amrDx[lev][0]);
+            mixBCValues(currentH[dit], validBox, m_amrDomains[lev], m_amrDx[lev][0], false);
             FixedNeumBCFill(currentB[dit], validBox, m_amrDomains[lev], m_amrDx[lev][0]);
 
             // Copy curr into old -- copy ghost cells too 
@@ -2250,7 +2145,7 @@ AmrHydro::timeStep(Real a_dt)
             for (dit.begin(); dit.ok(); ++dit) {
                 // get the validBox & fill BC ghost cells
                 const Box& validBox = levelGrids.get(dit);
-                BCFill(levelcurH[dit], validBox, m_amrDomains[lev], m_amrDx[lev][0]);
+                mixBCValues(levelcurH[dit], validBox, m_amrDomains[lev], m_amrDx[lev][0], false);
                 FixedNeumBCFill(levelcurB[dit], validBox, m_amrDomains[lev], m_amrDx[lev][0]);
 
                 levelnewH_lag[dit].copy(levelcurH[dit], 0, 0, 1); // should copy ghost cells too !
@@ -3190,7 +3085,7 @@ AmrHydro::timeStepFAS(Real a_dt)
             const Box& validBox = levelGrids.get(dit);
 
             // Fill BC ghost cells of h and b
-            BCFill(currentH[dit], validBox, m_amrDomains[lev], m_amrDx[lev][0]);
+            mixBCValues(currentH[dit], validBox, m_amrDomains[lev], m_amrDx[lev][0], false);
             FixedNeumBCFill(currentB[dit], validBox, m_amrDomains[lev], m_amrDx[lev][0]);
 
             // Copy curr into old -- copy ghost cells too 
@@ -3252,7 +3147,7 @@ AmrHydro::timeStepFAS(Real a_dt)
             for (dit.begin(); dit.ok(); ++dit) {
                 // get the validBox & fill BC ghost cells
                 const Box& validBox = levelGrids.get(dit);
-                BCFill(levelcurH[dit], validBox, m_amrDomains[lev], m_amrDx[lev][0]);
+                mixBCValues(levelcurH[dit], validBox, m_amrDomains[lev], m_amrDx[lev][0], false);
                 FixedNeumBCFill(levelcurB[dit], validBox, m_amrDomains[lev], m_amrDx[lev][0]);
 
                 levelnewH_lag[dit].copy(levelcurH[dit], 0, 0, 1); // should copy ghost cells too !
@@ -3812,7 +3707,7 @@ AmrHydro::timeStepFAS(Real a_dt)
             const Box& validBox = levelGrids.get(dit);
 
             // Fill BC ghost cells of h and b
-            BCFill(levelH[dit], validBox, m_amrDomains[lev], m_amrDx[lev][0]);
+            mixBCValues(levelH[dit], validBox, m_amrDomains[lev], m_amrDx[lev][0], false);
         }
 
         /* Re evaluate Re with fresh h */
