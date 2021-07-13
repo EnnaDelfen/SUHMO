@@ -111,11 +111,6 @@ public:
                        LevelData<FluxBox>&    levelRe, 
                        LevelData<FluxBox>&    levelB);
 
-    void aCoeff_bCoeff_CC(LevelData<FArrayBox>&   levelacoef, 
-                           LevelData<FArrayBox>&  levelbcoef_cc, 
-                           LevelData<FArrayBox>&  levelRe, 
-                           LevelData<FArrayBox>&  levelB);
-
     void CalcRHS_head( int currlev, 
                        LevelData<FArrayBox>& levelRHS_h, 
                        LevelData<FArrayBox>& levelPi, 

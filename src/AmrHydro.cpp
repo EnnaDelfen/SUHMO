@@ -1409,7 +1409,6 @@ AmrHydro::evaluate_Qw_ec(int lev,
                             CHF_FRA(Qwater_ec[dir]),
                             CHF_CONST_REAL(m_suhmoParm->m_omega),
                             CHF_CONST_REAL(m_suhmoParm->m_nu) );
-
         } 
     }
 }
@@ -1468,23 +1467,15 @@ AmrHydro::evaluate_Re_quadratic(int lev, bool computeGrad)
     DisjointBoxLayout& levelGrids       = m_amrGrids[lev];
     DataIterator dit                    = levelGrids.dataIterator();
     for (dit.begin(); dit.ok(); ++dit) {
-        FArrayBox& Re      = levelRe[dit];
-        FArrayBox& GradHcc = levelgradH[dit];
-        FArrayBox& B       = levelB[dit];
 
-        BoxIterator bit(Re.box()); // can use gridBox? 
-        for (bit.begin(); bit.ok(); ++bit) {
-            IntVect iv = bit();
-            // Update Re using GradH at CC
-            Real sqrt_gradH_cc = std::sqrt(GradHcc(iv, 0) * GradHcc(iv, 0) + GradHcc(iv, 1) * GradHcc(iv, 1));
-            Real discr = 1.0 + 4.0 * m_suhmoParm->m_omega * (
-                         std::pow(B(iv, 0), 3) * m_suhmoParm->m_gravity * sqrt_gradH_cc) / (
-                         12.0 * m_suhmoParm->m_nu * m_suhmoParm->m_nu);  
-            Re(iv, 0) = (- 1.0 + std::sqrt(discr)) / (2.0 * m_suhmoParm->m_omega) ; 
-            if(Re(iv, 0) < 0.0 ) {
-                pout() << iv << " " << Re(iv, 0) << "\n";
-            }
-        }
+        const Box& region = levelRe[dit].box();
+
+        FORT_COMPUTERE( CHF_FRA(levelB[dit]),
+                            CHF_FRA(levelgradH[dit]),
+                            CHF_BOX(region),
+                            CHF_FRA(levelRe[dit]),
+                            CHF_CONST_REAL(m_suhmoParm->m_omega),
+                            CHF_CONST_REAL(m_suhmoParm->m_nu) );
     }
 }
 
@@ -1527,35 +1518,6 @@ AmrHydro::aCoeff_bCoeff(LevelData<FArrayBox>&  levelacoef,
     }
 }
 
-
-void
-AmrHydro::aCoeff_bCoeff_CC(LevelData<FArrayBox>&  levelacoef, 
-                           LevelData<FArrayBox>&  levelbcoef_cc, 
-                           LevelData<FArrayBox>&  levelRe, 
-                           LevelData<FArrayBox>&  levelB)
-{
-    DataIterator dit = levelbcoef_cc.dataIterator();
-    for (dit.begin(); dit.ok(); ++dit) {
-
-        FArrayBox& B      = levelB[dit];
-        FArrayBox& aC     = levelacoef[dit];
-        FArrayBox& bC_cc  = levelbcoef_cc[dit];
-        FArrayBox& Re     = levelRe[dit];
-
-        // initialize 
-        aC.setVal(0.0);
-        bC_cc.setVal(0.0);
-
-        BoxIterator bit(bC_cc.box()); 
-        for (bit.begin(); bit.ok(); ++bit) {
-            IntVect iv = bit();
-            // Update b coeff
-            Real num_q = - std::pow(B(iv, 0),3) * m_suhmoParm->m_gravity;
-            Real denom_q = 12.0 * m_suhmoParm->m_nu * (1 + m_suhmoParm->m_omega * Re(iv, 0));
-            bC_cc(iv, 0) = num_q/denom_q;
-        }
-    }
-}
 
 void 
 AmrHydro::Calc_moulin_source_term_distributed (LevelData<FArrayBox>& levelMoulinSrc) 
