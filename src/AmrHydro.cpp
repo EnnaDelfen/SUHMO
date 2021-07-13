@@ -1199,7 +1199,7 @@ void AmrHydro::WFlx_level(LevelData<FluxBox>&          a_bcoef,
         //    pout() << "Re for iv " << iv << " " << Re(iv, 0) << "\n";
         //}
 
-        const Box& region = levelGrids[dit];
+        const Box& region = lvlRe[dit].box();
 
         FORT_COMPUTERE( CHF_FRA(a_B[dit]),
                         CHF_FRA(lvlgradH[dit]),
@@ -1208,7 +1208,6 @@ void AmrHydro::WFlx_level(LevelData<FluxBox>&          a_bcoef,
                         CHF_CONST_REAL(m_suhmoParm->m_omega),
                         CHF_CONST_REAL(m_suhmoParm->m_nu) );
     }
-            MayDay::Error("Abort");
 
     if (a_print_WFX) {
         /* custom plt here -- debug print */
