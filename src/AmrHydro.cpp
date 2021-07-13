@@ -1184,20 +1184,32 @@ void AmrHydro::WFlx_level(LevelData<FluxBox>&          a_bcoef,
     // Compute Re
     LevelData<FArrayBox> lvlRe(levelGrids, 1, a_u.ghostVect() ); 
     for (dit.begin(); dit.ok(); ++dit) {
-        FArrayBox& GradH   = lvlgradH[dit];
-        FArrayBox& B       = a_B[dit];
-        FArrayBox& Re      = lvlRe[dit];
+        //FArrayBox& GradH   = lvlgradH[dit];
+        //FArrayBox& B       = a_B[dit];
+        //FArrayBox& Re      = lvlRe[dit];
 
-        BoxIterator bit(Re.box()); // can use gridBox? 
-        for (bit.begin(); bit.ok(); ++bit) {
-            IntVect iv = bit();
-            Real sqrt_gradH_cc = std::sqrt(GradH(iv, 0) * GradH(iv, 0) + GradH(iv, 1) * GradH(iv, 1));
-            Real discr = 1.0 + 4.0 * m_suhmoParm->m_omega * (
-                        std::pow(B(iv, 0), 3) * m_suhmoParm->m_gravity * sqrt_gradH_cc) / (
-                        12.0 * m_suhmoParm->m_nu * m_suhmoParm->m_nu);  
-            Re(iv, 0) = (- 1.0 + std::sqrt(discr)) / (2.0 * m_suhmoParm->m_omega) ; 
-        }
+        //BoxIterator bit(Re.box()); // can use gridBox? 
+        //for (bit.begin(); bit.ok(); ++bit) {
+        //    IntVect iv = bit();
+        //    Real sqrt_gradH_cc = std::sqrt(GradH(iv, 0) * GradH(iv, 0) + GradH(iv, 1) * GradH(iv, 1));
+        //    Real discr = 1.0 + 4.0 * m_suhmoParm->m_omega * (
+        //                std::pow(B(iv, 0), 3) * m_suhmoParm->m_gravity * sqrt_gradH_cc) / (
+        //                12.0 * m_suhmoParm->m_nu * m_suhmoParm->m_nu);  
+        //    Re(iv, 0) = (- 1.0 + std::sqrt(discr)) / (2.0 * m_suhmoParm->m_omega) ; 
+        //    pout() << "Re for iv " << iv << " " << Re(iv, 0) << "\n";
+        //}
+
+        const Box& region = levelGrids[dit];
+
+        FORT_COMPUTERE( CHF_FRA(a_B[dit]),
+                        CHF_FRA(lvlgradH[dit]),
+                        CHF_BOX(region),
+                        CHF_FRA(lvlRe[dit]),
+                        CHF_CONST_REAL(m_suhmoParm->m_omega),
+                        CHF_CONST_REAL(m_suhmoParm->m_nu) );
     }
+            MayDay::Error("Abort");
+
     if (a_print_WFX) {
         /* custom plt here -- debug print */
             int nStuffToPlot = 4;
