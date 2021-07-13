@@ -13,12 +13,12 @@ C     subroutine COMPUTENONLINEARTERMS
 C     computes the NL and dNL pieces
 C
 C     INPUTS/OUTPUTS:
-C     NL        =>  NL piece
-C     dNL       =>  derivative of NL piece
 C     phi       =>  phi 
 C     aB        =>  Gap Height 
 C     aPi       =>  Ice Pressure 
 C     aZb       =>  Bed  Height
+C     NL        =>  NL piece
+C     dNL       =>  derivative of NL piece
 C     ------------------------------------------------------------------
       subroutine COMPUTENONLINEARTERMS(
      &     CHF_CONST_FRA[phi],
@@ -34,6 +34,7 @@ C     ------------------------------------------------------------------
       integer CHF_DDECL[i;j;k]
 
       CHF_MULTIDO[region; i; j; k]
+
          nlfunc(CHF_IX[i;j;k],0) = - Aparam * aB(CHF_IX[i;j  ;k  ],0) * 
      &                            (aPi(CHF_IX[i;j  ;k  ],0) - 1000.0 * 9.8 * (phi(CHF_IX[i;j  ;k  ],0) - aZb(CHF_IX[i;j  ;k  ],0)))  *
      &                            (aPi(CHF_IX[i;j  ;k  ],0) - 1000.0 * 9.8 * (phi(CHF_IX[i;j  ;k  ],0) - aZb(CHF_IX[i;j  ;k  ],0)))  *
@@ -48,6 +49,45 @@ C     ------------------------------------------------------------------
              nlfunc(CHF_IX[i;j;k],0)  = nlfunc(CHF_IX[i;j;k],0) * (1.0 - (brparam - aB(CHF_IX[i;j  ;k  ],0)) / brparam )
              dnlfunc(CHF_IX[i;j;k],0) = dnlfunc(CHF_IX[i;j;k],0) * aB(CHF_IX[i;j  ;k  ],0) /  brparam 
          endif
+
+      CHF_ENDDO
+
+      return
+      end
+
+
+
+C     -----------------------------------------------------------------
+C     subroutine COMPUTERE
+C     computes the Reynolds number
+C
+C     INPUTS/OUTPUTS:
+C     gradH     =>  Gradient of Head
+C     aB        =>  Gap Height 
+C     Re        =>  Reynolds
+C     ------------------------------------------------------------------
+      subroutine COMPUTERE(
+     &     CHF_CONST_FRA[aB],
+     &     CHF_CONST_FRA[agradH],
+     &     CHF_BOX[region],
+     &     CHF_CONST_FRA[Re],
+     &     CHF_CONST_REAL[omegaparam],
+     &     CHF_CONST_REAL[nuparam]) 
+    
+      REAL_T sqrt_gradH_cc, discr 
+      integer CHF_DDECL[i;j;k]
+
+      discr = 0.025
+      PRINT*, discr
+      CHF_MULTIDO[region; i; j; k]
+
+         sqrt_gradH_cc = sqrt(agradH(CHF_IX[i;j  ;k  ],0) * agradH(CHF_IX[i;j  ;k  ],0) + agradH(CHF_IX[i;j  ;k  ],1) * agradH(CHF_IX[i;j  ;k  ],1)) 
+         discr         =  1.0 + 4.0 * omegaparam * ( aB(CHF_IX[i;j  ;k  ],0)  * aB(CHF_IX[i;j  ;k  ],0)  * aB(CHF_IX[i;j  ;k  ],0) *
+     &                     9.8 * sqrt_gradH_cc ) / ( 12.0 * nuparam * nuparam )
+
+         Re(CHF_IX[i;j;k],0) = (- 1.0 + sqrt(discr)) / (2.0 * omegaparam) 
+C         print *, "Re for iv "
+C                , CHF_IX[i;j;k], " ", Re(CHF_IX[i;j;k],0)
 
       CHF_ENDDO
 
