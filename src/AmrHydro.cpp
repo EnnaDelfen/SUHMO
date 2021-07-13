@@ -175,7 +175,7 @@ void DirichletValue(Real* pos,
 }
 
 
-/* Return BC val -- based on parsed values and specified type */
+/* Return BC val -- based on parsed conditions and values */
 void mixBCValues(FArrayBox& a_state,
                  const Box& a_valid,
                  const ProblemDomain& a_domain,
@@ -239,10 +239,14 @@ void mixBCValues(FArrayBox& a_state,
   }
 }
 
+
+/* BC FOR ANY VAR */
+
+/* For any var -- not just Head because based on adj val */
 void FixedNeumBCFill(FArrayBox& a_state,
-            const Box& a_valid,
-            const ProblemDomain& a_domain,
-            Real a_dx)
+                     const Box& a_valid,
+                     const ProblemDomain& a_domain,
+                     Real a_dx)
 {
   if(!a_domain.domainBox().contains(a_state.box())) {
       for(int dir=0; dir<CH_SPACEDIM; ++dir) {
@@ -271,9 +275,6 @@ void FixedNeumBCFill(FArrayBox& a_state,
       } // end dir loop
   }
 }
-
-
-
 
 
 /* This function forces the ghost cells on the domain boundaries of a_state to be 0 -- no linear interpolation */ 
@@ -313,6 +314,10 @@ void NullBCFill(FArrayBox& a_state,
 }
 
 
+
+/* AmrHydro class functions */
+
+/* Solve for head with NL piece of operator provided as ext func */
 void
 AmrHydro::SolveForHead_nl(const Vector<DisjointBoxLayout>&               a_grids,
                           Vector<RefCountedPtr<LevelData<FArrayBox> > >& a_aCoef,
@@ -397,7 +402,7 @@ AmrHydro::SolveForHead_nl(const Vector<DisjointBoxLayout>&               a_grids
     amrSolver->solve(a_head, a_RHS, m_finest_level, 0, zeroInitialGuess);
 }
 
-/* AmrHydro class functions */
+/* Solve for head with L operator */
 void
 AmrHydro::SolveForHead(const Vector<DisjointBoxLayout>&               a_grids,
                       Vector<RefCountedPtr<LevelData<FArrayBox> > >& a_aCoef,
@@ -410,7 +415,6 @@ AmrHydro::SolveForHead(const Vector<DisjointBoxLayout>&               a_grids,
 {
     VCAMRPoissonOp2Factory* poissonOpF_head = new VCAMRPoissonOp2Factory;
 
-    //BCHolder bc(ConstDiriNeumBC(IntVect::Unit, RealVect::Unit,  IntVect::Zero, RealVect::Zero));
     poissonOpF_head->define(a_domains[0],
                       a_grids,
                       refRatio,
@@ -914,7 +918,6 @@ AmrHydro::initialize()
         }
 
 
-
         int finest_level = -1;
         if (usePredefinedGrids) {
             setupFixedGrids(gridFile);
@@ -992,7 +995,6 @@ AmrHydro::initialize()
     }
 
     // finally, set up covered_level flags
-    // AF that part is a little fuzzy
     m_covered_level.resize(m_max_level + 1, 0);
     // note that finest level can't be covered.
     for (int lev = m_finest_level - 1; lev >= 0; lev--) {
@@ -1019,7 +1021,7 @@ AmrHydro::initialize()
     }
 }
 
-// set BC for head ?
+// Init conditions
 void
 AmrHydro::setIBC(HydroIBC* a_IBC)
 {
@@ -1085,9 +1087,9 @@ AmrHydro::run(Real a_max_time, int a_max_step)
 
             /* core */
             if ((m_use_FAS) && (m_use_NL)) {
-                timeStepFAS(dt);
+                timeStepFAS(dt);               // we really want to use this
             } else {
-                timeStep(dt);
+                timeStep(dt);                  // not updated
             }
 
         } // end of plot_time_interval
@@ -1308,47 +1310,6 @@ void AmrHydro::NonLinear_level(LevelData<FArrayBox>&        a_NL,
   }
 }
 
-void AmrHydro::NonLinear(Vector<LevelData<FArrayBox>* >        a_NL,
-                         Vector<LevelData<FArrayBox>* >        a_dNL, 
-                         const Vector<LevelData<FArrayBox>* >  a_u,
-                         int a_finestLevel)
-{
-
-  for (int lev=0; lev<=a_finestLevel; lev++) {
-
-    LevelData<FArrayBox>& levelNL   = *(a_NL[lev]);
-    LevelData<FArrayBox>& leveldNL  = *(a_dNL[lev]);
-    LevelData<FArrayBox>& levelU    = *(a_u[lev]);
-
-    LevelData<FArrayBox>& levelB     = *m_gapheight[lev];
-    LevelData<FArrayBox>& levelPi    = *m_overburdenpress[lev];
-    LevelData<FArrayBox>& levelZb    = *m_bedelevation[lev];
-
-    DataIterator levelDit = levelNL.dataIterator();
-    for (levelDit.begin(); levelDit.ok(); ++levelDit) {
-
-        FArrayBox& thisNL    = levelNL[levelDit];
-        FArrayBox& thisdNL   = leveldNL[levelDit];
-        FArrayBox& thisU     = levelU[levelDit];
-
-        FArrayBox& B         = levelB[levelDit];
-        FArrayBox& Pressi    = levelPi[levelDit];
-        FArrayBox& Zb        = levelZb[levelDit];
-
-        BoxIterator bit(thisNL.box());
-        for (bit.begin(); bit.ok(); ++bit) {
-            IntVect iv = bit();
-            pout() << "Press ? " << iv << " " << Pressi(iv,0) << "\n";
-            thisNL(iv, 0)  = m_suhmoParm->m_A * B(iv,0) * 
-                             std::pow( (Pressi(iv,0) - m_suhmoParm->m_rho_w * m_suhmoParm->m_gravity *
-                             (thisU(iv,0) - Zb(iv,0))), 3);
-            thisdNL(iv, 0) = - 3.0 * m_suhmoParm->m_A * B(iv,0) * m_suhmoParm->m_rho_w *m_suhmoParm->m_gravity *
-                             ( std::pow( (Pressi(iv,0) - m_suhmoParm->m_rho_w * m_suhmoParm->m_G * 
-                             (thisU(iv,0) - Zb(iv,0))), 2));
-        }
-    } // end loop over grids on this level
-  } // end loop over levels
-}
 
 void
 AmrHydro::compute_grad_zb_ec(int                 lev,
@@ -1684,6 +1645,7 @@ AmrHydro::Calc_moulin_source_term_distributed (LevelData<FArrayBox>& levelMoulin
 
 }
 
+/* really should be deprecated */
 void 
 AmrHydro::Calc_moulin_source_term (LevelData<FArrayBox>& levelMoulinSrc) 
 {
@@ -1784,6 +1746,8 @@ AmrHydro::Calc_moulin_source_term (LevelData<FArrayBox>& levelMoulinSrc)
    }
 }
 
+
+/* really should be deprecated */
 void
 AmrHydro::CalcRHS_head(int curr_level, 
                        LevelData<FArrayBox>& levelRHS_h, 
@@ -1879,6 +1843,7 @@ AmrHydro::CalcRHS_gapHeightFAS(LevelData<FArrayBox>& levelRHS_b,
 }
 
 
+/* really should be deprecated */
 void
 AmrHydro::CalcRHS_gapHeight(LevelData<FArrayBox>& levelRHS_b, 
                             LevelData<FArrayBox>& levelPi, 
@@ -1933,7 +1898,7 @@ AmrHydro::CalcRHS_gapHeight(LevelData<FArrayBox>& levelRHS_b,
    }
 }
 
-/* core of advance routine */
+/* deprecated core of advance routine */
 void
 AmrHydro::timeStep(Real a_dt)
 {
@@ -5104,7 +5069,7 @@ AmrHydro::writePltWFX(int numPlotComps,
     }
 }
 
-/// write hdf5 plotfile to the standard location
+// write custom debug hdf5 plotfile to the standard location
 void
 AmrHydro::writePltCustom(int numPlotComps, 
                          Vector<std::string>& vectName,
@@ -5175,7 +5140,7 @@ AmrHydro::writePltCustom(int numPlotComps,
 }
 
 
-/// write hdf5 plotfile to the standard location
+// write hdf5 plotfile to the standard location
 void
 AmrHydro::writePlotFile()
 {
@@ -5357,7 +5322,7 @@ AmrHydro::writePlotFile()
     }
 }
 
-/// write checkpoint file out for later restarting
+// write checkpoint file out for later restarting
 void
 AmrHydro::writeCheckpointFile() const
 {
@@ -5503,7 +5468,7 @@ AmrHydro::writeCheckpointFile() const
     handle.close();
 }
 
-/// read checkpoint file for restart
+// read checkpoint file for restart
 void
 AmrHydro::readCheckpointFile(HDF5Handle& a_handle)
 {
@@ -5814,7 +5779,7 @@ AmrHydro::readCheckpointFile(HDF5Handle& a_handle)
 
 }
 
-/// set up for restart
+// set up for restart
 void
 AmrHydro::restart(string& a_restart_file)
 {

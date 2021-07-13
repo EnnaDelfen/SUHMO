@@ -94,11 +94,6 @@ public:
                     int                          a_smooth,
                     int                          a_depth);
 
-    void NonLinear(Vector<LevelData<FArrayBox>* >        a_NL,
-                   Vector<LevelData<FArrayBox>* >        a_dNL, 
-                   const Vector<LevelData<FArrayBox>* >  a_u,
-                   int a_finestLevel);
-
     void compute_grad_zb_ec(int                 lev,
                             LevelData<FluxBox>& a_levelgradZb_ec);
  
