@@ -98,3 +98,44 @@ C     ------------------------------------------------------------------
 
       return
       end
+
+
+C     -----------------------------------------------------------------
+C     subroutine COMPUTEQW
+C     computes the comps of qw 
+C
+C     INPUTS/OUTPUTS:
+C     aB        =>  EC Gap Height 
+C     aRe       =>  EC Reynolds
+C     gradH     =>  EC Gradient of Head
+C     Qw        =>  EC Qw
+C     ------------------------------------------------------------------
+      subroutine COMPUTEQW(
+     &     CHF_CONST_FRA[aB],
+     &     CHF_CONST_FRA[aRe],
+     &     CHF_CONST_FRA[agradH],
+     &     CHF_BOX[region],
+     &     CHF_CONST_FRA[Qw],
+     &     CHF_CONST_REAL[omegaparam],
+     &     CHF_CONST_REAL[nuparam]) 
+    
+      REAL_T num_q, denom_q
+      integer CHF_DDECL[i;j;k]
+
+      CHF_MULTIDO[region; i; j; k]
+
+         num_q = - ( aB(CHF_IX[i;j  ;k  ],0) 
+     &             * aB(CHF_IX[i;j  ;k  ],0)  
+     &             * aB(CHF_IX[i;j  ;k  ],0)  
+     &             * 9.8  
+     &             * agradH(CHF_IX[i;j  ;k  ],0) )  
+     &                  
+         denom_q  =  12.0 * nuparam * ( 1.0 +
+     &               omegaparam * aRe(CHF_IX[i;j  ;k  ],0) ) 
+
+         Qw(CHF_IX[i;j;k],0) = num_q / denom_q
+
+      CHF_ENDDO
+
+      return
+      end

@@ -1184,20 +1184,6 @@ void AmrHydro::WFlx_level(LevelData<FluxBox>&          a_bcoef,
     // Compute Re
     LevelData<FArrayBox> lvlRe(levelGrids, 1, a_u.ghostVect() ); 
     for (dit.begin(); dit.ok(); ++dit) {
-        //FArrayBox& GradH   = lvlgradH[dit];
-        //FArrayBox& B       = a_B[dit];
-        //FArrayBox& Re      = lvlRe[dit];
-
-        //BoxIterator bit(Re.box()); // can use gridBox? 
-        //for (bit.begin(); bit.ok(); ++bit) {
-        //    IntVect iv = bit();
-        //    Real sqrt_gradH_cc = std::sqrt(GradH(iv, 0) * GradH(iv, 0) + GradH(iv, 1) * GradH(iv, 1));
-        //    Real discr = 1.0 + 4.0 * m_suhmoParm->m_omega * (
-        //                std::pow(B(iv, 0), 3) * m_suhmoParm->m_gravity * sqrt_gradH_cc) / (
-        //                12.0 * m_suhmoParm->m_nu * m_suhmoParm->m_nu);  
-        //    Re(iv, 0) = (- 1.0 + std::sqrt(discr)) / (2.0 * m_suhmoParm->m_omega) ; 
-        //    pout() << "Re for iv " << iv << " " << Re(iv, 0) << "\n";
-        //}
 
         const Box& region = lvlRe[dit].box();
 
@@ -1413,18 +1399,17 @@ AmrHydro::evaluate_Qw_ec(int lev,
 
         // loop over directions
         for (int dir = 0; dir<SpaceDim; dir++) {
-            FArrayBox& Qwater_ecFab = Qwater_ec[dir];
-            FArrayBox& currB_ecFab  = currB_ec[dir];
-            FArrayBox& Re_ecFab     = Re_ec[dir];
-            FArrayBox& gradH_ecFab  = gradH_ec[dir];
 
-            BoxIterator bitEC(Qwater_ecFab.box()); // can use gridBox? 
-            for (bitEC.begin(); bitEC.ok(); ++bitEC) {
-                IntVect iv = bitEC();
-                Real num_q = - std::pow(currB_ecFab(iv, 0),3) * m_suhmoParm->m_gravity * gradH_ecFab(iv, 0);
-                Real denom_q = 12.0 * m_suhmoParm->m_nu * (1 + m_suhmoParm->m_omega * Re_ecFab(iv, 0));
-                Qwater_ecFab(iv, 0) = num_q/denom_q;
-            }
+            const Box& region = Qwater_ec[dir].box();
+
+            FORT_COMPUTEQW( CHF_FRA(currB_ec[dir]),
+                            CHF_FRA(Re_ec[dir]),
+                            CHF_FRA(gradH_ec[dir]),
+                            CHF_BOX(region),
+                            CHF_FRA(Qwater_ec[dir]),
+                            CHF_CONST_REAL(m_suhmoParm->m_omega),
+                            CHF_CONST_REAL(m_suhmoParm->m_nu) );
+
         } 
     }
 }
