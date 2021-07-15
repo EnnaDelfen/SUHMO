@@ -139,3 +139,37 @@ C     ------------------------------------------------------------------
 
       return
       end
+
+
+C     -----------------------------------------------------------------
+C     subroutine COMPUTESCAPROD
+C     simple multiplication
+C
+C     INPUTS/OUTPUTS:
+C     vara      =>  first product
+C     varb1/2   =>  second product
+C     prod1/2   =>  Result
+C     ------------------------------------------------------------------
+      subroutine COMPUTESCAPROD(
+     &     CHF_CONST_FRA[vara],
+     &     CHF_CONST_FRA[var1b],
+     &     CHF_CONST_FRA[var2b],
+     &     CHF_BOX[region],
+     &     CHF_CONST_FRA[prod1],
+     &     CHF_CONST_FRA[prod2]) 
+    
+      REAL_T num_q, denom_q
+      integer CHF_DDECL[i;j;k]
+
+      CHF_MULTIDO[region; i; j; k]
+
+         prod1(CHF_IX[i;j;k],0) = vara(CHF_IX[i;j  ;k  ],0) 
+     &             * var1b(CHF_IX[i;j  ;k  ],0)  
+
+         prod2(CHF_IX[i;j;k],0) = vara(CHF_IX[i;j  ;k  ],0)
+     &             * var2b(CHF_IX[i;j  ;k  ],0)  
+
+      CHF_ENDDO
+
+      return
+      end

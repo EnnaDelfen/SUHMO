@@ -3704,19 +3704,15 @@ AmrHydro::timeStepFAS(Real a_dt)
 
             // loop over directions
             for (int dir = 0; dir<SpaceDim; dir++) {
-                FArrayBox& Qwater_ecFab = Qwater_ec[dir];
-                FArrayBox& gradH_ecFab  = gradH_ec[dir];
-                FArrayBox& gradZb_ecFab = gradZb_ec[dir];
-                FArrayBox& tmp_ecFab    = tmp_ec[dir];
-                FArrayBox& tmp2_ecFab   = tmp2_ec[dir];
 
-                BoxIterator bitEC(Qwater_ecFab.box()); 
+                const Box& region = tmp_ec[dir].box();
 
-                for (bitEC.begin(); bitEC.ok(); ++bitEC) {
-                    IntVect iv = bitEC();
-                    tmp_ecFab(iv, 0)  = Qwater_ecFab(iv, 0) * gradH_ecFab(iv, 0);
-                    tmp2_ecFab(iv, 0) = Qwater_ecFab(iv, 0) * gradZb_ecFab(iv, 0) ;
-                }
+                FORT_COMPUTESCAPROD( CHF_FRA(Qwater_ec[dir]),
+                                     CHF_FRA(gradH_ec[dir]),
+                                     CHF_FRA(gradZb_ec[dir]),
+                                     CHF_BOX(region),
+                                     CHF_FRA(tmp_ec[dir]),
+                                     CHF_FRA(tmp2_ec[dir]) );
             } // loop over dir
         }
         // Qw gradH
