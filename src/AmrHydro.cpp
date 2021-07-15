@@ -1247,24 +1247,15 @@ void AmrHydro::WFlx_level(LevelData<FluxBox>&          a_bcoef,
         FluxBox& Re_ec     = lvlRe_ec[dit];
         // loop over directions
         for (int dir = 0; dir<SpaceDim; dir++) {
-            FArrayBox& bCFab = bC[dir];
-            FArrayBox& BFab  = B_ec[dir];
-            FArrayBox& ReFab = Re_ec[dir];
 
-            // initialize 
-            bCFab.setVal(0.0);
+            const Box& region = bC[dir].box();
 
-            BoxIterator bit(bCFab.box()); 
-            for (bit.begin(); bit.ok(); ++bit) {
-                IntVect iv = bit();
-                // Update b coeff
-                Real num_q = - std::pow(BFab(iv, 0),3) * m_suhmoParm->m_gravity;
-                Real denom_q = 12.0 * m_suhmoParm->m_nu * (1 + m_suhmoParm->m_omega * ReFab(iv, 0));
-                bCFab(iv, 0) = num_q/denom_q;
-                if (bCFab(iv, 0) >= 0.0) {
-                    pout() << " --(dx= "<< a_dx<<") cell dir Bc-EC " << iv << " " << dir << " " << bCFab(iv, 0) << "\n";
-                }
-            }
+            FORT_COMPUTEBCOEFF( CHF_FRA(B_ec[dir]),
+                                CHF_FRA(Re_ec[dir]),
+                                CHF_BOX(region),
+                                CHF_FRA(bC[dir]),
+                                CHF_CONST_REAL(m_suhmoParm->m_omega),
+                                CHF_CONST_REAL(m_suhmoParm->m_nu) );
         }
     }
 
@@ -1499,21 +1490,15 @@ AmrHydro::aCoeff_bCoeff(LevelData<FArrayBox>&  levelacoef,
         // loop over directions
         for (int dir = 0; dir<SpaceDim; dir++) {
 
-            FArrayBox& bCFab = bC[dir];
-            FArrayBox& BFab  = B[dir];
-            FArrayBox& ReFab = Re[dir];
+            const Box& region = bC[dir].box();
 
-            // initialize 
-            bCFab.setVal(0.0);
+            FORT_COMPUTEBCOEFF( CHF_FRA(B[dir]),
+                                CHF_FRA(Re[dir]),
+                                CHF_BOX(region),
+                                CHF_FRA(bC[dir]),
+                                CHF_CONST_REAL(m_suhmoParm->m_omega),
+                                CHF_CONST_REAL(m_suhmoParm->m_nu) );
 
-            BoxIterator bit(bCFab.box()); 
-            for (bit.begin(); bit.ok(); ++bit) {
-                IntVect iv = bit();
-                // Update b coeff
-                Real num_q = - std::pow(BFab(iv, 0),3) * m_suhmoParm->m_gravity;
-                Real denom_q = 12.0 * m_suhmoParm->m_nu * (1 + m_suhmoParm->m_omega * ReFab(iv, 0));
-                bCFab(iv, 0) = num_q/denom_q;
-            }
         }
     }
 }
@@ -3340,19 +3325,16 @@ AmrHydro::timeStepFAS(Real a_dt)
 
                 // loop over directions
                 for (int dir = 0; dir<SpaceDim; dir++) {
-                    FArrayBox& Qwater_ecFab = Qwater_ec[dir];
-                    FArrayBox& gradH_ecFab  = gradH_ec[dir];
-                    FArrayBox& tmp_ecFab    = tmp_ec[dir];
-                    FArrayBox& gradZb_ecFab = gradZb_ec[dir];
-                    FArrayBox& tmp2_ecFab   = tmp2_ec[dir];
 
-                    BoxIterator bitEC(Qwater_ecFab.box()); 
+                    const Box& region = tmp_ec[dir].box();
 
-                    for (bitEC.begin(); bitEC.ok(); ++bitEC) {
-                        IntVect iv = bitEC();
-                        tmp_ecFab(iv, 0)  = Qwater_ecFab(iv, 0) * gradH_ecFab(iv, 0);
-                        tmp2_ecFab(iv, 0) = Qwater_ecFab(iv, 0) * gradZb_ecFab(iv, 0) ;
-                    }
+                    FORT_COMPUTESCAPROD( CHF_FRA(Qwater_ec[dir]),
+                                         CHF_FRA(gradH_ec[dir]),
+                                         CHF_FRA(gradZb_ec[dir]),
+                                         CHF_BOX(region),
+                                         CHF_FRA(tmp_ec[dir]),
+                                         CHF_FRA(tmp2_ec[dir]) );
+
                 } // loop over dir
             }
             // Qw gradH

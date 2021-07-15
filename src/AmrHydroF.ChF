@@ -129,7 +129,7 @@ C     ------------------------------------------------------------------
      &             * aB(CHF_IX[i;j  ;k  ],0)  
      &             * 9.8  
      &             * agradH(CHF_IX[i;j  ;k  ],0) )  
-     &                  
+                 
          denom_q  =  12.0 * nuparam * ( 1.0 +
      &               omegaparam * aRe(CHF_IX[i;j  ;k  ],0) ) 
 
@@ -158,7 +158,6 @@ C     ------------------------------------------------------------------
      &     CHF_CONST_FRA[prod1],
      &     CHF_CONST_FRA[prod2]) 
     
-      REAL_T num_q, denom_q
       integer CHF_DDECL[i;j;k]
 
       CHF_MULTIDO[region; i; j; k]
@@ -168,6 +167,45 @@ C     ------------------------------------------------------------------
 
          prod2(CHF_IX[i;j;k],0) = vara(CHF_IX[i;j  ;k  ],0)
      &             * var2b(CHF_IX[i;j  ;k  ],0)  
+
+      CHF_ENDDO
+
+      return
+      end
+
+
+
+C     -----------------------------------------------------------------
+C     subroutine COMPUTEBCOEFF
+C     computes the betaCoeff for poissonOp 
+C
+C     INPUTS/OUTPUTS:
+C     aB        =>  EC Gap Height 
+C     aRe       =>  EC Reynolds
+C     Bcoeff    =>  EC B
+C     ------------------------------------------------------------------
+      subroutine COMPUTEBCOEFF(
+     &     CHF_CONST_FRA[aB],
+     &     CHF_CONST_FRA[aRe],
+     &     CHF_BOX[region],
+     &     CHF_CONST_FRA[Bcoeff],
+     &     CHF_CONST_REAL[omegaparam],
+     &     CHF_CONST_REAL[nuparam]) 
+    
+      REAL_T num_q, denom_q
+      integer CHF_DDECL[i;j;k]
+
+      CHF_MULTIDO[region; i; j; k]
+
+         num_q = - ( aB(CHF_IX[i;j  ;k  ],0) 
+     &             * aB(CHF_IX[i;j  ;k  ],0)  
+     &             * aB(CHF_IX[i;j  ;k  ],0)  
+     &             * 9.8 )  
+     &                  
+         denom_q  =  12.0 * nuparam * ( 1.0 +
+     &               omegaparam * aRe(CHF_IX[i;j  ;k  ],0) ) 
+
+         Bcoeff(CHF_IX[i;j;k],0) = num_q / denom_q
 
       CHF_ENDDO
 
