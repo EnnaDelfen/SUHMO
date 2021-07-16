@@ -129,7 +129,11 @@ public:
                               LevelData<FArrayBox>& levelmR, 
                               LevelData<FArrayBox>& levelB,
                               LevelData<FArrayBox>& levelBH, 
-                              LevelData<FArrayBox>& levelBL);
+                              LevelData<FArrayBox>& levelBL,
+                              LevelData<FArrayBox>& levelRHS_b_A,
+                              LevelData<FArrayBox>& levelRHS_b_B,
+                              LevelData<FArrayBox>& levelRHS_b_C);
+
 
     void CalcRHS_gapHeight(LevelData<FArrayBox>& levelRHS_b, 
                            LevelData<FArrayBox>& levelPi, 

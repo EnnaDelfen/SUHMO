@@ -386,10 +386,11 @@ AmrHydro::SolveForHead_nl(const Vector<DisjointBoxLayout>&               a_grids
     int maxIter   = 100; // max number of v cycles
     Real eps        =  1.0e-8;  // solution tolerance
     Real hang       =  0.01;      // next rnorm should be < (1-m_hang)*norm_last 
-    Real normThresh =  1.0e-12;  // abs tol
+    Real normThresh =  1.0e-10;  // abs tol
     amrSolver->setSolverParameters(numSmooth, numSmooth, numBottom,
                                    numMG, maxIter, 
                                    eps, hang, normThresh);
+    //amrSolver->m_imin = 20;
 
     if (m_verbosity > 3) {
         amrSolver->m_verbosity = 4;
@@ -1287,7 +1288,8 @@ void AmrHydro::NonLinear_level(LevelData<FArrayBox>&        a_NL,
                                       CHF_FRA(a_NL[levelDit]),
                                       CHF_FRA(a_dNL[levelDit]),
                                       CHF_CONST_REAL(m_suhmoParm->m_A),
-                                      CHF_CONST_REAL(m_suhmoParm->m_br) );
+                                      CHF_CONST_REAL(m_suhmoParm->m_cutOffbr),
+                                      CHF_CONST_REAL(m_suhmoParm->m_maxOffbr));
 
           //    // Correction Colin 03/18
           //    if ( m_suhmoParm->m_br > thisB(iv,0) ) {
@@ -1744,13 +1746,20 @@ AmrHydro::CalcRHS_gapHeightFAS(LevelData<FArrayBox>& levelRHS_b,
                                LevelData<FArrayBox>& levelmR, 
                                LevelData<FArrayBox>& levelB,
                                LevelData<FArrayBox>& levelbumpHeight,
-                               LevelData<FArrayBox>& levelbumpSpacing)
+                               LevelData<FArrayBox>& levelbumpSpacing,
+                               LevelData<FArrayBox>& levelRHS_b_A, 
+                               LevelData<FArrayBox>& levelRHS_b_B,
+                               LevelData<FArrayBox>& levelRHS_b_C)
 {
    DataIterator dit = levelRHS_b.dataIterator();
    for (dit.begin(); dit.ok(); ++dit) {
 
        FArrayBox& B       = levelB[dit];
        FArrayBox& RHS     = levelRHS_b[dit];
+
+       FArrayBox& RHS_A   = levelRHS_b_A[dit];
+       FArrayBox& RHS_B   = levelRHS_b_B[dit];
+       FArrayBox& RHS_C   = levelRHS_b_C[dit];
 
        FArrayBox& Pressi  = levelPi[dit];
        FArrayBox& Pw      = levelPw[dit];
@@ -1760,26 +1769,39 @@ AmrHydro::CalcRHS_gapHeightFAS(LevelData<FArrayBox>& levelRHS_b,
        
        // initialize RHS for h
        RHS.setVal(0.0);
+       RHS_A.setVal(0.0);
+       RHS_B.setVal(0.0);
+       RHS_C.setVal(0.0);
 
        // first term
        RHS.copy(meltR, 0, 0, 1);
+       RHS_A.copy(meltR, 0, 0, 1);
        RHS *= 1.0 / m_suhmoParm->m_rho_i;
+       RHS_A *= 1.0 / m_suhmoParm->m_rho_i;
        // third term ...
        Real ub_norm = std::sqrt(  m_suhmoParm->m_ub[0]*m_suhmoParm->m_ub[0] 
-                                + m_suhmoParm->m_ub[1]*m_suhmoParm->m_ub[1]); // / BL(iv,0);
+                                + m_suhmoParm->m_ub[1]*m_suhmoParm->m_ub[1]); 
        BoxIterator bit(RHS.box()); // can use gridBox? 
        for (bit.begin(); bit.ok(); ++bit) {
            IntVect iv = bit();
            if ( B(iv,0) < BH(iv,0)) {
-               RHS(iv,0) += ub_norm * (BH(iv,0) - B(iv,0)) / BL(iv,0);
+               RHS(iv,0) +=  ub_norm * (BH(iv,0) - B(iv,0)) / BL(iv,0);
+               RHS_B(iv,0) = ub_norm * (BH(iv,0) - B(iv,0)) / BL(iv,0);
            }
            // second term ... assume  n = 3 !!
            Real PimPw = (Pressi(iv,0) - Pw(iv,0));
            Real AbsPimPw = std::abs(PimPw);
            RHS(iv,0) -= m_suhmoParm->m_A * std::pow(AbsPimPw, 2) * PimPw * B(iv,0); 
-           if ( m_suhmoParm->m_br > B(iv,0) ) {
-               RHS(iv,0) *= ( 1.0 - (m_suhmoParm->m_br - B(iv,0)) / m_suhmoParm->m_br );
+           RHS_C(iv,0) = - m_suhmoParm->m_A * std::pow(AbsPimPw, 2) * PimPw * B(iv,0);
+           if ( m_suhmoParm->m_cutOffbr > B(iv,0) ) {
+               RHS(iv,0) *= ( 1.0 - (m_suhmoParm->m_cutOffbr - B(iv,0)) / m_suhmoParm->m_cutOffbr );
+               RHS_C(iv,0) *= ( 1.0 - (m_suhmoParm->m_cutOffbr - B(iv,0)) / m_suhmoParm->m_cutOffbr );
                //RHS(iv,0) *= std::tanh( std::pow(B(iv,0),3) / std::pow(m_suhmoParm->m_br,3) );
+           }
+
+           if ( m_suhmoParm->m_maxOffbr < B(iv,0) ) {
+               RHS(iv,0)   *= ( 1.0 - (m_suhmoParm->m_maxOffbr  - B(iv,0)) / m_suhmoParm->m_maxOffbr  );
+               RHS_C(iv,0) *= ( 1.0 - (m_suhmoParm->m_maxOffbr  - B(iv,0)) / m_suhmoParm->m_maxOffbr  );
            }
        }
    }
@@ -2854,6 +2876,10 @@ AmrHydro::timeStepFAS(Real a_dt)
     Vector<LevelData<FArrayBox>*> RHS_b;
     Vector<LevelData<FArrayBox>*> a_ReQwIter;
     // DEBUG 
+    Vector<LevelData<FArrayBox>*> RHS_b_A;
+    Vector<LevelData<FArrayBox>*> RHS_b_B;
+    Vector<LevelData<FArrayBox>*> RHS_b_C;
+
     a_head_lagged.resize(m_finest_level + 1, NULL);
     a_head_curr.resize(m_finest_level + 1, NULL);
     a_gapheight_lagged.resize(m_finest_level + 1, NULL);
@@ -2861,6 +2887,9 @@ AmrHydro::timeStepFAS(Real a_dt)
     moulin_source_term.resize(m_finest_level + 1, NULL);
     RHS_b.resize(m_finest_level + 1, NULL);
     a_ReQwIter.resize(m_finest_level + 1, NULL);
+    RHS_b_A.resize(m_finest_level + 1, NULL);
+    RHS_b_B.resize(m_finest_level + 1, NULL);
+    RHS_b_C.resize(m_finest_level + 1, NULL);
     // FACE CENTERED STUFF
     Vector<LevelData<FluxBox>*> a_Qw_ec;
     Vector<LevelData<FluxBox>*> a_Re_ec;
@@ -2880,61 +2909,61 @@ AmrHydro::timeStepFAS(Real a_dt)
     }
 
         /* custom plt here -- debug print */
-        if (m_PrintCustom && (m_cur_step == 301)) {
-            int nStuffToPlot = 6;
-            Vector<std::string> vectName;
-            vectName.resize(nStuffToPlot);
-            vectName[0]="head";
-            vectName[1]="gapHeight";
-            vectName[2]="Pwater";
-            vectName[3]="metingRate";
-            vectName[4]="Reynolds";
-            vectName[5]="Zbed";
+        //if (m_PrintCustom && (m_cur_step == 301)) {
+        //    int nStuffToPlot = 6;
+        //    Vector<std::string> vectName;
+        //    vectName.resize(nStuffToPlot);
+        //    vectName[0]="head";
+        //    vectName[1]="gapHeight";
+        //    vectName[2]="Pwater";
+        //    vectName[3]="metingRate";
+        //    vectName[4]="Reynolds";
+        //    vectName[5]="Zbed";
 
-            Vector<Vector<LevelData<FArrayBox>*>> stuffToPlot;
-            stuffToPlot.resize(nStuffToPlot);
-            for (int zz = 0; zz < nStuffToPlot; zz++) {
-                stuffToPlot[zz].resize(m_max_level + 1, NULL);
-            }
+        //    Vector<Vector<LevelData<FArrayBox>*>> stuffToPlot;
+        //    stuffToPlot.resize(nStuffToPlot);
+        //    for (int zz = 0; zz < nStuffToPlot; zz++) {
+        //        stuffToPlot[zz].resize(m_max_level + 1, NULL);
+        //    }
 
-            for (int lev = 0; lev <= m_finest_level; lev++) {
-                stuffToPlot[0][lev]  = new LevelData<FArrayBox>(m_amrGrids[lev], 1, HeadGhostVect);
-                stuffToPlot[1][lev]  = new LevelData<FArrayBox>(m_amrGrids[lev], 1, HeadGhostVect);
-                stuffToPlot[2][lev]  = new LevelData<FArrayBox>(m_amrGrids[lev], 1, HeadGhostVect);
-                stuffToPlot[3][lev]  = new LevelData<FArrayBox>(m_amrGrids[lev], 1, HeadGhostVect);
-                stuffToPlot[4][lev]  = new LevelData<FArrayBox>(m_amrGrids[lev], 1, HeadGhostVect);
-                stuffToPlot[5][lev]  = new LevelData<FArrayBox>(m_amrGrids[lev], 1, HeadGhostVect);
+        //    for (int lev = 0; lev <= m_finest_level; lev++) {
+        //        stuffToPlot[0][lev]  = new LevelData<FArrayBox>(m_amrGrids[lev], 1, HeadGhostVect);
+        //        stuffToPlot[1][lev]  = new LevelData<FArrayBox>(m_amrGrids[lev], 1, HeadGhostVect);
+        //        stuffToPlot[2][lev]  = new LevelData<FArrayBox>(m_amrGrids[lev], 1, HeadGhostVect);
+        //        stuffToPlot[3][lev]  = new LevelData<FArrayBox>(m_amrGrids[lev], 1, HeadGhostVect);
+        //        stuffToPlot[4][lev]  = new LevelData<FArrayBox>(m_amrGrids[lev], 1, HeadGhostVect);
+        //        stuffToPlot[5][lev]  = new LevelData<FArrayBox>(m_amrGrids[lev], 1, HeadGhostVect);
 
-                LevelData<FArrayBox>& levelHead      = *m_head[lev];
-                LevelData<FArrayBox>& levelHeadSTP   = *stuffToPlot[0][lev];
+        //        LevelData<FArrayBox>& levelHead      = *m_head[lev];
+        //        LevelData<FArrayBox>& levelHeadSTP   = *stuffToPlot[0][lev];
 
-                LevelData<FArrayBox>& levelGap       = *m_gapheight[lev];    
-                LevelData<FArrayBox>& levelGapSTP    = *stuffToPlot[1][lev];
+        //        LevelData<FArrayBox>& levelGap       = *m_gapheight[lev];    
+        //        LevelData<FArrayBox>& levelGapSTP    = *stuffToPlot[1][lev];
 
-                LevelData<FArrayBox>& levelPw        = *m_Pw[lev];
-                LevelData<FArrayBox>& levelPwSTP     = *stuffToPlot[2][lev];
+        //        LevelData<FArrayBox>& levelPw        = *m_Pw[lev];
+        //        LevelData<FArrayBox>& levelPwSTP     = *stuffToPlot[2][lev];
 
-                LevelData<FArrayBox>& levelMR        = *m_meltRate[lev];
-                LevelData<FArrayBox>& levelMRSTP     = *stuffToPlot[3][lev];
+        //        LevelData<FArrayBox>& levelMR        = *m_meltRate[lev];
+        //        LevelData<FArrayBox>& levelMRSTP     = *stuffToPlot[3][lev];
 
-                LevelData<FArrayBox>& levelRe        = *m_Re[lev];
-                LevelData<FArrayBox>& levelReSTP     = *stuffToPlot[4][lev];
+        //        LevelData<FArrayBox>& levelRe        = *m_Re[lev];
+        //        LevelData<FArrayBox>& levelReSTP     = *stuffToPlot[4][lev];
 
-                LevelData<FArrayBox>& levelZb        = *m_bedelevation[lev];
-                LevelData<FArrayBox>& levelZbSTP     = *stuffToPlot[5][lev];
+        //        LevelData<FArrayBox>& levelZb        = *m_bedelevation[lev];
+        //        LevelData<FArrayBox>& levelZbSTP     = *stuffToPlot[5][lev];
 
-                DataIterator dit = levelHead.dataIterator();
-                for (dit.begin(); dit.ok(); ++dit) {
-                    levelHeadSTP[dit].copy(levelHead[dit], 0, 0, 1);
-                    levelGapSTP[dit].copy(levelGap[dit], 0, 0, 1);
-                    levelPwSTP[dit].copy(levelPw[dit], 0, 0, 1);
-                    levelMRSTP[dit].copy(levelMR[dit], 0, 0, 1);
-                    levelReSTP[dit].copy(levelRe[dit], 0, 0, 1);
-                    levelZbSTP[dit].copy(levelZb[dit], 0, 0, 1);
-                }
-            } // loop on levs
-            writePltCustom(nStuffToPlot, vectName, stuffToPlot, std::to_string(-10));
-        } // end customPlt
+        //        DataIterator dit = levelHead.dataIterator();
+        //        for (dit.begin(); dit.ok(); ++dit) {
+        //            levelHeadSTP[dit].copy(levelHead[dit], 0, 0, 1);
+        //            levelGapSTP[dit].copy(levelGap[dit], 0, 0, 1);
+        //            levelPwSTP[dit].copy(levelPw[dit], 0, 0, 1);
+        //            levelMRSTP[dit].copy(levelMR[dit], 0, 0, 1);
+        //            levelReSTP[dit].copy(levelRe[dit], 0, 0, 1);
+        //            levelZbSTP[dit].copy(levelZb[dit], 0, 0, 1);
+        //        }
+        //    } // loop on levs
+        //    writePltCustom(nStuffToPlot, vectName, stuffToPlot, std::to_string(-10));
+        //} // end customPlt
 
 
     for (int lev = 0; lev <= m_finest_level; lev++) {
@@ -2976,6 +3005,10 @@ AmrHydro::timeStepFAS(Real a_dt)
         a_gapheight_lagged[lev] = new LevelData<FArrayBox>(m_amrGrids[lev], 1, HeadGhostVect);
         // Re/Qw iterations -- testing
         a_ReQwIter[lev]         = new LevelData<FArrayBox>(m_amrGrids[lev], 1, HeadGhostVect);
+        // DEBUG
+        RHS_b_A[lev]            = new LevelData<FArrayBox>(m_amrGrids[lev], 1, IntVect::Zero);
+        RHS_b_B[lev]            = new LevelData<FArrayBox>(m_amrGrids[lev], 1, IntVect::Zero);
+        RHS_b_C[lev]            = new LevelData<FArrayBox>(m_amrGrids[lev], 1, IntVect::Zero);
         // Stuff for OpLin
         aCoef[lev] = RefCountedPtr<LevelData<FArrayBox> >(new LevelData<FArrayBox>(m_amrGrids[lev], 1, IntVect::Zero));
         bCoef[lev] = RefCountedPtr<LevelData<FluxBox> >(new LevelData<FluxBox>(m_amrGrids[lev], 1, IntVect::Zero));
@@ -3446,8 +3479,9 @@ AmrHydro::timeStepFAS(Real a_dt)
 
         /* CONVERGENCE TESTS with LAGGED quantities */
         Real maxHead = computeMax(m_head, m_refinement_ratios, Interval(0,0), 0);
+        Real minHead = computeMin(m_head, m_refinement_ratios, Interval(0,0), 0);
         if (m_verbosity > 3) {
-            pout() <<"        Check for convergence of h (max is "<< maxHead<<" )"<<endl;
+            pout() <<"        Check for convergence of h (max = "<< maxHead<<", min = " << minHead << ")"<<endl;
         }
         for (int lev = 0; lev <= m_finest_level; lev++) {
             LevelData<FArrayBox>& levelnewH_lag  = *a_head_lagged[lev];
@@ -3466,7 +3500,7 @@ AmrHydro::timeStepFAS(Real a_dt)
         }
 
         /* custom plt here -- debug print */
-        if (m_PrintCustom && (m_cur_step > 1444)) {
+        if (m_PrintCustom && (m_cur_step > 100444)) {
             int nStuffToPlot = 12;
             Vector<std::string> vectName;
             vectName.resize(nStuffToPlot);
@@ -3566,6 +3600,9 @@ AmrHydro::timeStepFAS(Real a_dt)
             if (max_resH < m_eps_PicardIte){
                 if (m_verbosity > 0) {
                     pout() <<"        converged( it = "<< ite_idx << ", x(h) = " <<max_resH<< ")."<< endl;
+                }
+                if (m_verbosity > 3) {
+                    pout() <<"        Check h (max = "<< maxHead<<", min = " << minHead << ")"<<endl;
                 }
                 converged_h = true;
             }
@@ -3736,9 +3773,16 @@ AmrHydro::timeStepFAS(Real a_dt)
         LevelData<FArrayBox>& levelB     = *m_gapheight[lev];    
         LevelData<FArrayBox>& levelBH    = *m_bumpHeight[lev];    
         LevelData<FArrayBox>& levelBL    = *m_bumpSpacing[lev];    
+
+        // DEBUG
+        LevelData<FArrayBox>& levelRHS_b_A = *RHS_b_A[lev];
+        LevelData<FArrayBox>& levelRHS_b_B = *RHS_b_B[lev];
+        LevelData<FArrayBox>& levelRHS_b_C = *RHS_b_C[lev];
+
         CalcRHS_gapHeightFAS(levelRHS_b, levelPi, 
                              levelPw, levelmR, 
-                             levelB, levelBH, levelBL); 
+                             levelB, levelBH, levelBL,
+                             levelRHS_b_A, levelRHS_b_B, levelRHS_b_C); 
 
         LevelData<FArrayBox>& leveloldB  = *m_old_gapheight[lev];    
 
@@ -3759,6 +3803,71 @@ AmrHydro::timeStepFAS(Real a_dt)
             }
         }
     }  // loop on levs
+
+
+    /* FINAL custom plt here -- debug print */
+    if (m_PrintCustom) {
+        int nStuffToPlot = 7;
+        Vector<std::string> vectName;
+        vectName.resize(nStuffToPlot);
+        vectName[0]="head";
+        vectName[1]="gapHeight";
+        vectName[2]="RHS_head";
+        vectName[3]="RHS_b";
+        vectName[4]="RHS_bA";
+        vectName[5]="RHS_bB";
+        vectName[6]="RHS_bC";
+
+        Vector<Vector<LevelData<FArrayBox>*>> stuffToPlot;
+        stuffToPlot.resize(nStuffToPlot);
+        for (int zz = 0; zz < nStuffToPlot; zz++) {
+            stuffToPlot[zz].resize(m_max_level + 1, NULL);
+        }
+
+        for (int lev = 0; lev <= m_finest_level; lev++) {
+            stuffToPlot[0][lev]  = new LevelData<FArrayBox>(m_amrGrids[lev], 1, IntVect::Zero);
+            stuffToPlot[1][lev]  = new LevelData<FArrayBox>(m_amrGrids[lev], 1, IntVect::Zero);
+            stuffToPlot[2][lev]  = new LevelData<FArrayBox>(m_amrGrids[lev], 1, IntVect::Zero);
+            stuffToPlot[3][lev]  = new LevelData<FArrayBox>(m_amrGrids[lev], 1, IntVect::Zero);
+            stuffToPlot[4][lev]  = new LevelData<FArrayBox>(m_amrGrids[lev], 1, IntVect::Zero);
+            stuffToPlot[5][lev]  = new LevelData<FArrayBox>(m_amrGrids[lev], 1, IntVect::Zero);
+            stuffToPlot[6][lev]  = new LevelData<FArrayBox>(m_amrGrids[lev], 1, IntVect::Zero);
+
+            LevelData<FArrayBox>& levelHead      = *m_head[lev];
+            LevelData<FArrayBox>& levelHeadSTP   = *stuffToPlot[0][lev];
+
+            LevelData<FArrayBox>& levelGap       = *m_gapheight[lev];    
+            LevelData<FArrayBox>& levelGapSTP    = *stuffToPlot[1][lev];
+
+            LevelData<FArrayBox>& levelRHS       = *RHS_h[lev];
+            LevelData<FArrayBox>& levelRHSSTP    = *stuffToPlot[2][lev];
+
+            LevelData<FArrayBox>& levelRHSB      = *RHS_b[lev];
+            LevelData<FArrayBox>& levelRHSBSTP   = *stuffToPlot[3][lev];
+
+            LevelData<FArrayBox>& levelRHSB1     = *RHS_b_A[lev];
+            LevelData<FArrayBox>& levelRHSB1STP  = *stuffToPlot[4][lev];
+
+            LevelData<FArrayBox>& levelRHSB2     = *RHS_b_B[lev];
+            LevelData<FArrayBox>& levelRHSB2STP  = *stuffToPlot[5][lev];
+
+            LevelData<FArrayBox>& levelRHSB3     = *RHS_b_C[lev];
+            LevelData<FArrayBox>& levelRHSB3STP  = *stuffToPlot[6][lev];
+
+                DataIterator dit = levelHead.dataIterator();
+                for (dit.begin(); dit.ok(); ++dit) {
+                    levelHeadSTP[dit].copy(levelHead[dit], 0, 0, 1);
+                    levelGapSTP[dit].copy(levelGap[dit], 0, 0, 1);
+                    levelRHSSTP[dit].copy(levelRHS[dit], 0, 0, 1);
+                    levelRHSBSTP[dit].copy(levelRHSB[dit], 0, 0, 1);
+                    levelRHSB1STP[dit].copy(levelRHSB1[dit], 0, 0, 1);
+                    levelRHSB2STP[dit].copy(levelRHSB2[dit], 0, 0, 1);
+                    levelRHSB3STP[dit].copy(levelRHSB3[dit], 0, 0, 1);
+                }
+            } // loop on levs
+            writePltCustom(nStuffToPlot, vectName, stuffToPlot, std::to_string(ite_idx));
+        } // end customPlt
+
 
 
     /* POST PROC   */
@@ -3855,7 +3964,7 @@ AmrHydro::timeStepFAS(Real a_dt)
     Real maxGap = computeMax(m_gapheight, m_refinement_ratios, Interval(0,0), 0);
     Real minGap = computeMin(m_gapheight, m_refinement_ratios, Interval(0,0), 0);
     if (m_verbosity > 3) {
-        pout() <<"        Check for convergence of b (max = "<< maxGap<<", min = " << minGap << ")"<<endl;
+        pout() <<"        Check b (max = "<< maxGap<<", min = " << minGap << ")"<<endl;
     }
     for (int lev = 0; lev <= m_finest_level; lev++) {
         LevelData<FArrayBox>& levelnewB_lag  = *a_gapheight_lagged[lev]; // should be the same as the OLD
@@ -5042,11 +5151,11 @@ AmrHydro::writePltCustom(int numPlotComps,
 
     // generate plotfile name
     char iter_str[100];
-    sprintf(iter_str, "%s%06d_custom", m_plot_prefix.c_str(), m_cur_step);
+    sprintf(iter_str, "%sCustom%06d", m_plot_prefix.c_str(), m_cur_step);
 
     string filename(iter_str);
     
-    filename.append(namePlot);
+    //filename.append(namePlot);
 
     if (SpaceDim == 1)
     {

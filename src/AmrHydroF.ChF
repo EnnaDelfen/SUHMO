@@ -29,7 +29,8 @@ C     ------------------------------------------------------------------
      &     CHF_CONST_FRA[nlfunc], 
      &     CHF_CONST_FRA[dnlfunc],
      &     CHF_CONST_REAL[Aparam],
-     &     CHF_CONST_REAL[brparam]) 
+     &     CHF_CONST_REAL[brparam],
+     &     CHF_CONST_REAL[brparamMax]) 
     
       integer CHF_DDECL[i;j;k]
 
@@ -48,6 +49,11 @@ C     ------------------------------------------------------------------
          if ( brparam > aB(CHF_IX[i;j  ;k  ],0) ) then
              nlfunc(CHF_IX[i;j;k],0)  = nlfunc(CHF_IX[i;j;k],0) * (1.0 - (brparam - aB(CHF_IX[i;j  ;k  ],0)) / brparam )
              dnlfunc(CHF_IX[i;j;k],0) = dnlfunc(CHF_IX[i;j;k],0) * aB(CHF_IX[i;j  ;k  ],0) /  brparam 
+         endif
+
+         if ( brparamMax < aB(CHF_IX[i;j  ;k  ],0) ) then
+             nlfunc(CHF_IX[i;j;k],0)  = nlfunc(CHF_IX[i;j;k],0) * (1.0 - (brparamMax - aB(CHF_IX[i;j  ;k  ],0)) / brparamMax )
+             dnlfunc(CHF_IX[i;j;k],0) = dnlfunc(CHF_IX[i;j;k],0) * aB(CHF_IX[i;j  ;k  ],0) / brparamMax 
          endif
 
       CHF_ENDDO
