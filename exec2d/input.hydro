@@ -2,7 +2,7 @@
 main.domain_size=1000.00 1000.00 # physical dimensions of domain
 main.problem_type=basic
 main.maxTime = 6000000.0
-main.maxStep= 500 # 500 heures env 20 jours
+main.maxStep= 2000 # 500 heures env 20 jours
 
 # bc - 0 = diri / 1 = neum
 bc.lo_bc = 0 0
@@ -39,19 +39,11 @@ suhmo.ReInit  = 1000.0
 solver.use_fas=true
 solver.use_NL=true
 solver.bcoeff_otf=true
-#solver.eps_PicardIte=0.0001
 
-#suhmo.n_moulins=2
-#suhmo.moulin_position = 400. 500. 400. 700. # CELL pos for now
-#suhmo.moulin_flux = 4.0 4.0 # vol flux
-
-suhmo.n_moulins=1
-suhmo.moulin_position = 400. 500. 
-#suhmo.moulin_position = 600. 500. 
-#suhmo.moulin_position = 400. 700. 
-#suhmo.moulin_position = 400. 600. 
-suhmo.moulin_flux = 4.0 # vol flux
-suhmo.moulin_sigma = 30.0 # vol flux
+suhmo.n_moulins=2
+suhmo.moulin_position = 400. 300. 500. 400. # CELL pos for now
+suhmo.moulin_flux = 4.0 4.0 # vol flux
+suhmo.moulin_sigma = 15.0 15.0 # vol flux
 
 # class AmrHydro.cpp
 # misc
@@ -66,17 +58,17 @@ AmrHydro.block_factor=8
 AmrHydro.max_box_size=16
 AmrHydro.max_base_grid_size=16
 AmrHydro.regrid_lbase=0  # coarsest level that you regrid
-AmrHydro.regrid_interval=25
+AmrHydro.regrid_interval=40
 AmrHydro.domainLoIndex=0 0 # 2D
 AmrHydro.is_periodic=0 1   # 2D
-AmrHydro.fill_ratio=0.8
+AmrHydro.fill_ratio=0.5
 AmrHydro.nestingRadius=4
 AmrHydro.tags_grow = 2  # amount to buffer tags
 AmrHydro.n_tag_variables = 1
 AmrHydro.tag_variables=meltingRate
 AmrHydro.tagging_mins=0
 AmrHydro.tagging_caps=4
-AmrHydro.tagging_values=0.0006
+AmrHydro.tagging_values=0.0002
 #AmrHydro.tagSubsetBoxesFile=somefile
 #AmrHydro.grids_file=grids.dat
 # Time Stepping params
@@ -97,4 +89,4 @@ AmrHydro.check_prefix=chk
 AmrHydro.check_overwrite=false # if true, rewrite old checkpoints with new ones.
 AmrHydro.check_exit=false # if true, exit immediately after writing a checkpoint
 
-#AmrHydro.restart_file=chk000500.2d.hdf5
+#AmrHydro.restart_file=chk000475.2d.hdf5
