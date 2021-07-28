@@ -139,7 +139,7 @@ HydroIBC::initializeData(RealVect& a_dx,
             //thisPw(iv, 0)        = ( thisHead(iv, 0) - thiszbed(iv, 0) ) * (Params.m_rho_w * Params.m_gravity) ;
 
             /* Bed randomization */
-            if (Params.m_compute_bump_param = true ) {
+            if (Params.m_compute_bump_param) {
                 thisbumpHeight(iv, 0)      = Params.m_br; // + dist(generator);//Params.m_br*std::sin(y_loc)/10.0 + Params.m_br; 
             }
             thisbumpSpacing(iv, 0)     = Params.m_lr;
