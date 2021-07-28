@@ -99,6 +99,11 @@ public:
  
     void compute_grad_head(int lev);
 
+    void compute_grad_var(int lev,
+                          Vector<LevelData<FArrayBox>*>&  a_var,
+                          Vector<LevelData<FArrayBox>*>&  a_gradvar,
+                          Vector<LevelData<FluxBox>*>&    a_gradvar_ec);
+
     void evaluate_Qw_ec(int lev, 
                         LevelData<FluxBox>& levelQw_ec, 
                         LevelData<FluxBox>& levelB_ec,
@@ -110,6 +115,9 @@ public:
                        LevelData<FluxBox>&    levelbcoef, 
                        LevelData<FluxBox>&    levelRe, 
                        LevelData<FluxBox>&    levelB);
+
+    void dCoeff(LevelData<FluxBox>&    leveldcoef, 
+                Real a_dx);
 
     void CalcRHS_head( int currlev, 
                        LevelData<FArrayBox>& levelRHS_h, 
@@ -128,6 +136,7 @@ public:
                               LevelData<FArrayBox>& levelPw, 
                               LevelData<FArrayBox>& levelmR, 
                               LevelData<FArrayBox>& levelB,
+                              LevelData<FArrayBox>& levelDT,
                               LevelData<FArrayBox>& levelBH, 
                               LevelData<FArrayBox>& levelBL,
                               LevelData<FArrayBox>& levelRHS_b_A,
