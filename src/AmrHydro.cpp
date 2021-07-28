@@ -1549,14 +1549,15 @@ AmrHydro::aCoeff_bCoeff(LevelData<FArrayBox>&  levelacoef,
                                 CHF_FRA(bC[dir]),
                                 CHF_CONST_REAL(m_suhmoParm->m_omega),
                                 CHF_CONST_REAL(m_suhmoParm->m_nu) );
-
         }
     }
 }
 
 
 void
-AmrHydro::dCoeff(LevelData<FluxBox>&    leveldcoef, Real a_dx)
+AmrHydro::dCoeff(LevelData<FluxBox>&    leveldcoef, 
+                 Real                   a_dx,
+                 Real                   a_dt)
 {
     DataIterator dit = leveldcoef.dataIterator();
     for (dit.begin(); dit.ok(); ++dit) {
@@ -1571,7 +1572,7 @@ AmrHydro::dCoeff(LevelData<FluxBox>&    leveldcoef, Real a_dx)
             FORT_COMPUTEDCOEFF( CHF_BOX(region),
                                 CHF_FRA(bC[dir]),
                                 CHF_CONST_REAL(a_dx),
-                                CHF_CONST_REAL(m_dt));
+                                CHF_CONST_REAL(a_dt));
 
         }
     }
@@ -3200,7 +3201,7 @@ AmrHydro::timeStepFAS(Real a_dt)
             // Compute dCoeff 
             LevelData<FluxBox>&   levelDcoef  = *a_Dcoef[lev]; 
             Real dx = m_amrDx[lev][0];  
-            dCoeff(levelDcoef, dx);
+            dCoeff(levelDcoef, dx, a_dt);
         } // end loop levels
 
 

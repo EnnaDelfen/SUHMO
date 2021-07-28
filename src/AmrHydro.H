@@ -117,7 +117,8 @@ public:
                        LevelData<FluxBox>&    levelB);
 
     void dCoeff(LevelData<FluxBox>&    leveldcoef, 
-                Real a_dx);
+                Real                   a_dx,
+                Real                   a_dt);
 
     void CalcRHS_head( int currlev, 
                        LevelData<FArrayBox>& levelRHS_h, 

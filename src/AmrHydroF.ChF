@@ -238,9 +238,8 @@ C     ------------------------------------------------------------------
 
       CHF_MULTIDO[region; i; j; k]
 
-         num_q = dx * dx
-     &                  
-         denom_q  =  Dt
+         num_q    = dx * dx
+         denom_q  = Dt
 
          Dcoeff(CHF_IX[i;j;k],0) = num_q / denom_q
 
@@ -288,30 +287,29 @@ C     ------------------------------------------------------------------
       Somthing_that_will_not_compile
 #endif
 
-      integer n
       integer CHF_DDECL[i;j;k]
 
       CHF_MULTIDO[region; i; j; k]
 
-              Dterm(CHF_IX[i;j;k],n) =
+              Dterm(CHF_IX[i;j;k],0) =
      &             (CHF_DTERM[
-     &               Dcoef0(CHF_IX[i+1;j  ;k  ],n)
-     &               * (phi(CHF_IX[i+1;j  ;k  ],n)-phi(CHF_IX[i  ;j  ;k  ],n))
+     &               Dcoef0(CHF_IX[i+1;j  ;k  ],0)
+     &               * (phi(CHF_IX[i+1;j  ;k  ],0)-phi(CHF_IX[i  ;j  ;k  ],0))
      &
-     &             - Dcoef0(CHF_IX[i  ;j  ;k  ],n)
-     &               * (phi(CHF_IX[i  ;j  ;k  ],n)-phi(CHF_IX[i-1;j  ;k  ],n)) ;
+     &             - Dcoef0(CHF_IX[i  ;j  ;k  ],0)
+     &               * (phi(CHF_IX[i  ;j  ;k  ],0)-phi(CHF_IX[i-1;j  ;k  ],0)) ;
      &
-     &             + Dcoef1(CHF_IX[i  ;j+1;k  ],n)
-     &               * (phi(CHF_IX[i  ;j+1;k  ],n)-phi(CHF_IX[i  ;j  ;k  ],n))
+     &             + Dcoef1(CHF_IX[i  ;j+1;k  ],0)
+     &               * (phi(CHF_IX[i  ;j+1;k  ],0)-phi(CHF_IX[i  ;j  ;k  ],0))
      &
-     &             - Dcoef1(CHF_IX[i  ;j  ;k  ],n)
-     &               * (phi(CHF_IX[i  ;j  ;k  ],n)-phi(CHF_IX[i  ;j-1;k  ],n)) ;
+     &             - Dcoef1(CHF_IX[i  ;j  ;k  ],0)
+     &               * (phi(CHF_IX[i  ;j  ;k  ],0)-phi(CHF_IX[i  ;j-1;k  ],0)) ;
      &
-     &             + Dcoef2(CHF_IX[i  ;j  ;k+1],n)
-     &               * (phi(CHF_IX[i  ;j  ;k+1],n)-phi(CHF_IX[i  ;j  ;k  ],n))
+     &             + Dcoef2(CHF_IX[i  ;j  ;k+1],0)
+     &               * (phi(CHF_IX[i  ;j  ;k+1],0)-phi(CHF_IX[i  ;j  ;k  ],0))
      &
-     &             - Dcoef2(CHF_IX[i  ;j  ;k  ],n)
-     &               * (phi(CHF_IX[i  ;j  ;k  ],n)-phi(CHF_IX[i  ;j  ;k-1],n)) ]
+     &             - Dcoef2(CHF_IX[i  ;j  ;k  ],0)
+     &               * (phi(CHF_IX[i  ;j  ;k  ],0)-phi(CHF_IX[i  ;j  ;k-1],0)) ]
      &             )
 
       CHF_ENDDO
