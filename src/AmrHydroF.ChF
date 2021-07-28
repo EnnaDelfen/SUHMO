@@ -217,3 +217,105 @@ C     ------------------------------------------------------------------
 
       return
       end
+
+
+C     -----------------------------------------------------------------
+C     subroutine COMPUTEDCOEFF
+C     computes the diffCoeff for RHS
+C
+C     INPUTS/OUTPUTS:
+C     Dcoeff    =>  EC Diffusion coefficients
+C     dx        =>  cell spacing
+C     ------------------------------------------------------------------
+      subroutine COMPUTEDCOEFF(
+     &     CHF_BOX[region],
+     &     CHF_FRA[Dcoeff],
+     &     CHF_CONST_REAL[dx],
+     &     CHF_CONST_REAL[Dt]) 
+    
+      REAL_T num_q, denom_q
+      integer CHF_DDECL[i;j;k]
+
+      CHF_MULTIDO[region; i; j; k]
+
+         num_q = dx * dx
+     &                  
+         denom_q  =  Dt
+
+         Dcoeff(CHF_IX[i;j;k],0) = num_q / denom_q
+
+      CHF_ENDDO
+
+      return
+      end
+
+
+
+C     -----------------------------------------------------------------
+C     subroutine COMPUTEDIFTERM{1D,2D,3D}
+C     computes Div (Dcoef(i) * Grad)
+C     applied to phi
+C
+C     INPUTS/OUTPUTS:
+C     phi        => phi
+C     Dterm      => output quantity
+C     region     => box to compute over
+C     Dcoef[012] => face-centered coefs of diffusion
+C
+C     ------------------------------------------------------------------
+#if CH_SPACEDIM == 1
+      subroutine COMPUTEDIFTERM1D(
+     &     CHF_FRA[phi],
+     &     CHF_BOX[region],
+     &     CHF_CONST_FRA[Dterm],
+     &     CHF_CONST_FRA[Dcoef0])
+#elif CH_SPACEDIM == 2
+      subroutine COMPUTEDIFTERM2D(
+     &     CHF_FRA[phi],
+     &     CHF_BOX[region],
+     &     CHF_CONST_FRA[Dterm],
+     &     CHF_CONST_FRA[Dcoef0],
+     &     CHF_CONST_FRA[Dcoef1])
+#elif CH_SPACEDIM == 3
+      subroutine COMPUTEDIFTERM3D(
+     &     CHF_FRA[phi],
+     &     CHF_BOX[region],
+     &     CHF_CONST_FRA[Dterm],
+     &     CHF_CONST_FRA[Dcoef0],
+     &     CHF_CONST_FRA[Dcoef1],
+     &     CHF_CONST_FRA[Dcoef2])
+#else
+      Somthing_that_will_not_compile
+#endif
+
+      integer n
+      integer CHF_DDECL[i;j;k]
+
+      CHF_MULTIDO[region; i; j; k]
+
+              Dterm(CHF_IX[i;j;k],n) =
+     &             (CHF_DTERM[
+     &               Dcoef0(CHF_IX[i+1;j  ;k  ],n)
+     &               * (phi(CHF_IX[i+1;j  ;k  ],n)-phi(CHF_IX[i  ;j  ;k  ],n))
+     &
+     &             - Dcoef0(CHF_IX[i  ;j  ;k  ],n)
+     &               * (phi(CHF_IX[i  ;j  ;k  ],n)-phi(CHF_IX[i-1;j  ;k  ],n)) ;
+     &
+     &             + Dcoef1(CHF_IX[i  ;j+1;k  ],n)
+     &               * (phi(CHF_IX[i  ;j+1;k  ],n)-phi(CHF_IX[i  ;j  ;k  ],n))
+     &
+     &             - Dcoef1(CHF_IX[i  ;j  ;k  ],n)
+     &               * (phi(CHF_IX[i  ;j  ;k  ],n)-phi(CHF_IX[i  ;j-1;k  ],n)) ;
+     &
+     &             + Dcoef2(CHF_IX[i  ;j  ;k+1],n)
+     &               * (phi(CHF_IX[i  ;j  ;k+1],n)-phi(CHF_IX[i  ;j  ;k  ],n))
+     &
+     &             - Dcoef2(CHF_IX[i  ;j  ;k  ],n)
+     &               * (phi(CHF_IX[i  ;j  ;k  ],n)-phi(CHF_IX[i  ;j  ;k-1],n)) ]
+     &             )
+
+      CHF_ENDDO
+
+      return
+      end
+
