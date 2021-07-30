@@ -3024,6 +3024,7 @@ AmrHydro::regrid()
 
             m_amrGrids[lev] = newDBL;
              
+            /* Make sure level exists */
             if (m_old_head[lev] == NULL) {
                 m_old_head[lev]        = new LevelData<FArrayBox>;
                 m_head[lev]            = new LevelData<FArrayBox>;
@@ -3034,16 +3035,17 @@ AmrHydro::regrid()
                 m_bedelevation[lev]    = new LevelData<FArrayBox>;
                 m_overburdenpress[lev] = new LevelData<FArrayBox>;
                 
-                m_gradhead[lev]      = new LevelData<FArrayBox>;
-                m_gradhead_ec[lev]   = new LevelData<FluxBox>;
-                m_Pw[lev]            = new LevelData<FArrayBox>;
-                m_qw[lev]            = new LevelData<FArrayBox>;
-                m_meltRate[lev]      = new LevelData<FArrayBox>;
+                m_gradhead[lev]        = new LevelData<FArrayBox>;
+                m_gradhead_ec[lev]     = new LevelData<FluxBox>;
+                m_Pw[lev]              = new LevelData<FArrayBox>;
+                m_qw[lev]              = new LevelData<FArrayBox>;
+                m_meltRate[lev]        = new LevelData<FArrayBox>;
 
-                m_bumpHeight[lev]    = new LevelData<FArrayBox>;
-                m_bumpSpacing[lev]    = new LevelData<FArrayBox>;
+                m_bumpHeight[lev]      = new LevelData<FArrayBox>;
+                m_bumpSpacing[lev]     = new LevelData<FArrayBox>;
             }
-
+          
+            /* NEED VARIABLE */
             // HEAD
             LevelData<FArrayBox>* old_oldheadDataPtr  = m_old_head[lev];
             LevelData<FArrayBox>* old_headDataPtr     = m_head[lev];
@@ -3071,6 +3073,13 @@ AmrHydro::regrid()
             // Pi
             LevelData<FArrayBox>* new_overburdenpressDataPtr    =
                 new LevelData<FArrayBox>(newDBL, m_overburdenpress[0]->nComp(), m_overburdenpress[0]->ghostVect());
+            // Bed randomization
+            LevelData<FArrayBox>* old_bumpHeightDataPtr     = m_bumpHeight[lev];
+            LevelData<FArrayBox>* new_bumpHeightDataPtr    =
+                new LevelData<FArrayBox>(newDBL, m_bumpHeight[0]->nComp(), m_bumpHeight[0]->ghostVect());
+            LevelData<FArrayBox>* old_bumpSpacingDataPtr     = m_bumpSpacing[lev];
+            LevelData<FArrayBox>* new_bumpSpacingDataPtr    =
+                new LevelData<FArrayBox>(newDBL, m_bumpSpacing[0]->nComp(), m_bumpSpacing[0]->ghostVect());
 
             // Other vars: grad / Pw / Qw / mR
             LevelData<FArrayBox>* old_gradheadDataPtr = m_gradhead[lev];
@@ -3089,11 +3098,6 @@ AmrHydro::regrid()
             LevelData<FArrayBox>* new_meltRateDataPtr =
                 new LevelData<FArrayBox>(newDBL, m_meltRate[0]->nComp(), m_meltRate[0]->ghostVect());
 
-            // Bed randomization
-            LevelData<FArrayBox>* new_bumpHeightDataPtr    =
-                new LevelData<FArrayBox>(newDBL, m_bumpHeight[0]->nComp(), m_bumpHeight[0]->ghostVect());
-            LevelData<FArrayBox>* new_bumpSpacingDataPtr    =
-                new LevelData<FArrayBox>(newDBL, m_bumpSpacing[0]->nComp(), m_bumpSpacing[0]->ghostVect());
 
             //call initData to take care of BC and initialize the levels... 
             initDataRegrid(lev,
@@ -3108,8 +3112,8 @@ AmrHydro::regrid()
                            *new_iceheightDataPtr,
                            *new_bumpHeightDataPtr,
                            *new_bumpSpacingDataPtr);
-            //BCDataRegrid(lev, *new_bedelevationDataPtr, *new_overburdenpressDataPtr,*new_iceheightDataPtr);
 
+            /* DEBUG VAR */
             LevelData<FArrayBox>& head  = *new_headDataPtr;
             LevelData<FArrayBox>& gH    = *new_gapheightDataPtr;
             LevelData<FArrayBox>& Pw    = *new_PwDataPtr;
@@ -3158,20 +3162,26 @@ AmrHydro::regrid()
                 interpolator.m_boundary_limit_type     = 3;
                 interpolatorGrad.m_boundary_limit_type = 3;
 
+                /* NEED */
                 // HEAD
-                interpolator.interpToFine(*new_oldheadDataPtr, *m_old_head[lev - 1]);
+                interpolator.interpToFine(*new_oldheadDataPtr, *m_old_head[lev - 1]);  // prob useless
                 interpolator.interpToFine(*new_headDataPtr, *m_head[lev - 1]);
                 // Gap Height
-                interpolator.interpToFine(*new_oldgapheightDataPtr, *m_old_gapheight[lev - 1]);
+                interpolator.interpToFine(*new_oldgapheightDataPtr, *m_old_gapheight[lev - 1]); // prob useless
                 interpolator.interpToFine(*new_gapheightDataPtr, *m_gapheight[lev - 1]);
                 // Re
                 interpolator.interpToFine(*new_ReDataPtr, *m_Re[lev - 1]);
+                // Bed Randomization
+                interpolator.interpToFine(*new_bumpHeightDataPtr, *m_bumpHeight[lev - 1]);
+                interpolator.interpToFine(*new_bumpSpacingDataPtr, *m_bumpSpacing[lev - 1]);
+                /* CST FOR NOW SO TAKEN CARE OF BY CALL TO INITDATA */
                 // Ice Height
                 //interpolator.interpToFine(*new_iceheightDataPtr, *m_iceheight[lev - 1]);
                 // Bed elevation
                 //interpolator.interpToFine(*new_bedelevationDataPtr, *m_bedelevation[lev - 1]);
                 // Pi
                 //interpolator.interpToFine(*new_overburdenpressDataPtr, *m_overburdenpress[lev - 1]);
+                /* Actually could avoid this I m pretty sure */
                 // Other vars: grad / Pw / Qw / mR
                 interpolatorGrad.interpToFine(*new_gradheadDataPtr, *m_gradhead[lev - 1]);
                 interpolator.interpToFine(*new_PwDataPtr, *m_Pw[lev - 1]);
@@ -3204,14 +3214,19 @@ AmrHydro::regrid()
             // now potentially copy old-grid data on this level into new holder
             if (old_oldheadDataPtr!= NULL) {
                 if (oldDBL.isClosed()) {
+                    /* NEED */
                     // HEAD
-                    old_oldheadDataPtr->copyTo(*new_oldheadDataPtr);
+                    old_oldheadDataPtr->copyTo(*new_oldheadDataPtr); // prob useless  
                     old_headDataPtr->copyTo(*new_headDataPtr);
                     // Gap Height
-                    old_oldgapheightDataPtr->copyTo(*new_oldgapheightDataPtr);
+                    old_oldgapheightDataPtr->copyTo(*new_oldgapheightDataPtr); // prob useless  
                     old_gapheightDataPtr->copyTo(*new_gapheightDataPtr);
                     // Re
                     old_ReDataPtr->copyTo(*new_ReDataPtr);
+                    // Bed Randomization
+                    old_bumpHeightDataPtr->copyTo(*new_bumpHeightDataPtr);
+                    old_bumpSpacingDataPtr->copyTo(*new_bumpHeightDataPtr);
+                    /* Could avoid probably */
                     // Other vars: grad / Pw / Qw / mR
                     old_gradheadDataPtr->copyTo(*new_gradheadDataPtr);  
                     old_PwDataPtr->copyTo(*new_PwDataPtr); 
@@ -3224,6 +3239,8 @@ AmrHydro::regrid()
                 delete old_oldgapheightDataPtr;
                 delete old_gapheightDataPtr;
                 delete old_ReDataPtr;
+                delete old_bumpHeightDataPtr;
+                delete old_bumpSpacingDataPtr;
                 //
                 delete old_gradheadDataPtr;
                 delete old_PwDataPtr;
