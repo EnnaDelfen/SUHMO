@@ -1679,7 +1679,7 @@ AmrHydro::CalcRHS_gapHeightFAS(LevelData<FArrayBox>& levelRHS_b,
                RHS_C(iv,0) =- m_suhmoParm->m_A * std::pow(AbsPimPw, 2) * PimPw * B(iv,0);
            }
            // Add a Diffusive term to mdot
-           RHS(iv,0)   += 0.001 * DT(iv,0);
+           RHS(iv,0)   += m_suhmoParm->m_DiffFactor * DT(iv,0);
        }
    }
 }
@@ -2313,7 +2313,7 @@ AmrHydro::timeStepFAS(Real a_dt)
 
                     // Add a Diffusive term to mdot
                     //pout() << "Cell = " << iv << ", DT = " << moulinSrc(iv,0) <<"\n";
-                    RHSh(iv,0) += (0.0 * DiffusiveTerm(iv,0)) ;
+                    RHSh(iv,0) += m_suhmoParm->m_DiffFactor * DiffusiveTerm(iv,0) ;
                 }
             }
         }// loop on levs
