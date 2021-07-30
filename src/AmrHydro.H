@@ -120,16 +120,6 @@ public:
                 Real                   a_dx,
                 Real                   a_dt);
 
-    void CalcRHS_head( int currlev, 
-                       LevelData<FArrayBox>& levelRHS_h, 
-                       LevelData<FArrayBox>& levelPi, 
-                       LevelData<FArrayBox>& levelPw, 
-                       LevelData<FArrayBox>& levelmR, 
-                       LevelData<FArrayBox>& levelB,
-                       LevelData<FArrayBox>& levelMoulinSrc);
-
-    void Calc_moulin_source_term(LevelData<FArrayBox>& levelMoulinSrc);
-
     void Calc_moulin_source_term_distributed(LevelData<FArrayBox>& levelMoulinSrc);
 
     void CalcRHS_gapHeightFAS(LevelData<FArrayBox>& levelRHS_b, 
@@ -144,24 +134,6 @@ public:
                               LevelData<FArrayBox>& levelRHS_b_B,
                               LevelData<FArrayBox>& levelRHS_b_C);
 
-
-    void CalcRHS_gapHeight(LevelData<FArrayBox>& levelRHS_b, 
-                           LevelData<FArrayBox>& levelPi, 
-                           LevelData<FArrayBox>& levelPw, 
-                           LevelData<FArrayBox>& levelmR, 
-                           LevelData<FArrayBox>& levelB,
-                           LevelData<FArrayBox>& levelRHS_b_A,
-                           LevelData<FArrayBox>& levelRHS_b_B,
-                           LevelData<FArrayBox>& levelRHS_b_C);
-
-    void SolveForHead(const Vector<DisjointBoxLayout>&               a_grids,
-                      Vector<RefCountedPtr<LevelData<FArrayBox> > >& a_aCoef,
-                      Vector<RefCountedPtr<LevelData<FluxBox> > >&   a_bCoef,
-                      Vector<ProblemDomain>& a_domains,
-                      Vector<int>& refRatio,
-                      Real& coarsestDx,
-                      Vector<LevelData<FArrayBox>*>& a_head, 
-                      Vector<LevelData<FArrayBox>*>& a_RHS);
 
     void SolveForHead_nl(const Vector<DisjointBoxLayout>&                a_grids,
                           Vector<RefCountedPtr<LevelData<FArrayBox> > >& a_aCoef,
