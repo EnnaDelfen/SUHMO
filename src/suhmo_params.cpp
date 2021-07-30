@@ -20,8 +20,9 @@ void suhmo_params::setDefaults()
     m_br = 0.0 ;
     m_lr = 0.0;
     m_A = 0.0;
-    m_cutOffbr = 0.0 ;
-    m_maxOffbr = 1000.0 ;
+    m_cutOffbr = 0.0;
+    m_maxOffbr = 1000.0;
+    m_DiffFactor = 0.0;
     m_compute_bump_param = true;
     // Initialization 
     m_slope = 0.0;
@@ -53,6 +54,7 @@ void suhmo_params::readInputs()
     ppParams.get("br", m_br);
     ppParams.get("cutOffbr", m_cutOffbr);
     ppParams.get("maxOffbr", m_maxOffbr);
+    ppParams.get("diffFactor", m_DiffFactor);
     ppParams.get("lr", m_lr);
     ppParams.get("A", m_A);
     ppParams.get("slope", m_slope);

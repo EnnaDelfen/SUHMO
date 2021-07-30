@@ -43,6 +43,7 @@ public:
     Real m_br;            // height between bed bumps m
     Real m_cutOffbr;      // used to limit creep for low gap height
     Real m_maxOffbr;      // used to limit creep for low gap height
+    Real m_DiffFactor;    // used to limit the gap height
     Real m_lr;            // spacing between bed bumps m
     bool m_compute_bump_param;
     Real m_A;             // Flow law ??
