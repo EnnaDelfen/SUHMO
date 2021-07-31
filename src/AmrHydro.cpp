@@ -1730,6 +1730,7 @@ AmrHydro::timeStepFAS(Real a_dt)
 
     // Also create and initialize tmp vectors
     Vector<LevelData<FArrayBox>*> a_head_lagged;
+    Vector<LevelData<FArrayBox>*> a_head_curr;
     Vector<LevelData<FArrayBox>*> a_gapheight_lagged;
     Vector<LevelData<FArrayBox>*> RHS_h;
     Vector<LevelData<FArrayBox>*> moulin_source_term;
@@ -1742,6 +1743,7 @@ AmrHydro::timeStepFAS(Real a_dt)
     Vector<LevelData<FArrayBox>*> RHS_b_C;
 
     a_head_lagged.resize(m_finest_level + 1, NULL);
+    a_head_curr.resize(m_finest_level + 1, NULL);
     a_gapheight_lagged.resize(m_finest_level + 1, NULL);
     RHS_h.resize(m_finest_level + 1, NULL);
     moulin_source_term.resize(m_finest_level + 1, NULL);
@@ -1867,6 +1869,7 @@ AmrHydro::timeStepFAS(Real a_dt)
         a_diffusiveTerm[lev]      = new LevelData<FArrayBox>(m_amrGrids[lev], 1, IntVect::Zero);
         // Head and B lagged for iterations
         a_head_lagged[lev]      = new LevelData<FArrayBox>(m_amrGrids[lev], 1, HeadGhostVect);
+        a_head_curr[lev]        = new LevelData<FArrayBox>(m_amrGrids[lev], 1, HeadGhostVect);
         a_gapheight_lagged[lev] = new LevelData<FArrayBox>(m_amrGrids[lev], 1, HeadGhostVect);
         // Re/Qw iterations -- testing
         a_ReQwIter[lev]         = new LevelData<FArrayBox>(m_amrGrids[lev], 1, HeadGhostVect);
@@ -2333,8 +2336,17 @@ AmrHydro::timeStepFAS(Real a_dt)
             // Compute aCoeff and bCoeff using updated qtites
             aCoeff_bCoeff(levelacoef, levelbcoef, levelRe_ec, levelB_ec);
 
+            //stuff for solve -- to get SAME number of levs and not max/finest
             m_amrGrids_curr[lev]   = m_amrGrids[lev];
             m_amrDomains_curr[lev] = m_amrDomains[lev];
+            LevelData<FArrayBox>& levelcurH      = *m_head[lev];
+            LevelData<FArrayBox>& levelcurHlcl   = *a_head_curr[lev];
+            DisjointBoxLayout& levelGrids        = m_amrGrids[lev];
+            DataIterator dit                     = levelGrids.dataIterator();
+            for (dit.begin(); dit.ok(); ++dit) {
+                // Copy curr into old -- copy ghost cells too 
+                levelcurHlcl[dit].copy(levelcurH[dit], 0, 0, 1);
+            }
         } // loop on levs
 
         //     Solve for h with FAS scheme
@@ -2344,7 +2356,18 @@ AmrHydro::timeStepFAS(Real a_dt)
 
         SolveForHead_nl(m_amrGrids_curr, aCoef, bCoef,
                         m_amrDomains_curr, m_refinement_ratios, coarsestDx,
-                        m_head, RHS_h);
+                        a_head_curr, RHS_h);
+
+        for (int lev = 0; lev <= m_finest_level; lev++) {
+            LevelData<FArrayBox>& levelcurH      = *m_head[lev];
+            LevelData<FArrayBox>& levelcurHlcl   = *a_head_curr[lev];
+            DisjointBoxLayout& levelGrids        = m_amrGrids[lev];
+            DataIterator dit                     = levelGrids.dataIterator();
+            for (dit.begin(); dit.ok(); ++dit) {
+                // Copy curr into old -- copy ghost cells too 
+                levelcurH[dit].copy(levelcurHlcl[dit], 0, 0, 1);
+            }
+        }
 
         /* Averaging down and fill in ghost cells */
         if (m_verbosity > 3) {
@@ -2886,6 +2909,7 @@ AmrHydro::timeStepFAS(Real a_dt)
     pout() <<"   ...clean up memory "<< endl;
     for (int lev = 0; lev <= m_finest_level; lev++) {
             delete a_head_lagged[lev];
+            delete a_head_curr[lev];
             delete a_gapheight_lagged[lev];
             delete RHS_h[lev];
             delete moulin_source_term[lev];
