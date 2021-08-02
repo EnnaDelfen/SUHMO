@@ -2314,7 +2314,6 @@ AmrHydro::timeStepFAS(Real a_dt)
                     RHSh(iv,0) += moulinSrc(iv,0);
 
                     // Add a Diffusive term to mdot
-                    //pout() << "Cell = " << iv << ", DT = " << moulinSrc(iv,0) <<"\n";
                     RHSh(iv,0) += m_suhmoParm->m_DiffFactor * DiffusiveTerm(iv,0) ;
                 }
             }
@@ -2790,7 +2789,7 @@ AmrHydro::timeStepFAS(Real a_dt)
 
     /* POST PROC   */
     if (m_post_proc) {
-        Real out_water_flux_x; 
+        Real out_water_flux_x = 0.0; 
         Real max_water_flux_x_loc = -1000.;
         //for (int lev = 0; lev <= m_finest_level; lev++) {
             DisjointBoxLayout&    levelGrids = m_amrGrids[0];
