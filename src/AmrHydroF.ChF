@@ -238,7 +238,7 @@ C     ------------------------------------------------------------------
 
       CHF_MULTIDO[region; i; j; k]
 
-         num_q    = dx * dx
+         num_q    = dx
          denom_q  = Dt
 
          Dcoeff(CHF_IX[i;j;k],0) = num_q / denom_q

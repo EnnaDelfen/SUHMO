@@ -132,7 +132,8 @@ public:
                               LevelData<FArrayBox>& levelBL,
                               LevelData<FArrayBox>& levelRHS_b_A,
                               LevelData<FArrayBox>& levelRHS_b_B,
-                              LevelData<FArrayBox>& levelRHS_b_C);
+                              LevelData<FArrayBox>& levelRHS_b_C,
+                              LevelData<FArrayBox>& levelchanDegree);
 
 
     void SolveForHead_nl(const Vector<DisjointBoxLayout>&                a_grids,
@@ -283,20 +284,6 @@ protected:
 
     /// initialize data on hierarchy
     void initData(Vector<LevelData<FArrayBox>*>& a_initialVelocity);
-
-    /// initialize the BC of fixed data ( ice height, Pi and zBed)
-    void initDataRegrid(int a_level,
-                        LevelData<FArrayBox>& a_levhead,
-                        LevelData<FArrayBox>& a_levgapheight,
-                        LevelData<FArrayBox>& a_levPw,
-                        LevelData<FArrayBox>& a_levqw,
-                        LevelData<FArrayBox>& a_levRe,
-                        LevelData<FArrayBox>& a_levmR,
-                        LevelData<FArrayBox>& a_levzBed,
-                        LevelData<FArrayBox>& a_levPi,
-                        LevelData<FArrayBox>& a_levIceHeight,
-                        LevelData<FArrayBox>& a_bumpHeight,
-                        LevelData<FArrayBox>& a_bumpSpacing);
 
     void BCDataRegrid(int a_level,
                       LevelData<FArrayBox>& a_levzBed,
