@@ -122,20 +122,20 @@ HydroIBC::initializeData(RealVect& a_dx,
             /* initial gap height */
             thisGapHeight(iv, 0) = Params.m_gapInit;
             /* Ice height (should be ice only, so surface - (bed + gap)) */
-            //thisiceHeight(iv, 0) = 6.0 * (std::sqrt(x_loc + Params.m_H) - std::sqrt(Params.m_H)) + 1.0;
-            thisiceHeight(iv, 0) = Params.m_H;
+            thisiceHeight(iv, 0) = 6.0 * (std::sqrt(x_loc + Params.m_H) - std::sqrt(Params.m_H)) + 1.0;
+            //thisiceHeight(iv, 0) = Params.m_H;
             /* Ice overburden pressure : rho_i * g * H */
             thispi(iv, 0)        = Params.m_rho_i * Params.m_gravity * thisiceHeight(iv, 0);
             
             /* option 1: guess Pw, find head */
             // Water press ?? No idea --> Pi/2.0
-            //thisPw(iv, 0)        = thispi(iv, 0) * 0.5;
+            thisPw(iv, 0)        = thispi(iv, 0) * 0.5;
             /* option 2: Pw = Patm, find head */
-            thisPw(iv, 0)        = 1.0;
+            //thisPw(iv, 0)        = 10000.0;
             Real Fact            = 1./(Params.m_rho_w * Params.m_gravity);
             thisHead(iv, 0)      = thisPw(iv, 0) * Fact + thiszbed(iv, 0) ;
             /* option 3: fix head constant to 0 */
-            //thisHead(iv, 0)      = 0.0;
+            //thisHead(iv, 0)      = 10.*Params.m_slope*x_loc;
             //thisPw(iv, 0)        = ( thisHead(iv, 0) - thiszbed(iv, 0) ) * (Params.m_rho_w * Params.m_gravity) ;
 
             /* Bed randomization */
@@ -145,7 +145,7 @@ HydroIBC::initializeData(RealVect& a_dx,
             thisbumpSpacing(iv, 0)     = Params.m_lr;
 
             /* dummy stuff  */
-            thisRe(iv, 0)        = Params.m_ReInit;
+            thisRe(iv, 0)        = std::max(100.0 - 0.1*Params.m_ReInit*x_loc, 10.0);
             Real denom_q         = 12.0 * Params.m_nu * (1 + Params.m_omega * Params.m_ReInit);
             // grad head = slope for now
             Real num_q           = - Params.m_gravity * std::pow(thisGapHeight(iv, 0),3) * Params.m_slope ;
