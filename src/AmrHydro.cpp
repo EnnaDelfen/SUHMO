@@ -2327,8 +2327,9 @@ AmrHydro::timeStepFAS(Real a_dt)
                                   (tmp_cc(iv, 0) + tmp_cc(iv, 1));
 
                     // Add sliding term 
+                    // mR -- turn off fric heat and geot heat
                     Pressw(iv,0) = m_suhmoParm->m_gravity * m_suhmoParm->m_rho_w * (currH(iv,0) - zb(iv,0));
-                    Real sca_prod = 20. * 20. * m_suhmoParm->m_ub[0] * std::abs(Pressi(iv,0) - Pressw(iv,0)) * m_suhmoParm->m_ub[0];
+                    Real sca_prod = 0.0 ; //20. * 20. * m_suhmoParm->m_ub[0] * std::abs(Pressi(iv,0) - Pressw(iv,0)) * m_suhmoParm->m_ub[0];
                     RHSh(iv,0) += sca_prod * rho_coef / m_suhmoParm->m_L ;
 
                     // Add moulin 
@@ -2708,8 +2709,8 @@ AmrHydro::timeStepFAS(Real a_dt)
                 IntVect iv = bit(); 
                 //Pw
                 Pressw(iv,0) = m_suhmoParm->m_gravity * m_suhmoParm->m_rho_w * (newH(iv,0) - zb(iv,0));
-                // mR
-                Real sca_prod = 20. * 20. * m_suhmoParm->m_ub[0] * std::abs(Pressi(iv,0) - Pressw(iv,0)) * m_suhmoParm->m_ub[0];
+                // mR -- turn off fric heat and geot heat
+                Real sca_prod = 0.0; //20. * 20. * m_suhmoParm->m_ub[0] * std::abs(Pressi(iv,0) - Pressw(iv,0)) * m_suhmoParm->m_ub[0];
                 mR(iv,0)   = m_suhmoParm->m_G + 
                              sca_prod
                              - m_suhmoParm->m_ct * m_suhmoParm->m_cw * m_suhmoParm->m_rho_w * m_suhmoParm->m_rho_w * m_suhmoParm->m_gravity *
