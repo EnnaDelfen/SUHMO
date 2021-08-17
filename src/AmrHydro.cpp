@@ -408,6 +408,8 @@ AmrHydro::SolveForHead_nl(const Vector<DisjointBoxLayout>&               a_grids
     // solve !
     bool zeroInitialGuess = false;
     amrSolver->solve(a_head, a_RHS, m_finest_level, 0, zeroInitialGuess);
+
+    delete amrSolver;
 }
 
 AmrHydro::AmrHydro() : m_IBCPtr(NULL)
@@ -423,6 +425,7 @@ AmrHydro::setParams()
     m_suhmoParm = new suhmo_params;
     m_suhmoParm->readInputs();
 }
+
 
 void
 AmrHydro::setDefaults()
@@ -1150,43 +1153,43 @@ void AmrHydro::WFlx_level(LevelData<FluxBox>&          a_bcoef,
                         CHF_CONST_REAL(m_suhmoParm->m_nu) );
     }
 
-    if (a_print_WFX) {
-        /* custom plt here -- debug print */
-            int nStuffToPlot = 4;
-            Vector<std::string> vectName;
-            vectName.resize(nStuffToPlot);
-            vectName[0]="GapHeight";
-            vectName[1]="Head";
-            vectName[2]="Reynolds";
-            vectName[3]="GradH";
+    //if (a_print_WFX) {
+    //    /* custom plt here -- debug print */
+    //        int nStuffToPlot = 4;
+    //        Vector<std::string> vectName;
+    //        vectName.resize(nStuffToPlot);
+    //        vectName[0]="GapHeight";
+    //        vectName[1]="Head";
+    //        vectName[2]="Reynolds";
+    //        vectName[3]="GradH";
 
-            Vector<Vector<LevelData<FArrayBox>*>> stuffToPlot;
-            stuffToPlot.resize(nStuffToPlot);
-            for (int zz = 0; zz < nStuffToPlot; zz++) {
-                stuffToPlot[zz].resize(1, NULL);
-            }
+    //        Vector<Vector<LevelData<FArrayBox>*>> stuffToPlot;
+    //        stuffToPlot.resize(nStuffToPlot);
+    //        for (int zz = 0; zz < nStuffToPlot; zz++) {
+    //            stuffToPlot[zz].resize(1, NULL);
+    //        }
 
-            stuffToPlot[0][0]  = new LevelData<FArrayBox>(levelGrids, 1, a_u.ghostVect());
-            stuffToPlot[1][0]  = new LevelData<FArrayBox>(levelGrids, 1, a_u.ghostVect());
-            stuffToPlot[2][0]  = new LevelData<FArrayBox>(levelGrids, 1, a_u.ghostVect());
-            stuffToPlot[3][0]  = new LevelData<FArrayBox>(levelGrids, 1, a_u.ghostVect());
+    //        stuffToPlot[0][0]  = new LevelData<FArrayBox>(levelGrids, 1, a_u.ghostVect());
+    //        stuffToPlot[1][0]  = new LevelData<FArrayBox>(levelGrids, 1, a_u.ghostVect());
+    //        stuffToPlot[2][0]  = new LevelData<FArrayBox>(levelGrids, 1, a_u.ghostVect());
+    //        stuffToPlot[3][0]  = new LevelData<FArrayBox>(levelGrids, 1, a_u.ghostVect());
 
-            LevelData<FArrayBox>& levelGapSTP   = *stuffToPlot[0][0];
-            LevelData<FArrayBox>& levelHeadSTP  = *stuffToPlot[1][0];
-            LevelData<FArrayBox>& levelReSTP    = *stuffToPlot[2][0];
-            LevelData<FArrayBox>& levelGradHSTP = *stuffToPlot[3][0];
+    //        LevelData<FArrayBox>& levelGapSTP   = *stuffToPlot[0][0];
+    //        LevelData<FArrayBox>& levelHeadSTP  = *stuffToPlot[1][0];
+    //        LevelData<FArrayBox>& levelReSTP    = *stuffToPlot[2][0];
+    //        LevelData<FArrayBox>& levelGradHSTP = *stuffToPlot[3][0];
 
-            DataIterator dit = levelHeadSTP.dataIterator();
-            for (dit.begin(); dit.ok(); ++dit) {
-                levelGapSTP[dit].copy(a_B[dit], 0, 0, 1);
-                levelHeadSTP[dit].copy(lcl_u[dit], 0, 0, 1);
-                levelReSTP[dit].copy(lvlRe[dit], 0, 0, 1);
-                levelGradHSTP[dit].copy(lvlgradH[dit], 0, 0, 1);
-            }
-            writePltWFX(nStuffToPlot, vectName, stuffToPlot, 
-                        levelDomain, levelGrids, 
-                        a_smooth, a_depth);
-    }
+    //        DataIterator dit = levelHeadSTP.dataIterator();
+    //        for (dit.begin(); dit.ok(); ++dit) {
+    //            levelGapSTP[dit].copy(a_B[dit], 0, 0, 1);
+    //            levelHeadSTP[dit].copy(lcl_u[dit], 0, 0, 1);
+    //            levelReSTP[dit].copy(lvlRe[dit], 0, 0, 1);
+    //            levelGradHSTP[dit].copy(lvlgradH[dit], 0, 0, 1);
+    //        }
+    //        writePltWFX(nStuffToPlot, vectName, stuffToPlot, 
+    //                    levelDomain, levelGrids, 
+    //                    a_smooth, a_depth);
+    //}
     
     // CC -> EC
     LevelData<FluxBox>   lvlB_ec(levelGrids, 1, IntVect::Zero);
@@ -2832,6 +2835,18 @@ AmrHydro::timeStepFAS(Real a_dt)
             }
         } // loop on levs
         writePltCustom(nStuffToPlot, vectName, stuffToPlot, "");
+
+        for (int lev = 0; lev <= m_finest_level; lev++) {
+            delete stuffToPlot[0][lev];
+            delete stuffToPlot[1][lev];
+            delete stuffToPlot[2][lev];
+            delete stuffToPlot[3][lev];
+            delete stuffToPlot[4][lev];
+            delete stuffToPlot[5][lev];
+            delete stuffToPlot[6][lev];
+            delete stuffToPlot[7][lev];
+            delete stuffToPlot[8][lev];
+        }
     } // end customPlt
 
 
@@ -2972,7 +2987,7 @@ AmrHydro::timeStepFAS(Real a_dt)
             delete a_Re_ec[lev];
             delete a_GapHeight_ec[lev];
             delete a_gradZb_ec[lev];
-            //delete a_Dcoef[lev];
+            delete a_Dcoef[lev];
             //delete aCoef[lev];
             //delete bCoef[lev];
     }
@@ -3109,6 +3124,7 @@ AmrHydro::regrid()
                 m_bedelevation[lev]    = new LevelData<FArrayBox>;
                 m_overburdenpress[lev] = new LevelData<FArrayBox>;
             }
+
           
             /* NEED VARIABLE */
             // HEAD
@@ -3148,6 +3164,13 @@ AmrHydro::regrid()
                 new LevelData<FArrayBox>(newDBL, m_bumpSpacing[0]->nComp(), m_bumpSpacing[0]->ghostVect());
 
             // Other vars: grads / Pw / Qw / mR
+            if (m_gradhead[lev] != NULL) {
+                delete m_gradhead[lev];
+                delete m_gradhead_ec[lev];
+                delete m_Pw[lev];
+                delete m_qw[lev];
+                delete m_meltRate[lev];
+            }
             m_gradhead[lev]        = new LevelData<FArrayBox>(newDBL, m_gradhead[0]->nComp(), m_gradhead[0]->ghostVect());
             m_gradhead_ec[lev]     = new LevelData<FluxBox>(newDBL, m_gradhead_ec[0]->nComp(), IntVect::Zero);
             m_Pw[lev]              = new LevelData<FArrayBox>(newDBL, m_Pw[0]->nComp(), m_Pw[0]->ghostVect());
@@ -3303,6 +3326,16 @@ AmrHydro::regrid()
             m_iceheight[lev]       = new_iceheightDataPtr;
             m_bedelevation[lev]    = new_bedelevationDataPtr;
             m_overburdenpress[lev] = new_overburdenpressDataPtr;
+
+            // can now delete holders
+            delete new_headDataPtr;
+            delete new_gapheightDataPtr;
+            delete new_ReDataPtr;
+            delete new_iceheightDataPtr;
+            delete new_bedelevationDataPtr;
+            delete new_overburdenpressDataPtr;
+            delete new_bumpHeightDataPtr;
+            delete new_bumpSpacingDataPtr;
 
 
             if (m_verbosity > 20) {
@@ -4643,8 +4676,8 @@ AmrHydro::readCheckpointFile(HDF5Handle& a_handle)
             m_iceheight[lev]     = new LevelData<FArrayBox>(levelDBL, nPhiComp, nGhost);
             m_bedelevation[lev]  = new LevelData<FArrayBox>(levelDBL, nPhiComp, nGhost);
             m_overburdenpress[lev]   = new LevelData<FArrayBox>(levelDBL, nPhiComp, nGhost);
-            m_bumpHeight[lev] = new LevelData<FArrayBox>(levelDBL, nPhiComp, nGhost); 
-            m_bumpSpacing[lev] = new LevelData<FArrayBox>(levelDBL, nPhiComp, nGhost); 
+            m_bumpHeight[lev]        = new LevelData<FArrayBox>(levelDBL, nPhiComp, nGhost); 
+            m_bumpSpacing[lev]       = new LevelData<FArrayBox>(levelDBL, nPhiComp, nGhost); 
 
             // read this level's data
             /* HEAD */
