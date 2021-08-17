@@ -63,6 +63,10 @@ AMRNonLinearPoissonOp::AMRNonLinearPoissonOp()
 {
 }
 
+AMRNonLinearPoissonOp::~AMRNonLinearPoissonOp()
+{
+}
+
 /** full define function for AMRLevelOp with both coarser and finer levels */
 void AMRNonLinearPoissonOp::define(const DisjointBoxLayout& a_grids,
                                    const DisjointBoxLayout& a_gridsFiner,
@@ -1979,22 +1983,9 @@ MGLevelOp<LevelData<FArrayBox> >* AMRNonLinearPoissonOpFactory::MGnewOp(const Pr
       CoarseAverage averagerZb(m_zb[ref]->getBoxes(),
                              layout, zb->nComp(), coarsening);
 
-      //if (m_coefficient_average_type == CoarseAverage::arithmetic)
-      //  {
-          averagerB.averageToCoarse(*B,   *(m_B[ref]));
-          averagerPi.averageToCoarse(*Pri, *(m_Pi[ref]));
-          averagerZb.averageToCoarse(*zb,  *(m_zb[ref]));
-      //  }
-      //else if (m_coefficient_average_type == CoarseAverage::harmonic)
-      //  {
-      //    averagerB.averageToCoarseHarmonic(*B,   *(m_B[ref]));
-      //    averagerPi.averageToCoarseHarmonic(*Pri, *(m_Pi[ref]));
-      //    averagerZb.averageToCoarseHarmonic(*zb,  *(m_zb[ref]));
-      //  }
-      //else
-      //  {
-      //    MayDay::Abort("AMRNonLinearPoissonOpFactory::MGNewOp -- bad averagetype");
-      //  }
+      averagerB.averageToCoarse(*B,   *(m_B[ref]));
+      averagerPi.averageToCoarse(*Pri, *(m_Pi[ref]));
+      averagerZb.averageToCoarse(*zb,  *(m_zb[ref]));
 
       newOp->m_B  = B;   // Gap Height
       newOp->m_Pi = Pri; // Overb Press  

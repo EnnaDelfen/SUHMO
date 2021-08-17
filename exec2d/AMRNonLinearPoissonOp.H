@@ -36,7 +36,6 @@ typedef void (AmrHydro::*NL_level) (LevelData<FArrayBox>& a_NL, LevelData<FArray
 typedef void (AmrHydro::*waterFlux_level) (LevelData<FluxBox>& a_Bcoef, const LevelData<FArrayBox>&  a_u, 
                                            const LevelData<FArrayBox>*  a_ucoarse, LevelData<FArrayBox>& a_B,
                                            Real a_dx, bool a_print, int a_smooth, int a_depth);
-//typedef void (AmrHydro::*NL) (Vector<LevelData<FArrayBox>* > a_NL, Vector<LevelData<FArrayBox>* > a_dNL, const Vector<LevelData<FArrayBox>* >  a_u, int a_finestLevel);
 
 ///
 /**
@@ -59,9 +58,7 @@ public:
   ///
   /**
    */
-  virtual ~AMRNonLinearPoissonOp()
-  {
-  }
+  virtual ~AMRNonLinearPoissonOp();
 
   ///
   /** full define function for AMRLevelOp with both coarser and finer levels */
