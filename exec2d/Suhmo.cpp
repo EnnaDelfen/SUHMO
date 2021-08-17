@@ -21,6 +21,7 @@
 #include "AmrHydro.H"
 
 #include "HydroIBC.H"
+#include "memusage.H" 
 
 #ifdef CH_USE_PETSC
 #include "petsc.h"
@@ -108,6 +109,7 @@ main(int argc, char* argv[])
     } // end nested scope
 
     CH_TIMER_REPORT();
+    dumpmemoryatexit();
 
 #ifdef CH_USE_PETSC
     ierr = PetscFinalize();
