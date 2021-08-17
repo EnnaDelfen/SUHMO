@@ -58,7 +58,7 @@ public:
 
     /* set default values for hydro_params */
     void setParams();
-
+ 
     /* initializes new object based on data in ParmParse database */
     void initialize();
 
@@ -407,11 +407,6 @@ protected:
     /* */
     Vector<LevelData<FArrayBox>*> m_old_head;               // Hydraulic head
     Vector<LevelData<FArrayBox>*> m_old_gapheight;          // Subglacial height
-    /* */
-    Vector<LevelData<FArrayBox>*> m_old_Pw;                 // Water pressure
-    Vector<LevelData<FArrayBox>*> m_old_qw;                 // Water flux
-    Vector<LevelData<FArrayBox>*> m_old_Re;                 // Reynolds number
-    Vector<LevelData<FArrayBox>*> m_old_meltRate;           // Melting rate
 
     /* new-time data */
     /* */
