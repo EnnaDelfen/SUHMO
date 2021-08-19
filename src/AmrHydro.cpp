@@ -1593,7 +1593,7 @@ AmrHydro::Calc_moulin_source_term_distributed (LevelData<FArrayBox>& levelMoulin
        FArrayBox& moulinSrcTmp   = levelMoulinSrcTmp[dit];
 
        //moulinSrc.setVal(0.0);
-       moulinSrc.setVal(7.93e-11);
+       moulinSrc.setVal(m_suhmoParm->m_distributed_input);
 
        BoxIterator bit(moulinSrcTmp.box());
        for (bit.begin(); bit.ok(); ++bit) {
@@ -2241,7 +2241,7 @@ AmrHydro::timeStepFAS(Real a_dt)
             } else if (m_suhmoParm->m_n_moulins < 0) {
                 for (dit.begin(); dit.ok(); ++dit) {
                     FArrayBox& moulinSrc = levelmoulin_source_term[dit];
-                    moulinSrc.setVal(m_suhmoParm->m_moulin_flux[0]);
+                    moulinSrc.setVal(m_suhmoParm->m_distributed_input);
                 }
             } else {
                 for (dit.begin(); dit.ok(); ++dit) {
