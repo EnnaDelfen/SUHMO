@@ -30,6 +30,7 @@ void suhmo_params::setDefaults()
     m_ReInit = 0.0;
     // Moulin
     m_n_moulins = 0;
+    m_distributed_input = 0.0;
 }
 
 void suhmo_params::readInputs()
@@ -61,6 +62,7 @@ void suhmo_params::readInputs()
     ppParams.get("GapInit", m_gapInit);
     ppParams.get("ReInit", m_ReInit);
     // MOULINS
+    ppParams.get("distributed_input", m_distributed_input);
     ppParams.get("n_moulins", m_n_moulins);
     if (m_n_moulins > 0 ) {
         m_moulin_position.resize(m_n_moulins*SpaceDim,0.0);

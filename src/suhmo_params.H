@@ -55,6 +55,7 @@ public:
     int m_n_moulins;
     std::vector<Real> m_moulin_position; // spaceDim per moulin
     std::vector<Real> m_moulin_flux;     // m3.s-1 per moulin 
+    Real m_distributed_input;     // m3.s-1 background input everywhere
     std::vector<Real> m_sigma;           //  
     // verbosity level
     int m_verbosity;
