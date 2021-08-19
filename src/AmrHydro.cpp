@@ -1593,9 +1593,9 @@ AmrHydro::Calc_moulin_source_term_distributed (LevelData<FArrayBox>& levelMoulin
        FArrayBox& moulinSrcTmp   = levelMoulinSrcTmp[dit];
 
        //moulinSrc.setVal(0.0);
-       moulinSrc.setVal(1.0e-10);
+       moulinSrc.setVal(7.93e-11);
 
-       BoxIterator bit(moulinSrc.box());
+       BoxIterator bit(moulinSrcTmp.box());
        for (bit.begin(); bit.ok(); ++bit) {
            IntVect iv = bit();
            for (int m = 0; m<m_suhmoParm->m_n_moulins; m++) {
@@ -1887,10 +1887,10 @@ AmrHydro::timeStepFAS(Real a_dt)
 
         // Head and b RHS
         RHS_h[lev]                = new LevelData<FArrayBox>(m_amrGrids[lev], 1, IntVect::Zero);
-        moulin_source_term[lev]   = new LevelData<FArrayBox>(m_amrGrids[lev], 1, IntVect::Zero);
+        moulin_source_term[lev]   = new LevelData<FArrayBox>(m_amrGrids[lev], 1, HeadGhostVect);
         RHS_b[lev]                = new LevelData<FArrayBox>(m_amrGrids[lev], 1, IntVect::Zero);
         a_diffusiveTerm[lev]      = new LevelData<FArrayBox>(m_amrGrids[lev], 1, IntVect::Zero);
-        a_chanDegree[lev]         = new LevelData<FArrayBox>(m_amrGrids[lev], 1, IntVect::Zero);
+        a_chanDegree[lev]         = new LevelData<FArrayBox>(m_amrGrids[lev], 1, HeadGhostVect);
         // Head and B lagged for iterations
         a_head_lagged[lev]      = new LevelData<FArrayBox>(m_amrGrids[lev], 1, HeadGhostVect);
         a_head_curr[lev]        = new LevelData<FArrayBox>(m_amrGrids[lev], 1, HeadGhostVect);
@@ -2851,75 +2851,125 @@ AmrHydro::timeStepFAS(Real a_dt)
 
 
 
-    /* POST PROC   */
+    /* POST PROC -- 1 LEVEL  */
     if (m_post_proc) {
-        Real out_water_flux_x = 0.0; 
+        pout() << "\n\n\n";
+        pout() <<"oo POST PROC analysis oo "<< endl;
+        
+        int DomSize = m_amrDomains[0].domainBox().size(0); 
+
+        Vector<Real> out_water_flux_x_tot(DomSize , 0.0);
+        Vector<Real> out_water_flux_x_distrib(DomSize, 0.0);
+        Vector<Real> out_water_flux_x_chan(DomSize, 0.0);
+        Vector<Real> out_recharge(DomSize, 0.0);
+
+        DisjointBoxLayout&    levelGrids = m_amrGrids[0];
+
+        LevelData<FArrayBox>& levelchanDegree = *a_chanDegree[0];
+        LevelData<FluxBox>   levelCD_ec(levelGrids, 1, IntVect::Zero);
+        levelchanDegree.exchange();
+        CellToEdge(levelchanDegree, levelCD_ec);
+
+        LevelData<FArrayBox>& levelMoulinSrc  = *moulin_source_term[0];
+        LevelData<FluxBox>   levelMoulinSrc_ec(levelGrids, 1, IntVect::Zero);
+        levelMoulinSrc.exchange();
+        CellToEdge(levelMoulinSrc, levelMoulinSrc_ec);
+
+        LevelData<FArrayBox>& levelmR         = *m_meltRate[0];
+        LevelData<FluxBox>    levelmR_ec(levelGrids, 1, IntVect::Zero);
+        levelmR.exchange();
+        CellToEdge(levelmR, levelmR_ec);
+
         Real max_water_flux_x_loc = -1000.;
-        //for (int lev = 0; lev <= m_finest_level; lev++) {
-            DisjointBoxLayout&    levelGrids = m_amrGrids[0];
-            LevelData<FluxBox>&   levelQw_ec = *a_Qw_ec[0]; 
-            DataIterator dit                 = levelGrids.dataIterator();
-            for (dit.begin(); dit.ok(); ++dit) {
-                FluxBox& Qwater_ec = levelQw_ec[dit];
-                // loop over directions
-                //for (int dir = 0; dir<SpaceDim; dir++) {
-                    FArrayBox& Qwater_ecFab = Qwater_ec[0];
-                    BoxIterator bitEC(Qwater_ecFab.box()); 
-                    for (bitEC.begin(); bitEC.ok(); ++bitEC) {
-                        IntVect iv = bitEC();
-                        if (iv[0] == 0) {
-                            out_water_flux_x += Qwater_ecFab(iv, 0) * m_amrDx[0][0];
-                            max_water_flux_x_loc = std::max( std::abs(Qwater_ecFab(iv, 0) * m_amrDx[0][0]), max_water_flux_x_loc);
-                        }
-                    }
-                //}
-            } 
-        //} 
+
+        LevelData<FluxBox>&   levelQw_ec = *a_Qw_ec[0]; 
+
+        DataIterator dit                 = levelGrids.dataIterator();
+
+        for (dit.begin(); dit.ok(); ++dit) {
+            FluxBox&   Qwater_ec    = levelQw_ec[dit];
+            FArrayBox& Qwater_ecFab = Qwater_ec[0];
+            FluxBox&   CD_ec        = levelCD_ec[dit];
+            FArrayBox& CD_ecFab     = CD_ec[0];
+            FluxBox&   MS_ec        = levelMoulinSrc_ec[dit];
+            FArrayBox& MS_ecFab     = MS_ec[0];
+            FluxBox&   MR_ec        = levelmR_ec[dit];
+            FArrayBox& MR_ecFab     = MR_ec[0];
+
+            const Box& validBox = levelGrids.get(dit);
+
+            BoxIterator bitEC(validBox); 
+            for (bitEC.begin(); bitEC.ok(); ++bitEC) {
+                IntVect iv = bitEC();
+                out_water_flux_x_tot[iv[0]] += Qwater_ecFab(iv, 0) * m_amrDx[0][0];
+                max_water_flux_x_loc = std::max( std::abs(Qwater_ecFab(iv, 0) * m_amrDx[0][0]), max_water_flux_x_loc);
+                out_water_flux_x_chan[iv[0]] += Qwater_ecFab(iv, 0) * m_amrDx[0][0] * CD_ecFab(iv, 0);
+                out_water_flux_x_distrib[iv[0]] += Qwater_ecFab(iv, 0) * m_amrDx[0][0] * (1.0 - CD_ecFab(iv, 0));
+                out_recharge[iv[0]] += (MS_ecFab(iv, 0) + MR_ecFab(iv, 0)/m_suhmoParm->m_rho_w) * m_amrDx[0][0] * m_amrDx[0][0];
+            }
+        } 
 
 #ifdef CH_MPI
-       Real recv;
-       int result = MPI_Allreduce(&out_water_flux_x, &recv, 1, MPI_CH_REAL,
+       Vector<Real> recv(DomSize);
+       int result = MPI_Allreduce(&out_water_flux_x_tot[0], &recv[0], DomSize, MPI_CH_REAL,
                                   MPI_SUM, Chombo_MPI::comm);
        if (result != MPI_SUCCESS)
        {
            MayDay::Error("communication error on MPI_SUM");
        }
-       out_water_flux_x = recv;
+       out_water_flux_x_tot = recv;
 
-       result = MPI_Allreduce(&max_water_flux_x_loc, &recv, 1, MPI_CH_REAL,
+       Vector<Real> recvChan(DomSize);
+       result = MPI_Allreduce(&out_water_flux_x_chan[0], &recvChan[0], DomSize, MPI_CH_REAL,
+                                  MPI_SUM, Chombo_MPI::comm);
+       if (result != MPI_SUCCESS)
+       {
+           MayDay::Error("communication error on MPI_SUM");
+       }
+       out_water_flux_x_chan = recvChan;
+
+       Vector<Real> recvDist(DomSize);
+       result = MPI_Allreduce(&out_water_flux_x_distrib[0], &recvDist[0], DomSize, MPI_CH_REAL,
+                                  MPI_SUM, Chombo_MPI::comm);
+       if (result != MPI_SUCCESS)
+       {
+           MayDay::Error("communication error on MPI_SUM");
+       }
+       out_water_flux_x_distrib = recvDist;
+
+       Vector<Real> recvMoulin(DomSize);
+       result = MPI_Allreduce(&out_recharge[0], &recvMoulin[0], DomSize, MPI_CH_REAL,
+                                  MPI_SUM, Chombo_MPI::comm);
+       if (result != MPI_SUCCESS)
+       {
+           MayDay::Error("communication error on MPI_SUM");
+       }
+       out_recharge = recvMoulin;
+
+       Real recv2;
+       result = MPI_Allreduce(&max_water_flux_x_loc, &recv2, 1, MPI_CH_REAL,
                               MPI_MAX, Chombo_MPI::comm);
        if (result != MPI_SUCCESS)
        {
            MayDay::Error("communication error on MPI_MAX");
        }
-       max_water_flux_x_loc = recv;
+       max_water_flux_x_loc = recv2;
 #endif
 
-        Real channel_water_flux_x; 
-        Real distrib_water_flux_x; 
-        for (dit.begin(); dit.ok(); ++dit) {
-            FluxBox& Qwater_ec = levelQw_ec[dit];
-            FArrayBox& Qwater_ecFab = Qwater_ec[0];
-            BoxIterator bitEC(Qwater_ecFab.box()); 
-            for (bitEC.begin(); bitEC.ok(); ++bitEC) {
-                IntVect iv = bitEC();
-                if (iv[0] == 0) {
-                    Real abs_loc_val = std::abs(Qwater_ecFab(iv, 0) * m_amrDx[0][0]);
-                    if (abs_loc_val > 0.5 * max_water_flux_x_loc) {
-                        channel_water_flux_x += Qwater_ecFab(iv, 0) * m_amrDx[0][0];
-                    } else { 
-                        distrib_water_flux_x += Qwater_ecFab(iv, 0) * m_amrDx[0][0];
-                    }
-                }
-            }
-        } 
+        for (int xi = (DomSize - 2); xi > -1 ; xi--) {
+            out_recharge[xi]  = out_recharge[xi]  + out_recharge[xi+1] ;
+        }
 
-        pout() << "\n\n\n";
-        pout() <<"oo POST PROC analysis oo "<< endl;
-        pout() <<" - Y integrated water flux in X dir is = "<< out_water_flux_x << endl;
-        pout() <<" -          contrib from CHANNEL (%)   = "<< channel_water_flux_x << " (" << channel_water_flux_x/out_water_flux_x * 100. << ")"<< endl;
-        pout() <<" -          contrib from DISTRIB (%)   = "<< distrib_water_flux_x << " (" << distrib_water_flux_x/out_water_flux_x * 100. << ")"<< endl;
-        pout() << "\n\n\n";
+        pout() <<" - Y integrated water flux in X dir: " << endl;
+        pout() <<"#Xpos TOT CHAN DISTRIB RECHARGE" << endl;
+        for (int xi = 1; xi < DomSize; xi++) {
+            Real xloc = (xi+0.5)*m_amrDx[0][0];
+            pout() << "   " << xloc << " " << - out_water_flux_x_tot[xi]    << " " << -out_water_flux_x_chan[xi] 
+                                    << " " << -out_water_flux_x_distrib[xi] << " " << out_recharge[xi]           << endl;
+        }
+        //pout() <<" -          contrib from CHANNEL (%)   = "<< channel_water_flux_x << " (" << channel_water_flux_x/out_water_flux_x * 100. << ")"<< endl;
+        //pout() <<" -          contrib from DISTRIB (%)   = "<< distrib_water_flux_x << " (" << distrib_water_flux_x/out_water_flux_x * 100. << ")"<< endl;
+        pout() << "END\n\n\n";
     }
 
     /* Averaging down and fill in ghost cells */
