@@ -30,7 +30,9 @@ void suhmo_params::setDefaults()
     m_ReInit = 0.0;
     // Moulin
     m_n_moulins = 0;
-    m_distributed_input = 0.0;
+    m_distributed_input  = 0.0;
+    m_time_varying_input = false;
+    m_runoff             = 0.0;
 }
 
 void suhmo_params::readInputs()
@@ -62,6 +64,7 @@ void suhmo_params::readInputs()
     ppParams.get("GapInit", m_gapInit);
     ppParams.get("ReInit", m_ReInit);
     // MOULINS
+    ppParams.get("time_varying_input", m_time_varying_input);
     ppParams.get("distributed_input", m_distributed_input);
     ppParams.get("n_moulins", m_n_moulins);
     if (m_n_moulins > 0 ) {
@@ -71,9 +74,9 @@ void suhmo_params::readInputs()
         ppParams.getarr("moulin_flux", m_moulin_flux, 0, m_n_moulins);
         m_sigma.resize(m_n_moulins,0.0);
         ppParams.getarr("moulin_sigma", m_sigma, 0, m_n_moulins);
-    } else {
-        m_moulin_flux.resize(1,0.0);
-        ppParams.getarr("moulin_flux", m_moulin_flux, 0, 1);
+    }
+    if (m_time_varying_input) {
+        ppParams.get("Ra", m_runoff);
     }
 
     // need to include verbose

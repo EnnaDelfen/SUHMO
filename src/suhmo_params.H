@@ -57,6 +57,8 @@ public:
     std::vector<Real> m_moulin_flux;     // m3.s-1 per moulin 
     Real m_distributed_input;     // m3.s-1 background input everywhere
     std::vector<Real> m_sigma;           //  
+    bool m_time_varying_input;
+    Real m_runoff;
     // verbosity level
     int m_verbosity;
 };
