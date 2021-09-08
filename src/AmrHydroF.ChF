@@ -317,3 +317,32 @@ C     ------------------------------------------------------------------
       return
       end
 
+C     -----------------------------------------------------------------
+C     subroutine COMPUTE_TIMEVARYINGRECHARGE
+C     computes the time varying distributed recharge
+C
+C     INPUTS/OUTPUTS:
+C     zs        =>  ice height 
+C     Recharge  =>  distributed input m/s
+C     ------------------------------------------------------------------
+      subroutine COMPUTE_TIMEVARYINGRECHARGE(
+     &     CHF_CONST_FRA[aZs],
+     &     CHF_BOX[region],
+     &     CHF_CONST_FRA[Recharge],
+     &     CHF_CONST_REAL[TK],
+     &     CHF_CONST_REAL[BackgroundInput]) 
+    
+      REAL_T ddf, dT_dZ 
+      integer CHF_DDECL[i;j;k]
+
+      ddf   = 0.01/86400.
+      dT_dZ = -0.0075
+
+      CHF_MULTIDO[region; i; j; k]
+
+         Recharge(CHF_IX[i;j;k],0) = max(ddf * (TK + aZs(CHF_IX[i;j;k],0) * dT_dZ), 0.0) + BackgroundInput
+
+      CHF_ENDDO
+
+      return
+      end

@@ -2244,9 +2244,26 @@ AmrHydro::timeStepFAS(Real a_dt)
                     interpolator.interpToFine(*moulin_source_term[lev], *moulin_source_term[lev - 1]);
                 }
             } else if (m_suhmoParm->m_n_moulins < 0) {
-                for (dit.begin(); dit.ok(); ++dit) {
-                    FArrayBox& moulinSrc = levelmoulin_source_term[dit];
-                    moulinSrc.setVal(m_suhmoParm->m_distributed_input);
+                if (m_suhmoParm->m_time_varying_input) {
+
+                    Real T_K   = -16.0 * std::cos( 2.0 * Pi * m_time / ( 365.*24*60*60.) ) - 5.0 + m_suhmoParm->m_deltaT;
+
+                    LevelData<FArrayBox>& levelIceHeight = *m_iceheight[lev];
+                    for (dit.begin(); dit.ok(); ++dit) {
+
+                        const Box& region = levelmoulin_source_term[dit].box();
+
+                        FORT_COMPUTE_TIMEVARYINGRECHARGE( CHF_FRA(levelIceHeight[dit]),
+                                                          CHF_BOX(region),
+                                                          CHF_FRA(levelmoulin_source_term[dit]),
+                                                          CHF_CONST_REAL(T_K),
+                                                          CHF_CONST_REAL(m_suhmoParm->m_distributed_input) );
+                    }
+                } else {
+                    for (dit.begin(); dit.ok(); ++dit) {
+                        FArrayBox& moulinSrc = levelmoulin_source_term[dit];
+                        moulinSrc.setVal(m_suhmoParm->m_distributed_input);
+                    }
                 }
             } else {
                 for (dit.begin(); dit.ok(); ++dit) {

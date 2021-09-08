@@ -45,7 +45,6 @@ public:
     Real m_maxOffbr;      // used to limit creep for low gap height
     Real m_DiffFactor;    // used to limit the gap height
     Real m_lr;            // spacing between bed bumps m
-    bool m_compute_bump_param;
     Real m_A;             // Flow law ??
     // Initialization 
     Real m_slope;         // bed slope
@@ -59,6 +58,7 @@ public:
     std::vector<Real> m_sigma;           //  
     bool m_time_varying_input;
     Real m_runoff;
+    Real m_deltaT;
     // verbosity level
     int m_verbosity;
 };

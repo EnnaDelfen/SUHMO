@@ -23,7 +23,6 @@ void suhmo_params::setDefaults()
     m_cutOffbr = 0.0;
     m_maxOffbr = 1000.0;
     m_DiffFactor = 0.0;
-    m_compute_bump_param = true;
     // Initialization 
     m_slope = 0.0;
     m_gapInit = 0.0;
@@ -33,6 +32,7 @@ void suhmo_params::setDefaults()
     m_distributed_input  = 0.0;
     m_time_varying_input = false;
     m_runoff             = 0.0;
+    m_deltaT             = 0.0;
 }
 
 void suhmo_params::readInputs()
@@ -74,9 +74,13 @@ void suhmo_params::readInputs()
         ppParams.getarr("moulin_flux", m_moulin_flux, 0, m_n_moulins);
         m_sigma.resize(m_n_moulins,0.0);
         ppParams.getarr("moulin_sigma", m_sigma, 0, m_n_moulins);
-    }
-    if (m_time_varying_input) {
-        ppParams.get("Ra", m_runoff);
+        if (m_time_varying_input) {
+            ppParams.get("Ra", m_runoff);
+        }
+    } else if (m_n_moulins < 0) {
+        if (m_time_varying_input) {
+            ppParams.get("deltaT", m_deltaT);
+        }
     }
 
     // need to include verbose
