@@ -912,14 +912,11 @@ AmrHydro::initialize()
             m_bumpSpacing[lev] = NULL;
         }
 
-        m_suhmoParm->m_compute_bump_param = false;
-
     } else {
         // we're restarting from a checkpoint file
         string restart_file;
         ppAmr.get("restart_file", restart_file);
         m_do_restart = true;
-        m_suhmoParm->m_compute_bump_param =  false;
 #ifdef CH_USE_HDF5
         restart(restart_file);
 #endif
@@ -1539,6 +1536,7 @@ AmrHydro::dCoeff(LevelData<FluxBox>&    leveldcoef,
 void 
 AmrHydro::Calc_moulin_source_term_distributed (LevelData<FArrayBox>& levelMoulinSrc) 
 {
+   // UNITS FOR m_moulin_flux SHOULD BE M3/S
    // WOrk on coarser level
    int curr_level = 0;
 
@@ -1592,32 +1590,36 @@ AmrHydro::Calc_moulin_source_term_distributed (LevelData<FArrayBox>& levelMoulin
        FArrayBox& moulinSrc      = levelMoulinSrc[dit];
        FArrayBox& moulinSrcTmp   = levelMoulinSrcTmp[dit];
 
-       //moulinSrc.setVal(0.0);
        moulinSrc.setVal(m_suhmoParm->m_distributed_input);
 
        BoxIterator bit(moulinSrcTmp.box());
        for (bit.begin(); bit.ok(); ++bit) {
            IntVect iv = bit();
            for (int m = 0; m<m_suhmoParm->m_n_moulins; m++) {
-               moulinSrc(iv,0) += moulinSrcTmp(iv,m) / a_moulinsInteg[m] *  m_suhmoParm->m_moulin_flux[m] ; 
-               a_moulinsIntegFinal[m] += moulinSrc(iv,0) * m_amrDx[curr_level][0] * m_amrDx[curr_level][1]; 
+               moulinSrc(iv,0) += moulinSrcTmp(iv,m) * ( 1.0 - m_suhmoParm->m_runoff * std::sin(2.0 * Pi * m_time / 86400. ) )  
+                                  / a_moulinsInteg[m] *  m_suhmoParm->m_moulin_flux[m] ; 
+               a_moulinsIntegFinal[m] += moulinSrcTmp(iv,m) * ( 1.0 - m_suhmoParm->m_runoff * std::sin(2.0 * Pi * m_time / 86400. ) )   
+                                  / a_moulinsInteg[m] * m_suhmoParm->m_moulin_flux[m] * m_amrDx[curr_level][0] * m_amrDx[curr_level][1]; 
            }
        }
    }
 
 #ifdef CH_MPI
    for (int m = 0; m<m_suhmoParm->m_n_moulins; m++) {
+       recv = 0;
        int result = MPI_Allreduce(&a_moulinsIntegFinal[m], &recv, 1, MPI_CH_REAL,
                                   MPI_SUM, Chombo_MPI::comm);
        a_moulinsIntegFinal[m] = recv;
    }
 #endif
    // Check
+   Real totalRechar = 0.0;
    for (int m = 0; m<m_suhmoParm->m_n_moulins; m++) {
-       if (m_verbosity > 3) {
-           pout() << "level is: " << curr_level << ", Integral of moulin number " << m <<" is (vol. rate): " << a_moulinsIntegFinal[m] << endl; 
-       } 
+       totalRechar += a_moulinsIntegFinal[m];
    }
+   if (m_verbosity > 3) {
+       pout() << "level is: " << curr_level << ", Integral of all moulins is (vol. rate): " << totalRechar << endl; 
+   } 
 
 }
 
@@ -2231,6 +2233,9 @@ AmrHydro::timeStepFAS(Real a_dt)
             LevelData<FluxBox>   leveltmp2_ec(levelGrids, 1, IntVect::Zero);
             LevelData<FArrayBox> leveltmp2_cc(levelGrids, 1*SpaceDim, HeadGhostVect);
 
+           
+            // UNITS FOR m_moulin_flux SHOULD BE M3/S
+            // UNITS FOR m_distributed_input SHOULD BE M/S
             if (m_suhmoParm->m_n_moulins > 0) {
                 if (lev == 0) {
                     Calc_moulin_source_term_distributed(levelmoulin_source_term);
@@ -2332,7 +2337,7 @@ AmrHydro::timeStepFAS(Real a_dt)
                     // Add sliding term 
                     // mR -- turn off fric heat and geot heat
                     Pressw(iv,0) = m_suhmoParm->m_gravity * m_suhmoParm->m_rho_w * (currH(iv,0) - zb(iv,0));
-                    Real sca_prod = 0.0 ; //20. * 20. * m_suhmoParm->m_ub[0] * std::abs(Pressi(iv,0) - Pressw(iv,0)) * m_suhmoParm->m_ub[0];
+                    Real sca_prod = 20. * 20. * m_suhmoParm->m_ub[0] * std::abs(Pressi(iv,0) - Pressw(iv,0)) * m_suhmoParm->m_ub[0];
                     RHSh(iv,0) += sca_prod * rho_coef / m_suhmoParm->m_L ;
 
                     // Add moulin 
@@ -2424,7 +2429,7 @@ AmrHydro::timeStepFAS(Real a_dt)
         Real maxHead = computeMax(m_head, m_refinement_ratios, Interval(0,0), 0);
         Real minHead = computeMin(m_head, m_refinement_ratios, Interval(0,0), 0);
         if (m_verbosity > 3) {
-            pout() <<"        Check for convergence of h (max = "<< maxHead<<", min = " << minHead << ")"<<endl;
+            pout() <<"        Check for convergence of h (max = " << maxHead<<", min = " << minHead << ")"<<endl;
         }
         for (int lev = 0; lev <= m_finest_level; lev++) {
             LevelData<FArrayBox>& levelnewH_lag  = *a_head_lagged[lev];
@@ -2713,7 +2718,7 @@ AmrHydro::timeStepFAS(Real a_dt)
                 //Pw
                 Pressw(iv,0) = m_suhmoParm->m_gravity * m_suhmoParm->m_rho_w * (newH(iv,0) - zb(iv,0));
                 // mR -- turn off fric heat and geot heat
-                Real sca_prod = 0.0; //20. * 20. * m_suhmoParm->m_ub[0] * std::abs(Pressi(iv,0) - Pressw(iv,0)) * m_suhmoParm->m_ub[0];
+                Real sca_prod = 20. * 20. * m_suhmoParm->m_ub[0] * std::abs(Pressi(iv,0) - Pressw(iv,0)) * m_suhmoParm->m_ub[0];
                 mR(iv,0)   = m_suhmoParm->m_G + 
                              sca_prod
                              - m_suhmoParm->m_ct * m_suhmoParm->m_cw * m_suhmoParm->m_rho_w * m_suhmoParm->m_rho_w * m_suhmoParm->m_gravity *
@@ -2764,7 +2769,7 @@ AmrHydro::timeStepFAS(Real a_dt)
 
     /* FINAL custom plt here -- debug print */
     if ((m_PrintCustom) && (m_cur_step % m_plot_interval == 0) ) {
-        int nStuffToPlot = 9;
+        int nStuffToPlot = 10;
         Vector<std::string> vectName;
         vectName.resize(nStuffToPlot);
         vectName[0]="head";
@@ -2776,6 +2781,7 @@ AmrHydro::timeStepFAS(Real a_dt)
         vectName[6]="RHS_bC";
         vectName[7]="RHS_hmoul";
         vectName[8]="Channelization";
+        vectName[9]="Qx";
 
         Vector<Vector<LevelData<FArrayBox>*>> stuffToPlot;
         stuffToPlot.resize(nStuffToPlot);
@@ -2793,6 +2799,7 @@ AmrHydro::timeStepFAS(Real a_dt)
             stuffToPlot[6][lev]  = new LevelData<FArrayBox>(m_amrGrids[lev], 1, IntVect::Zero);
             stuffToPlot[7][lev]  = new LevelData<FArrayBox>(m_amrGrids[lev], 1, IntVect::Zero);
             stuffToPlot[8][lev]  = new LevelData<FArrayBox>(m_amrGrids[lev], 1, IntVect::Zero);
+            stuffToPlot[9][lev]  = new LevelData<FArrayBox>(m_amrGrids[lev], 1, IntVect::Zero);
 
             LevelData<FArrayBox>& levelHead      = *m_head[lev];
             LevelData<FArrayBox>& levelHeadSTP   = *stuffToPlot[0][lev];
@@ -2821,6 +2828,9 @@ AmrHydro::timeStepFAS(Real a_dt)
             LevelData<FArrayBox>& levelCD        = *a_chanDegree[lev];
             LevelData<FArrayBox>& levelCDSTP     = *stuffToPlot[8][lev];
 
+            LevelData<FArrayBox>& levelqw        = *m_qw[lev];
+            LevelData<FArrayBox>& levelqwSTP     = *stuffToPlot[9][lev];
+
             DataIterator dit = levelHead.dataIterator();
             for (dit.begin(); dit.ok(); ++dit) {
                 levelHeadSTP[dit].copy(levelHead[dit], 0, 0, 1);
@@ -2832,6 +2842,7 @@ AmrHydro::timeStepFAS(Real a_dt)
                 levelRHSB3STP[dit].copy(levelRHSB3[dit], 0, 0, 1);
                 levelRHSH1STP[dit].copy(levelRHSH1[dit], 0, 0, 1);
                 levelCDSTP[dit].copy(levelCD[dit], 0, 0, 1);
+                levelqwSTP[dit].copy(levelqw[dit], 0, 0, 1);
             }
         } // loop on levs
         writePltCustom(nStuffToPlot, vectName, stuffToPlot, "");
@@ -2846,6 +2857,7 @@ AmrHydro::timeStepFAS(Real a_dt)
             delete stuffToPlot[6][lev];
             delete stuffToPlot[7][lev];
             delete stuffToPlot[8][lev];
+            delete stuffToPlot[9][lev];
         }
     } // end customPlt
 
@@ -2854,13 +2866,15 @@ AmrHydro::timeStepFAS(Real a_dt)
     /* POST PROC -- 1 LEVEL  */
     if (m_post_proc) {
         pout() << "\n\n\n";
-        pout() <<"oo POST PROC analysis oo "<< endl;
+        pout() <<"oo POST PROC analysis (domsize is "<< m_amrDomains[0].domainBox().size(0) <<") oo "<< endl;
         
         int DomSize = m_amrDomains[0].domainBox().size(0); 
-
+        int DomSizeY = m_amrDomains[0].domainBox().size(1); 
+ 
+        // DISCHARGE -- Q
         Vector<Real> out_water_flux_x_tot(DomSize , 0.0);
-        Vector<Real> out_water_flux_x_distrib(DomSize, 0.0);
-        Vector<Real> out_water_flux_x_chan(DomSize, 0.0);
+        Vector<Real> out_water_flux_x_distrib(DomSize, 0.0);        // INEFFICIENT 
+        Vector<Real> out_water_flux_x_chan(DomSize, 0.0);           // EFFICIENT
         Vector<Real> out_recharge(DomSize, 0.0);
 
         DisjointBoxLayout&    levelGrids = m_amrGrids[0];
@@ -2937,6 +2951,7 @@ AmrHydro::timeStepFAS(Real a_dt)
        }
        out_water_flux_x_distrib = recvDist;
 
+       // RHS B -- Moulins and mRate
        Vector<Real> recvMoulin(DomSize);
        result = MPI_Allreduce(&out_recharge[0], &recvMoulin[0], DomSize, MPI_CH_REAL,
                                   MPI_SUM, Chombo_MPI::comm);
@@ -2969,7 +2984,7 @@ AmrHydro::timeStepFAS(Real a_dt)
         }
         //pout() <<" -          contrib from CHANNEL (%)   = "<< channel_water_flux_x << " (" << channel_water_flux_x/out_water_flux_x * 100. << ")"<< endl;
         //pout() <<" -          contrib from DISTRIB (%)   = "<< distrib_water_flux_x << " (" << distrib_water_flux_x/out_water_flux_x * 100. << ")"<< endl;
-        pout() << "END\n\n\n";
+        //pout() << "END\n\n\n";
     }
 
     /* Averaging down and fill in ghost cells */
