@@ -233,18 +233,18 @@ public:
 
     /* Access functions */
     // m_gapheight
-    const LevelData<FArrayBox>* gapHeight(int a_level) const {
+    const RefCountedPtr<LevelData<FArrayBox>> gapHeight(int a_level) const {
         return m_gapheight[a_level];
     }
-    Vector<LevelData<FArrayBox>*>& amrGapHeight() {
+    Vector<RefCountedPtr<LevelData<FArrayBox>> >& amrGapHeight() {
         return m_gapheight;
     }
 
     // m_head
-    const LevelData<FArrayBox>* head(int a_level) const {
+    const RefCountedPtr<LevelData<FArrayBox>> head(int a_level) const {
         return m_head[a_level];
     }
-    Vector<LevelData<FArrayBox>*>& amrHead() {
+    Vector<RefCountedPtr<LevelData<FArrayBox>> >& amrHead() {
         return m_head;
     }
 
@@ -283,7 +283,7 @@ protected:
     void levelSetup(int a_level, const DisjointBoxLayout& a_grids);
 
     /// initialize data on hierarchy
-    void initData(Vector<LevelData<FArrayBox>*>& a_initialVelocity);
+    void initData(Vector<RefCountedPtr<LevelData<FArrayBox>> >& a_initialVelocity);
 
     void BCDataRegrid(int a_level,
                       LevelData<FArrayBox>& a_levzBed,
@@ -410,8 +410,8 @@ protected:
 
     /* new-time data */
     /* */
-    Vector<LevelData<FArrayBox>*> m_head;                   // Hydraulic head
-    Vector<LevelData<FArrayBox>*> m_gapheight;              // Subglacial height
+    Vector<RefCountedPtr<LevelData<FArrayBox>> > m_head;    // Hydraulic head
+    Vector<RefCountedPtr<LevelData<FArrayBox>> > m_gapheight;              // Subglacial height
 
     Vector<LevelData<FArrayBox>*> m_gradhead;               // Grad of Hydraulic head
     Vector<LevelData<FluxBox>*> m_gradhead_ec;               // Grad of Hydraulic head

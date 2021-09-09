@@ -484,11 +484,6 @@ AmrHydro::~AmrHydro()
     // clean up memory
     for (int lev = 0; lev < m_head.size(); lev++)
     {
-        if (m_head[lev] != NULL)
-        {
-            delete m_head[lev];
-            m_head[lev] = NULL;
-        }
         if (m_gradhead[lev] != NULL)
         {
             delete m_gradhead[lev];
@@ -503,11 +498,6 @@ AmrHydro::~AmrHydro()
         {
             delete m_old_head[lev];
             m_old_head[lev] = NULL;
-        }
-        if (m_gapheight[lev] != NULL)
-        {
-            delete m_gapheight[lev];
-            m_gapheight[lev] = NULL;
         }
         if (m_old_gapheight[lev] != NULL)
         {
@@ -831,13 +821,13 @@ AmrHydro::initialize()
         //---------------------------------
         // Time-dependent variables    
         m_old_head.resize(m_max_level + 1, NULL);
-        m_head.resize(m_max_level + 1, NULL);
+        m_head.resize(m_max_level + 1);
 
         m_gradhead.resize(m_max_level + 1, NULL);
         m_gradhead_ec.resize(m_max_level + 1, NULL);
 
         m_old_gapheight.resize(m_max_level + 1, NULL);
-        m_gapheight.resize(m_max_level + 1, NULL);
+        m_gapheight.resize(m_max_level + 1);
         
         m_Pw.resize(m_max_level + 1, NULL);
         m_qw.resize(m_max_level + 1, NULL);
@@ -858,13 +848,13 @@ AmrHydro::initialize()
         //-------------------------------------------------
         for (int lev = 0; lev <= m_max_level; lev++) {
             m_old_head[lev] = new LevelData<FArrayBox>;
-            m_head[lev] =  new LevelData<FArrayBox>;
+            m_head[lev]     = RefCountedPtr<LevelData<FArrayBox>>  (new LevelData<FArrayBox>);
             
             m_gradhead[lev] = new LevelData<FArrayBox>;
             m_gradhead_ec[lev] = new LevelData<FluxBox>;
 
             m_old_gapheight[lev] = new LevelData<FArrayBox>;
-            m_gapheight[lev] = new LevelData<FArrayBox>;
+            m_gapheight[lev] = RefCountedPtr<LevelData<FArrayBox>>  (new LevelData<FArrayBox>);
            
             m_Pw[lev] = new LevelData<FArrayBox>;
             m_qw[lev] = new LevelData<FArrayBox>;
@@ -891,13 +881,11 @@ AmrHydro::initialize()
         /* Null the unused levels ... */
         for (int lev = m_finest_level+1; lev <= m_max_level; lev++) {
             m_old_head[lev]    = NULL;
-            m_head[lev]        = NULL;
             
             m_gradhead[lev]    = NULL;
             m_gradhead_ec[lev] = NULL;
 
             m_old_gapheight[lev] = NULL;
-            m_gapheight[lev]     = NULL;
            
             m_Pw[lev] = NULL;
             m_qw[lev] = NULL;
@@ -2443,8 +2431,8 @@ AmrHydro::timeStepFAS(Real a_dt)
 
 
         /* CONVERGENCE TESTS with LAGGED quantities */
-        Real maxHead = computeMax(m_head, m_refinement_ratios, Interval(0,0), 0);
-        Real minHead = computeMin(m_head, m_refinement_ratios, Interval(0,0), 0);
+        Real maxHead = computeMax(m_head, m_refinement_ratios, Interval(0,0), 0, m_finest_level+1);
+        Real minHead = computeMin(m_head, m_refinement_ratios, Interval(0,0), 0, m_finest_level+1);
         if (m_verbosity > 3) {
             pout() <<"        Check for convergence of h (max = " << maxHead<<", min = " << minHead << ")"<<endl;
         }
@@ -3213,8 +3201,8 @@ AmrHydro::timeStepFAS(Real a_dt)
     }
 
     /* CONVERGENCE TESTS with LAGGED quantities */
-    Real maxGap = computeMax(m_gapheight, m_refinement_ratios, Interval(0,0), 0);
-    Real minGap = computeMin(m_gapheight, m_refinement_ratios, Interval(0,0), 0);
+    Real maxGap = computeMax(m_gapheight, m_refinement_ratios, Interval(0,0), 0, m_finest_level+1);
+    Real minGap = computeMin(m_gapheight, m_refinement_ratios, Interval(0,0), 0, m_finest_level+1);
     if (m_verbosity > 3) {
         pout() <<"        Check b (max = "<< maxGap<<", min = " << minGap << ")"<<endl;
     }
@@ -3291,6 +3279,57 @@ AmrHydro::timeStepFAS(Real a_dt)
     }
 }
 
+
+// create a new LevelData<FArrayBox>*, interpolate from a_crseData and copy from a_oldData as needed, delete a_oldData 
+RefCountedPtr<LevelData<FArrayBox>> destructiveRegrid(RefCountedPtr<LevelData<FArrayBox>> a_oldData,
+					                                  const DisjointBoxLayout& a_newDBL,
+				                                      const RefCountedPtr<LevelData<FArrayBox>> a_crseData,
+					                                  int   a_ratio)
+{
+  CH_assert(a_crseData);
+  RefCountedPtr<LevelData<FArrayBox>> newData = RefCountedPtr<LevelData<FArrayBox>> ( new LevelData<FArrayBox>(a_newDBL, a_crseData->nComp(), a_crseData->ghostVect()) );
+  CH_assert(newData);
+  
+  if (a_crseData) {
+
+      CH_assert(a_crseData->nComp() == newData->nComp());
+      CH_assert(a_crseData->ghostVect() == newData->ghostVect() );
+  
+      // Fill with interpolated data from coarser level
+      FineInterp interpolator(a_newDBL, newData->nComp(), a_ratio, newData->disjointBoxLayout().physDomain());
+      //limitSlopes          =  0,
+      //noSlopeLimiting      =  1,   XXXXXXXXX
+      //PCInterp             =  2,
+      //limitTangentialOnly  =  3,
+      interpolator.m_boundary_limit_type     = 3;
+
+      interpolator.interpToFine(*newData, *a_crseData);
+      
+      // handle ghost cells on the coarse-fine interface
+      PiecewiseLinearFillPatch ghostFiller (a_newDBL, 
+                                            a_crseData->disjointBoxLayout() ,  
+                                            a_crseData->nComp(), 
+                                            a_crseData->disjointBoxLayout().physDomain(), 
+                                            a_ratio,
+                                            a_crseData->ghostVect()[0]);
+
+      ghostFiller.fillInterp(*newData, *a_crseData, *a_crseData, 1.0, 0, 0,  a_crseData->nComp());
+  }
+  
+  // Copy old-grid data on this level into new holder
+  if (a_oldData) {
+      if (a_oldData->isDefined()) {
+	      a_oldData->copyTo(*newData);
+	  }
+  }
+  
+  // exchange is necessary to fill periodic ghost cells
+  // which aren't filled by the copyTo from oldLevelH or by
+  // CF interp OR for when there are several Grids
+  newData->exchange();
+
+  return newData;
+}
 
 // do regridding
 void
@@ -3385,35 +3424,31 @@ AmrHydro::regrid()
             /* Make sure level exists */
             if (m_head[lev] == NULL) {
                 /* NEED */
-                m_head[lev]            = new LevelData<FArrayBox>;
-                m_gapheight[lev]       = new LevelData<FArrayBox>;
-                m_Re[lev]              = new LevelData<FArrayBox>;
                 m_bumpHeight[lev]      = new LevelData<FArrayBox>;
                 m_bumpSpacing[lev]     = new LevelData<FArrayBox>;
                 // CST for now
                 m_iceheight[lev]       = new LevelData<FArrayBox>;
                 m_bedelevation[lev]    = new LevelData<FArrayBox>;
                 m_overburdenpress[lev] = new LevelData<FArrayBox>;
+            } else {
+                delete m_old_head[lev];
+                delete m_old_gapheight[lev];
+                delete m_Re[lev];              
+                delete m_gradhead[lev];     
+                delete m_gradhead_ec[lev];    
+                delete m_Pw[lev];              
+                delete m_qw[lev];              
+                delete m_meltRate[lev];        
             }
 
           
             /* NEED VARIABLE */
             // HEAD
-            LevelData<FArrayBox>* old_headDataPtr     = m_head[lev];
-            LevelData<FArrayBox>* new_headDataPtr    =
-                new LevelData<FArrayBox>(newDBL, m_head[0]->nComp(), m_head[0]->ghostVect());
             // old Head will be replaced by copy of head
             m_old_head[lev]        = new LevelData<FArrayBox>(newDBL, m_old_head[0]->nComp(), m_old_head[0]->ghostVect());
             // Gap Height
-            LevelData<FArrayBox>* old_gapheightDataPtr    = m_gapheight[lev];
-            LevelData<FArrayBox>* new_gapheightDataPtr    =
-                new LevelData<FArrayBox>(newDBL, m_gapheight[0]->nComp(), m_gapheight[0]->ghostVect());
             // old gapheight will be replaced by copy of head
             m_old_gapheight[lev]   = new LevelData<FArrayBox>(newDBL, m_old_gapheight[0]->nComp(), m_old_gapheight[0]->ghostVect());
-            // Re
-            LevelData<FArrayBox>* old_ReDataPtr = m_Re[lev];
-            LevelData<FArrayBox>* new_ReDataPtr =
-                new LevelData<FArrayBox>(newDBL, m_Re[0]->nComp(), m_Re[0]->ghostVect());
             // Ice Height
             LevelData<FArrayBox>* old_iceheightDataPtr    = m_iceheight[lev];
             LevelData<FArrayBox>* new_iceheightDataPtr    =
@@ -3435,13 +3470,7 @@ AmrHydro::regrid()
                 new LevelData<FArrayBox>(newDBL, m_bumpSpacing[0]->nComp(), m_bumpSpacing[0]->ghostVect());
 
             // Other vars: grads / Pw / Qw / mR
-            if (m_gradhead[lev] != NULL) {
-                delete m_gradhead[lev];
-                delete m_gradhead_ec[lev];
-                delete m_Pw[lev];
-                delete m_qw[lev];
-                delete m_meltRate[lev];
-            }
+            m_Re[lev]              = new LevelData<FArrayBox>(newDBL, m_Re[0]->nComp(), m_Re[0]->ghostVect());
             m_gradhead[lev]        = new LevelData<FArrayBox>(newDBL, m_gradhead[0]->nComp(), m_gradhead[0]->ghostVect());
             m_gradhead_ec[lev]     = new LevelData<FluxBox>(newDBL, m_gradhead_ec[0]->nComp(), IntVect::Zero);
             m_Pw[lev]              = new LevelData<FArrayBox>(newDBL, m_Pw[0]->nComp(), m_Pw[0]->ghostVect());
@@ -3450,34 +3479,32 @@ AmrHydro::regrid()
 
 
             /* DEBUG VAR */
-            LevelData<FArrayBox>& head  = *new_headDataPtr;
-            LevelData<FArrayBox>& gH    = *new_gapheightDataPtr;
-            LevelData<FArrayBox>& Re    = *new_ReDataPtr;
-            LevelData<FArrayBox>& zB    = *new_bedelevationDataPtr;
-            LevelData<FArrayBox>& overP = *new_overburdenpressDataPtr;
-            LevelData<FArrayBox>& iceH  = *new_iceheightDataPtr;
+            //LevelData<FArrayBox>& head  = *new_headDataPtr;
+            //LevelData<FArrayBox>& gH    = *new_gapheightDataPtr;
+            //LevelData<FArrayBox>& zB    = *new_bedelevationDataPtr;
+            //LevelData<FArrayBox>& overP = *new_overburdenpressDataPtr;
+            //LevelData<FArrayBox>& iceH  = *new_iceheightDataPtr;
 
-            DataIterator dit = newDBL.dataIterator();
+            //DataIterator dit = newDBL.dataIterator();
 
             // DEBUG
-            if (m_verbosity > 20) {
+            //if (m_verbosity > 20) {
 
-                pout() << " Checking data beg of process  " << endl;
+            //    pout() << " Checking data beg of process  " << endl;
 
-                for (dit.begin(); dit.ok(); ++dit) {
-                    BoxIterator bit(head[dit].box()); 
-                    for (bit.begin(); bit.ok(); ++bit) {
-                        IntVect iv = bit(); 
-                        pout() << iv << " h: " << head[dit](iv,0) 
-                                     << ",b: " << gH[dit](iv,0)           
-                                     << ",Re: " << Re[dit](iv,0)           
-                                     << ",zB: " << zB[dit](iv,0)           
-                                     << ",oP: " << overP[dit](iv,0)           
-                                     << ",iceH: " << iceH[dit](iv,0) << endl;
-                    }
-                }
+            //    for (dit.begin(); dit.ok(); ++dit) {
+            //        BoxIterator bit(head[dit].box()); 
+            //        for (bit.begin(); bit.ok(); ++bit) {
+            //            IntVect iv = bit(); 
+            //            pout() << iv << " h: " << head[dit](iv,0) 
+            //                         << ",b: " << gH[dit](iv,0)           
+            //                         << ",zB: " << zB[dit](iv,0)           
+            //                         << ",oP: " << overP[dit](iv,0)           
+            //                         << ",iceH: " << iceH[dit](iv,0) << endl;
+            //        }
+            //    }
 
-            } // End verbosity
+            //} // End verbosity
 
             // Fill with interpolated data from coarser level
             {
@@ -3492,11 +3519,7 @@ AmrHydro::regrid()
 
                 /* NEED */
                 // HEAD
-                interpolator.interpToFine(*new_headDataPtr, *m_head[lev - 1]);
                 // Gap Height
-                interpolator.interpToFine(*new_gapheightDataPtr, *m_gapheight[lev - 1]);
-                // Re
-                interpolator.interpToFine(*new_ReDataPtr, *m_Re[lev - 1]);
                 // Bed Randomization
                 interpolator.interpToFine(*new_bumpHeightDataPtr, *m_bumpHeight[lev - 1]);
                 interpolator.interpToFine(*new_bumpSpacingDataPtr, *m_bumpSpacing[lev - 1]);
@@ -3510,15 +3533,11 @@ AmrHydro::regrid()
             }
 
             // now potentially copy old-grid data on this level into new holder
-            if (old_headDataPtr!= NULL) {
+            if (old_bumpHeightDataPtr!= NULL) {
                 if (oldDBL.isClosed()) {
                     /* NEED */
                     // HEAD
-                    old_headDataPtr->copyTo(*new_headDataPtr);
                     // Gap Height
-                    old_gapheightDataPtr->copyTo(*new_gapheightDataPtr);
-                    // Re
-                    old_ReDataPtr->copyTo(*new_ReDataPtr);
                     // Bed Randomization
                     old_bumpHeightDataPtr->copyTo(*new_bumpHeightDataPtr);
                     old_bumpSpacingDataPtr->copyTo(*new_bumpSpacingDataPtr);
@@ -3531,9 +3550,6 @@ AmrHydro::regrid()
                     old_overburdenpressDataPtr->copyTo(*new_overburdenpressDataPtr);
                 }
                 // can now delete old data
-                delete old_headDataPtr;
-                delete old_gapheightDataPtr;
-                delete old_ReDataPtr;
                 delete old_bumpHeightDataPtr;
                 delete old_bumpSpacingDataPtr;
                 delete old_iceheightDataPtr;
@@ -3547,12 +3563,6 @@ AmrHydro::regrid()
                               1,  // num comps
                               m_amrDomains[lev]);
             /* NEED */
-            // HEAD -- should be useless
-            //qcfi.coarseFineInterp(new_headDataPtr, *m_head[lev-1]);           
-            // Gap Height -- should be useless
-            //qcfi.coarseFineInterp(new_gapheightDataPtr, *m_gapheight[lev-1]);
-            // Re -- should be useless
-            //qcfi.coarseFineInterp(new_ReDataPtr, *m_Re[lev-1]);
             // Bed Randomization
             qcfi.coarseFineInterp(*new_bumpHeightDataPtr, *m_bumpHeight[lev-1]);
             qcfi.coarseFineInterp(*new_bumpSpacingDataPtr, *m_bumpSpacing[lev-1]);
@@ -3569,9 +3579,6 @@ AmrHydro::regrid()
             // which aren't filled by the copyTo from oldLevelH or by
             // CF interp OR for when there are several Grids
             /* NEED */
-            //new_headDataPtr->exchange();
-            //new_gapheightDataPtr->exchange();
-            //new_ReDataPtr->exchange();
             new_bumpHeightDataPtr->exchange();
             new_bumpSpacingDataPtr->exchange();
             // CST FOR NOW
@@ -3588,9 +3595,9 @@ AmrHydro::regrid()
 
             // now place new holders into multilevel arrays
             /* NEED */
-            m_head[lev]            = new_headDataPtr;
-            m_gapheight[lev]       = new_gapheightDataPtr;
-            m_Re[lev]              = new_ReDataPtr;
+            m_head[lev]            = destructiveRegrid(m_head[lev], newDBL,
+                                     m_head[lev-1], m_refinement_ratios[lev-1]);
+            m_gapheight[lev]       = destructiveRegrid(m_gapheight[lev], newDBL, m_gapheight[lev-1], m_refinement_ratios[lev-1]);;
             m_bumpHeight[lev]      = new_bumpHeightDataPtr;
             m_bumpSpacing[lev]     = new_bumpSpacingDataPtr;
             // CST FOR NOW
@@ -3598,35 +3605,25 @@ AmrHydro::regrid()
             m_bedelevation[lev]    = new_bedelevationDataPtr;
             m_overburdenpress[lev] = new_overburdenpressDataPtr;
 
-            // can now delete holders
-            delete new_headDataPtr;
-            delete new_gapheightDataPtr;
-            delete new_ReDataPtr;
-            delete new_iceheightDataPtr;
-            delete new_bedelevationDataPtr;
-            delete new_overburdenpressDataPtr;
-            delete new_bumpHeightDataPtr;
-            delete new_bumpSpacingDataPtr;
 
+            //if (m_verbosity > 20) {
 
-            if (m_verbosity > 20) {
+            //    pout() << " Checking data after Exchanges " << endl;
 
-                pout() << " Checking data after Exchanges " << endl;
+            //    for (dit.begin(); dit.ok(); ++dit) {
+            //        BoxIterator bit(head[dit].box()); 
+            //        for (bit.begin(); bit.ok(); ++bit) {
+            //            IntVect iv = bit(); 
+            //            pout() << iv << " h: " << head[dit](iv,0) 
+            //                         << ",b: " << gH[dit](iv,0)           
+            //                         << ",Re: " << Re[dit](iv,0)           
+            //                         << ",zB: " << zB[dit](iv,0)           
+            //                         << ",oP: " << overP[dit](iv,0)           
+            //                         << ",iceH: " << iceH[dit](iv,0) << endl;
+            //        }
+            //    }
 
-                for (dit.begin(); dit.ok(); ++dit) {
-                    BoxIterator bit(head[dit].box()); 
-                    for (bit.begin(); bit.ok(); ++bit) {
-                        IntVect iv = bit(); 
-                        pout() << iv << " h: " << head[dit](iv,0) 
-                                     << ",b: " << gH[dit](iv,0)           
-                                     << ",Re: " << Re[dit](iv,0)           
-                                     << ",zB: " << zB[dit](iv,0)           
-                                     << ",oP: " << overP[dit](iv,0)           
-                                     << ",iceH: " << iceH[dit](iv,0) << endl;
-                    }
-                }
-
-            } // End verbosity
+            //} // End verbosity
 
         } // end loop over currently defined levels
 
@@ -3636,10 +3633,6 @@ AmrHydro::regrid()
             if (m_old_head[lev] != NULL) {
                 delete m_old_head[lev];
                 m_old_head[lev] = NULL;
-            }
-            if (m_head[lev] != NULL) {
-                delete m_head[lev];
-                m_head[lev] = NULL;
             }
             if (m_gradhead[lev] != NULL) {
                 delete m_gradhead[lev];
@@ -3652,10 +3645,6 @@ AmrHydro::regrid()
             if (m_old_gapheight[lev] != NULL) {
                 delete m_old_gapheight[lev];
                 m_old_gapheight[lev] = NULL;
-            }
-            if (m_gapheight[lev] != NULL) {
-                delete m_gapheight[lev];
-                m_gapheight[lev] = NULL;
             }
             if (m_Pw[lev] != NULL) {
                 delete m_Pw[lev];
@@ -4080,10 +4069,10 @@ AmrHydro::levelSetup(int a_level, const DisjointBoxLayout& a_grids)
     m_old_head[a_level]->define(a_grids, nPhiComp, HeadGhostVect);
     m_old_gapheight[a_level]->define(a_grids, nPhiComp, HeadGhostVect);
 
-    m_head[a_level]         = new LevelData<FArrayBox>(a_grids, nPhiComp, HeadGhostVect);
+    m_head[a_level]         = RefCountedPtr<LevelData<FArrayBox>> (new LevelData<FArrayBox>(a_grids, nPhiComp, HeadGhostVect));
     m_gradhead[a_level]     = new LevelData<FArrayBox>(a_grids, SpaceDim*nPhiComp, HeadGhostVect);
     m_gradhead_ec[a_level]  = new LevelData<FluxBox>(a_grids, nPhiComp, IntVect::Zero);
-    m_gapheight[a_level]    = new LevelData<FArrayBox>(a_grids, nPhiComp, HeadGhostVect);
+    m_gapheight[a_level]    = RefCountedPtr<LevelData<FArrayBox>> (new LevelData<FArrayBox>(a_grids, nPhiComp, HeadGhostVect));
     m_Pw[a_level]           = new LevelData<FArrayBox>(a_grids, nPhiComp, HeadGhostVect);
     m_qw[a_level]           = new LevelData<FArrayBox>(a_grids, SpaceDim*nPhiComp, HeadGhostVect);
     m_Re[a_level]           = new LevelData<FArrayBox>(a_grids, nPhiComp, HeadGhostVect);
@@ -4096,7 +4085,7 @@ AmrHydro::levelSetup(int a_level, const DisjointBoxLayout& a_grids)
 }
 
 void
-AmrHydro::initData(Vector<LevelData<FArrayBox>*>& a_head)
+AmrHydro::initData(Vector<RefCountedPtr<LevelData<FArrayBox>> >& a_head)
 {
     if (m_verbosity > 3) {
         pout() << "AmrHydro::initData" << endl;
@@ -4849,11 +4838,11 @@ AmrHydro::readCheckpointFile(HDF5Handle& a_handle)
     m_amrGrids.resize(m_max_level + 1);
     m_amrDx.resize(m_max_level + 1);
     m_old_head.resize(m_max_level + 1, NULL);
-    m_head.resize(m_max_level + 1, NULL);
+    m_head.resize(m_max_level + 1);
     m_gradhead.resize(m_max_level + 1, NULL);
     m_gradhead_ec.resize(m_max_level + 1, NULL);
     m_old_gapheight.resize(m_max_level + 1, NULL);
-    m_gapheight.resize(m_max_level + 1, NULL);
+    m_gapheight.resize(m_max_level + 1);
     m_Pw.resize(m_max_level + 1, NULL);
     m_qw.resize(m_max_level + 1, NULL);
     m_Re.resize(m_max_level + 1, NULL);
@@ -4935,11 +4924,11 @@ AmrHydro::readCheckpointFile(HDF5Handle& a_handle)
             IntVect nGhost  = m_num_head_ghost * IntVect::Unit;
             int nPhiComp = 1;
             m_old_head[lev]      = new LevelData<FArrayBox>(levelDBL, nPhiComp, nGhost);
-            m_head[lev]          = new LevelData<FArrayBox>(levelDBL, nPhiComp, nGhost);
+            m_head[lev]          = RefCountedPtr<LevelData<FArrayBox>> (new LevelData<FArrayBox>(levelDBL, nPhiComp, nGhost));
             m_gradhead[lev]      = new LevelData<FArrayBox>(levelDBL, SpaceDim*nPhiComp, nGhost);
             m_gradhead_ec[lev]   = new LevelData<FluxBox>(levelDBL, nPhiComp, IntVect::Zero);
             m_old_gapheight[lev] = new LevelData<FArrayBox>(levelDBL, nPhiComp, nGhost);
-            m_gapheight[lev]     = new LevelData<FArrayBox>(levelDBL, nPhiComp, nGhost);
+            m_gapheight[lev]     = RefCountedPtr<LevelData<FArrayBox>> (new LevelData<FArrayBox>(levelDBL, nPhiComp, nGhost));
             m_Pw[lev]            = new LevelData<FArrayBox>(levelDBL, nPhiComp, nGhost);
             m_qw[lev]            = new LevelData<FArrayBox>(levelDBL, SpaceDim*nPhiComp, nGhost);
             m_Re[lev]            = new LevelData<FArrayBox>(levelDBL, nPhiComp, nGhost);
