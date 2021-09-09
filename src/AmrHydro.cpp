@@ -2892,7 +2892,26 @@ AmrHydro::timeStepFAS(Real a_dt)
         Vector<Real> out_water_flux_x_tot(DomSize , 0.0);
         Vector<Real> out_water_flux_x_distrib(DomSize, 0.0);        // INEFFICIENT 
         Vector<Real> out_water_flux_x_chan(DomSize, 0.0);           // EFFICIENT
+        Vector<Real> out_water_flux_x_chan_Bands(3, 0.0);
+        Vector<Real> out_water_flux_x_distrib_Bands(3, 0.0);
+        int idx_bandMin_lo = 0;
+        int idx_bandMin_hi = 0;
+        int idx_bandMed_lo = 0;
+        int idx_bandMed_hi = 0;
+        Real xloc_bandMin_lo = 9999999999;
+        Real xloc_bandMin_hi = -1;
+        Real xloc_bandMed_lo = 9999999999;
+        Real xloc_bandMed_hi = -1;
+        // RHS B -- Moulins and mRate
+        Vector<Real> out_recharge_tot(DomSize, 0.0);
         Vector<Real> out_recharge(DomSize, 0.0);
+        // Pressures
+        Vector<Real> avPressure(DomSize, 0.0);
+        Vector<Real> out_avgN(4, 0.0);
+        int count_avgNLow  = 0;
+        int count_avgNMed  = 0;
+        int count_avgNHigh = 0;
+        int count_avgN     = 0;
 
         DisjointBoxLayout&    levelGrids = m_amrGrids[0];
 
@@ -2902,16 +2921,10 @@ AmrHydro::timeStepFAS(Real a_dt)
         CellToEdge(levelchanDegree, levelCD_ec);
 
         LevelData<FArrayBox>& levelMoulinSrc  = *moulin_source_term[0];
-        LevelData<FluxBox>   levelMoulinSrc_ec(levelGrids, 1, IntVect::Zero);
-        levelMoulinSrc.exchange();
-        CellToEdge(levelMoulinSrc, levelMoulinSrc_ec);
-
         LevelData<FArrayBox>& levelmR         = *m_meltRate[0];
-        LevelData<FluxBox>    levelmR_ec(levelGrids, 1, IntVect::Zero);
-        levelmR.exchange();
-        CellToEdge(levelmR, levelmR_ec);
+        LevelData<FArrayBox>& levelPressi     = *m_overburdenpress[0];
+        LevelData<FArrayBox>& levelPw         = *m_Pw[0];
 
-        Real max_water_flux_x_loc = -1000.;
 
         LevelData<FluxBox>&   levelQw_ec = *a_Qw_ec[0]; 
 
@@ -2922,25 +2935,65 @@ AmrHydro::timeStepFAS(Real a_dt)
             FArrayBox& Qwater_ecFab = Qwater_ec[0];
             FluxBox&   CD_ec        = levelCD_ec[dit];
             FArrayBox& CD_ecFab     = CD_ec[0];
-            FluxBox&   MS_ec        = levelMoulinSrc_ec[dit];
-            FArrayBox& MS_ecFab     = MS_ec[0];
-            FluxBox&   MR_ec        = levelmR_ec[dit];
-            FArrayBox& MR_ecFab     = MR_ec[0];
+
+            FArrayBox&  MS          = levelMoulinSrc[dit];
+            FArrayBox&  MR          = levelmR[dit];
+            FArrayBox& Pressi       = levelPressi[dit];
+            FArrayBox& Pw           = levelPw[dit];
 
             const Box& validBox = levelGrids.get(dit);
 
             BoxIterator bitEC(validBox); 
             for (bitEC.begin(); bitEC.ok(); ++bitEC) {
                 IntVect iv = bitEC();
-                out_water_flux_x_tot[iv[0]] += Qwater_ecFab(iv, 0) * m_amrDx[0][0];
-                max_water_flux_x_loc = std::max( std::abs(Qwater_ecFab(iv, 0) * m_amrDx[0][0]), max_water_flux_x_loc);
-                out_water_flux_x_chan[iv[0]] += Qwater_ecFab(iv, 0) * m_amrDx[0][0] * CD_ecFab(iv, 0);
+                // DISCHARGE -- Q
+                out_water_flux_x_tot[iv[0]]     += Qwater_ecFab(iv, 0) * m_amrDx[0][0];
+                out_water_flux_x_chan[iv[0]]    += Qwater_ecFab(iv, 0) * m_amrDx[0][0] * CD_ecFab(iv, 0);
                 out_water_flux_x_distrib[iv[0]] += Qwater_ecFab(iv, 0) * m_amrDx[0][0] * (1.0 - CD_ecFab(iv, 0));
-                out_recharge[iv[0]] += (MS_ecFab(iv, 0) + MR_ecFab(iv, 0)/m_suhmoParm->m_rho_w) * m_amrDx[0][0] * m_amrDx[0][0];
+
+                // RHS B -- Moulins and mRate
+                //CC
+                Real xloc = (iv[0]+0.5)*m_amrDx[0][0];    
+                // Because of mass conservation eq -basically recharge = RHS of this eq in my head.
+                // If I only use the MS, then for run B its sum of A1 and A5 which in this case does NOT equal total discharge !!
+                out_recharge[iv[0]]      += MS(iv, 0) * m_amrDx[0][0] * m_amrDx[0][0];  
+                out_recharge_tot[iv[0]]  += (MS(iv, 0) + MR(iv, 0)/m_suhmoParm->m_rho_w) * m_amrDx[0][0] * m_amrDx[0][0];
+
+                // Pressures
+                avPressure[iv[0]]        += (Pressi(iv, 0) - Pw(iv, 0)); 
+                out_avgN[3]              += (Pressi(iv, 0) - Pw(iv, 0)); 
+                count_avgN += 1; 
+                if ((xloc > 10000) && (xloc < 15000)){
+                    out_avgN[0]   += (Pressi(iv, 0) - Pw(iv, 0));
+                    count_avgNLow += 1; 
+                    xloc_bandMin_lo = std::min(xloc, xloc_bandMin_lo);
+                    xloc_bandMin_hi = std::max(xloc, xloc_bandMin_hi);
+                    out_water_flux_x_chan_Bands[0] += Qwater_ecFab(iv, 0) * m_amrDx[0][0] * CD_ecFab(iv, 0);
+                    out_water_flux_x_distrib_Bands[0] += Qwater_ecFab(iv, 0) * m_amrDx[0][0] * (1.0 - CD_ecFab(iv, 0));
+                } else if ((xloc > 50000) && (xloc < 55000)) {
+                    out_avgN[1]   += (Pressi(iv, 0) - Pw(iv, 0));
+                    count_avgNMed += 1; 
+                    xloc_bandMed_lo = std::min(xloc, xloc_bandMed_lo);
+                    xloc_bandMed_hi = std::max(xloc, xloc_bandMed_hi);
+                    out_water_flux_x_chan_Bands[1] += Qwater_ecFab(iv, 0) * m_amrDx[0][0] * CD_ecFab(iv, 0);
+                    out_water_flux_x_distrib_Bands[1] += Qwater_ecFab(iv, 0) * m_amrDx[0][0] * (1.0 - CD_ecFab(iv, 0));
+                } else if ((xloc > 85000) && (xloc < 90000)) {
+                    out_avgN[2]    += (Pressi(iv, 0) - Pw(iv, 0));
+                    count_avgNHigh += 1; 
+                    out_water_flux_x_chan_Bands[2] += Qwater_ecFab(iv, 0) * m_amrDx[0][0] * CD_ecFab(iv, 0);
+                    out_water_flux_x_distrib_Bands[2] += Qwater_ecFab(iv, 0) * m_amrDx[0][0] * (1.0 - CD_ecFab(iv, 0));
+                }  
+
+                // TEMPORARY
+                int time_tmp = (int) m_time;
+                if ((iv[0] == 0) && (iv[1] == 2) && (time_tmp % 86400 == 0)) {
+                    pout() << "Time(d) moulin = " <<  m_time / 86400. << " " << MS(iv, 0) << endl;
+                }
             }
         } 
 
 #ifdef CH_MPI
+       // DISCHARGE -- Q
        Vector<Real> recv(DomSize);
        int result = MPI_Allreduce(&out_water_flux_x_tot[0], &recv[0], DomSize, MPI_CH_REAL,
                                   MPI_SUM, Chombo_MPI::comm);
@@ -2978,26 +3031,162 @@ AmrHydro::timeStepFAS(Real a_dt)
        }
        out_recharge = recvMoulin;
 
-       Real recv2;
-       result = MPI_Allreduce(&max_water_flux_x_loc, &recv2, 1, MPI_CH_REAL,
+       Vector<Real> recvMoulinTot(DomSize);
+       result = MPI_Allreduce(&out_recharge_tot[0], &recvMoulinTot[0], DomSize, MPI_CH_REAL,
+                                  MPI_SUM, Chombo_MPI::comm);
+       if (result != MPI_SUCCESS)
+       {
+           MayDay::Error("communication error on MPI_SUM");
+       }
+       out_recharge_tot = recvMoulinTot;
+
+       // Pressures
+       Vector<Real> recvavP(DomSize);
+       result = MPI_Allreduce(&avPressure[0], &recvavP[0], DomSize, MPI_CH_REAL,
+                                  MPI_SUM, Chombo_MPI::comm);
+       if (result != MPI_SUCCESS)
+       {
+           MayDay::Error("communication error on MPI_SUM");
+       }
+       avPressure = recvavP;
+
+       Vector<Real> recvavN(4);
+       result = MPI_Allreduce(&out_avgN[0], &recvavN[0], 4, MPI_CH_REAL,
+                                  MPI_SUM, Chombo_MPI::comm);
+       if (result != MPI_SUCCESS)
+       {
+           MayDay::Error("communication error on MPI_SUM");
+       }
+       out_avgN = recvavN;
+
+       Vector<Real> recChanBand(3);
+       result = MPI_Allreduce(&out_water_flux_x_chan_Bands[0], &recChanBand[0], 4, MPI_CH_REAL,
+                                  MPI_SUM, Chombo_MPI::comm);
+       if (result != MPI_SUCCESS)
+       {
+           MayDay::Error("communication error on MPI_SUM");
+       }
+       out_water_flux_x_chan_Bands= recChanBand;
+
+       Vector<Real> recChanDistr(3);
+       result = MPI_Allreduce(&out_water_flux_x_distrib_Bands[0], &recChanDistr[0], 4, MPI_CH_REAL,
+                                  MPI_SUM, Chombo_MPI::comm);
+       if (result != MPI_SUCCESS)
+       {
+           MayDay::Error("communication error on MPI_SUM");
+       }
+       out_water_flux_x_distrib_Bands= recChanDistr;
+
+       int recvInt;
+       result = MPI_Allreduce(&count_avgNLow, &recvInt, 1, MPI_INT,
+                              MPI_SUM, Chombo_MPI::comm);
+       if (result != MPI_SUCCESS)
+       {
+           MayDay::Error("communication error on MPI_MAX");
+       }
+       count_avgNLow = recvInt;
+       recvInt = 0;
+       result = MPI_Allreduce(&count_avgNMed, &recvInt, 1, MPI_INT,
+                              MPI_SUM, Chombo_MPI::comm);
+       if (result != MPI_SUCCESS)
+       {
+           MayDay::Error("communication error on MPI_MAX");
+       }
+       count_avgNMed = recvInt;
+       recvInt = 0;
+       result = MPI_Allreduce(&count_avgNHigh, &recvInt, 1, MPI_INT,
+                              MPI_SUM, Chombo_MPI::comm);
+       if (result != MPI_SUCCESS)
+       {
+           MayDay::Error("communication error on MPI_MAX");
+       }
+       count_avgNHigh = recvInt;
+       recvInt = 0;
+       result = MPI_Allreduce(&count_avgN, &recvInt, 1, MPI_INT,
+                              MPI_SUM, Chombo_MPI::comm);
+       if (result != MPI_SUCCESS)
+       {
+           MayDay::Error("communication error on MPI_MAX");
+       }
+       count_avgN = recvInt;
+
+       Real recvMax;
+       result = MPI_Allreduce(&xloc_bandMin_hi, &recvMax, 1, MPI_CH_REAL,
                               MPI_MAX, Chombo_MPI::comm);
        if (result != MPI_SUCCESS)
        {
            MayDay::Error("communication error on MPI_MAX");
        }
-       max_water_flux_x_loc = recv2;
+       xloc_bandMin_hi = recvMax;
+       result = MPI_Allreduce(&xloc_bandMed_hi, &recvMax, 1, MPI_CH_REAL,
+                              MPI_MAX, Chombo_MPI::comm);
+       if (result != MPI_SUCCESS)
+       {
+           MayDay::Error("communication error on MPI_MAX");
+       }
+       xloc_bandMed_hi = recvMax;
+
+       Real recvMin;
+       result = MPI_Allreduce(&xloc_bandMin_lo, &recvMin, 1, MPI_CH_REAL,
+                              MPI_MIN, Chombo_MPI::comm);
+       if (result != MPI_SUCCESS)
+       {
+           MayDay::Error("communication error on MPI_MIN");
+       }
+       xloc_bandMin_lo = recvMin;
+       result = MPI_Allreduce(&xloc_bandMed_lo, &recvMin, 1, MPI_CH_REAL,
+                              MPI_MIN, Chombo_MPI::comm);
+       if (result != MPI_SUCCESS)
+       {
+           MayDay::Error("communication error on MPI_MIN");
+       }
+       xloc_bandMed_lo = recvMin;
 #endif
 
         for (int xi = (DomSize - 2); xi > -1 ; xi--) {
             out_recharge[xi]  = out_recharge[xi]  + out_recharge[xi+1] ;
+            out_recharge_tot[xi]  = out_recharge_tot[xi]  + out_recharge_tot[xi+1] ;
         }
+        
+        idx_bandMin_lo = (int) xloc_bandMin_lo/m_amrDx[0][0] - 0.5;
+        idx_bandMin_hi = (int) xloc_bandMin_hi/m_amrDx[0][0] - 0.5;
+        idx_bandMed_lo = (int) xloc_bandMed_lo/m_amrDx[0][0] - 0.5;
+        idx_bandMed_hi = (int) xloc_bandMed_hi/m_amrDx[0][0] - 0.5;
 
-        pout() <<" - Y integrated water flux in X dir: " << endl;
-        pout() <<"#Xpos TOT CHAN DISTRIB RECHARGE" << endl;
-        for (int xi = 1; xi < DomSize; xi++) {
-            Real xloc = (xi+0.5)*m_amrDx[0][0];
-            pout() << "   " << xloc << " " << - out_water_flux_x_tot[xi]    << " " << -out_water_flux_x_chan[xi] 
-                                    << " " << -out_water_flux_x_distrib[xi] << " " << out_recharge[xi]           << endl;
+        // TEMPORAL POSTPROC
+        //int time_tmp = (int) m_time + a_dt;
+        //if (time_tmp % 86400 == 0) {
+        //    pout() << idx_bandMin_lo << " " << idx_bandMin_hi << " " << idx_bandMed_lo << " "<< idx_bandMed_hi << endl;
+        //    pout() << "1-Time  2-disTOT  3-disEFF  4-disINEF  " 
+        //           << "5-disEFF_LB_lo  6-disEFF_LB_hi 7-disEFF_LB  "
+        //           << "8-disINEF_LB_lo  9-disINEF_LB_hi  10-disINEF_LB"
+        //           << " " <<  time_tmp / 86400. << " " << - out_water_flux_x_tot[1]   << " " << -out_water_flux_x_chan[1]   << " " << -out_water_flux_x_distrib[1]
+        //           << " " <<  - out_water_flux_x_chan[idx_bandMin_lo]      << " " << - out_water_flux_x_chan[idx_bandMin_hi] 
+        //           //<< " " <<  - out_water_flux_x_chan[idx_bandMin_lo] + out_water_flux_x_chan[idx_bandMin_hi]  
+        //           << " " << DomSizeY*out_water_flux_x_chan_Bands[0]/count_avgNLow  
+        //           << " " <<  - out_water_flux_x_distrib[idx_bandMin_lo]      << " " << - out_water_flux_x_distrib[idx_bandMin_hi] 
+        //           //<< " " <<  - out_water_flux_x_distrib[idx_bandMin_lo] + out_water_flux_x_distrib[idx_bandMin_hi] 
+        //           << " " << DomSizeY*out_water_flux_x_distrib_Bands[0]/count_avgNLow  
+        //           << endl;
+        //    pout() << "Time  rechTOT  rechMS  "
+        //           << "rechMS_LB_lo    rechMS_LB_hi "
+        //           << " " <<  time_tmp / 86400.  << " " <<  out_recharge_tot[0]  << " "  << out_recharge[0] 
+        //           << " " <<  out_recharge[idx_bandMin_lo] << " " << out_recharge[idx_bandMin_hi]
+        //           << endl;
+        //    pout() << "Time  N_LB  N_MB  N_HB  avN  "
+        //           << " " << time_tmp / 86400. 
+        //           << " " << out_avgN[0]/count_avgNLow << " " << out_avgN[1]/count_avgNMed << " " << out_avgN[2]/count_avgNHigh 
+        //           << " " << out_avgN[3] /count_avgN 
+        //           << endl;
+        //}
+ 
+        // SPATIAL POSTPROC
+        for (int xi = 0; xi < DomSize; xi++) {
+            Real x_loc = (xi+0.5)*m_amrDx[0][0];    
+            pout() << "Xpos avN recharge discharge EFFdischarge INEFdischarge "
+                   << " " << x_loc << " " << avPressure[xi]/DomSizeY << " " << out_recharge[xi] 
+                   << " " << -out_water_flux_x_tot[xi] << " " << -out_water_flux_x_chan[xi] << " " << -out_water_flux_x_distrib[xi]
+                   << endl;
         }
         //pout() <<" -          contrib from CHANNEL (%)   = "<< channel_water_flux_x << " (" << channel_water_flux_x/out_water_flux_x * 100. << ")"<< endl;
         //pout() <<" -          contrib from DISTRIB (%)   = "<< distrib_water_flux_x << " (" << distrib_water_flux_x/out_water_flux_x * 100. << ")"<< endl;
