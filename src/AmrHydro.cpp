@@ -482,76 +482,6 @@ AmrHydro::~AmrHydro()
     }
 
     // clean up memory
-    for (int lev = 0; lev < m_head.size(); lev++)
-    {
-        if (m_gradhead[lev] != NULL)
-        {
-            delete m_gradhead[lev];
-            m_gradhead[lev] = NULL;
-        }
-        if (m_gradhead_ec[lev] != NULL)
-        {
-            delete m_gradhead_ec[lev];
-            m_gradhead_ec[lev] = NULL;
-        }
-        if (m_old_head[lev] != NULL)
-        {
-            delete m_old_head[lev];
-            m_old_head[lev] = NULL;
-        }
-        if (m_old_gapheight[lev] != NULL)
-        {
-            delete m_old_gapheight[lev];
-            m_old_gapheight[lev] = NULL;
-        }
-        if (m_Pw[lev] != NULL)
-        {
-            delete m_Pw[lev];
-            m_Pw[lev] = NULL;
-        }
-        if (m_qw[lev] != NULL)
-        {
-            delete m_qw[lev];
-            m_qw[lev] = NULL;
-        }
-        if (m_Re[lev] != NULL)
-        {
-            delete m_Re[lev];
-            m_Re[lev] = NULL;
-        }
-        if (m_meltRate[lev] != NULL)
-        {
-            delete m_meltRate[lev];
-            m_meltRate[lev] = NULL;
-        }
-        if (m_iceheight[lev] != NULL)
-        {
-            delete m_iceheight[lev];
-            m_iceheight[lev] = NULL;
-        }
-        if (m_bedelevation[lev] != NULL)
-        {
-            delete m_bedelevation[lev];
-            m_bedelevation[lev] = NULL;
-        }
-        if (m_overburdenpress[lev] != NULL)
-        {
-            delete m_overburdenpress[lev];
-            m_overburdenpress[lev] = NULL;
-        }
-        // Bed randomization
-        if (m_bumpHeight[lev] != NULL)
-        {
-            delete m_bumpHeight[lev];
-            m_bumpHeight[lev] = NULL;
-        }
-        if (m_bumpSpacing[lev] != NULL)
-        {
-            delete m_bumpSpacing[lev];
-            m_bumpSpacing[lev] = NULL;
-        }
-    }
-
     delete m_suhmoParm;
     m_suhmoParm = NULL;
 
@@ -820,53 +750,53 @@ AmrHydro::initialize()
         // Set AMR hierarchy vector
         //---------------------------------
         // Time-dependent variables    
-        m_old_head.resize(m_max_level + 1, NULL);
+        m_old_head.resize(m_max_level + 1);
         m_head.resize(m_max_level + 1);
 
-        m_gradhead.resize(m_max_level + 1, NULL);
-        m_gradhead_ec.resize(m_max_level + 1, NULL);
+        m_gradhead.resize(m_max_level + 1);
+        m_gradhead_ec.resize(m_max_level + 1);
 
-        m_old_gapheight.resize(m_max_level + 1, NULL);
+        m_old_gapheight.resize(m_max_level + 1);
         m_gapheight.resize(m_max_level + 1);
         
-        m_Pw.resize(m_max_level + 1, NULL);
-        m_qw.resize(m_max_level + 1, NULL);
-        m_Re.resize(m_max_level + 1, NULL);
-        m_meltRate.resize(m_max_level + 1, NULL);
-        m_iceheight.resize(m_max_level + 1, NULL);
+        m_Pw.resize(m_max_level + 1);
+        m_qw.resize(m_max_level + 1);
+        m_Re.resize(m_max_level + 1);
+        m_meltRate.resize(m_max_level + 1);
+        m_iceheight.resize(m_max_level + 1);
 
         // Time constant variables
-        m_bedelevation.resize(m_max_level + 1, NULL);
-        m_overburdenpress.resize(m_max_level + 1, NULL);
+        m_bedelevation.resize(m_max_level + 1);
+        m_overburdenpress.resize(m_max_level + 1);
 
         // Bed randomization
-        m_bumpHeight.resize(m_max_level + 1, NULL);
-        m_bumpSpacing.resize(m_max_level + 1, NULL);
+        m_bumpHeight.resize(m_max_level + 1);
+        m_bumpSpacing.resize(m_max_level + 1);
 
         //-------------------------------------------------
         // For each level, define a collection of FArray/FluxBox
         //-------------------------------------------------
         for (int lev = 0; lev <= m_max_level; lev++) {
-            m_old_head[lev] = new LevelData<FArrayBox>;
-            m_head[lev]     = RefCountedPtr<LevelData<FArrayBox>>  (new LevelData<FArrayBox>);
+            m_old_head[lev]      = RefCountedPtr<LevelData<FArrayBox>>  (new LevelData<FArrayBox>);
+            m_head[lev]          = RefCountedPtr<LevelData<FArrayBox>>  (new LevelData<FArrayBox>);
+            m_old_gapheight[lev] = RefCountedPtr<LevelData<FArrayBox>>  (new LevelData<FArrayBox>);
+            m_gapheight[lev]     = RefCountedPtr<LevelData<FArrayBox>>  (new LevelData<FArrayBox>);
             
-            m_gradhead[lev] = new LevelData<FArrayBox>;
-            m_gradhead_ec[lev] = new LevelData<FluxBox>;
+            m_gradhead[lev]      = RefCountedPtr<LevelData<FArrayBox>>  (new LevelData<FArrayBox>);
+            m_gradhead_ec[lev]   = RefCountedPtr<LevelData<FluxBox>>  (new LevelData<FluxBox>);
 
-            m_old_gapheight[lev] = new LevelData<FArrayBox>;
-            m_gapheight[lev] = RefCountedPtr<LevelData<FArrayBox>>  (new LevelData<FArrayBox>);
            
-            m_Pw[lev] = new LevelData<FArrayBox>;
-            m_qw[lev] = new LevelData<FArrayBox>;
-            m_Re[lev] = new LevelData<FArrayBox>;
-            m_meltRate[lev] = new LevelData<FArrayBox>;
-            m_iceheight[lev] = new LevelData<FArrayBox>;
+            m_Pw[lev]          = RefCountedPtr<LevelData<FArrayBox>>  (new LevelData<FArrayBox>);
+            m_qw[lev]          = RefCountedPtr<LevelData<FArrayBox>>  (new LevelData<FArrayBox>);
+            m_Re[lev]          = RefCountedPtr<LevelData<FArrayBox>>  (new LevelData<FArrayBox>);
+            m_meltRate[lev]    = RefCountedPtr<LevelData<FArrayBox>>  (new LevelData<FArrayBox>);
+            m_iceheight[lev]   = RefCountedPtr<LevelData<FArrayBox>>  (new LevelData<FArrayBox>);
 
-            m_bedelevation[lev] = new LevelData<FArrayBox>;
-            m_overburdenpress[lev] = new LevelData<FArrayBox>;
+            m_bedelevation[lev]    = RefCountedPtr<LevelData<FArrayBox>>  (new LevelData<FArrayBox>);
+            m_overburdenpress[lev] = RefCountedPtr<LevelData<FArrayBox>>  (new LevelData<FArrayBox>);
 
-            m_bumpHeight[lev] = new LevelData<FArrayBox>;
-            m_bumpSpacing[lev] = new LevelData<FArrayBox>;
+            m_bumpHeight[lev]  = RefCountedPtr<LevelData<FArrayBox>>  (new LevelData<FArrayBox>);
+            m_bumpSpacing[lev] = RefCountedPtr<LevelData<FArrayBox>>  (new LevelData<FArrayBox>);
         }
 
 
@@ -879,26 +809,6 @@ AmrHydro::initialize()
         }
 
         /* Null the unused levels ... */
-        for (int lev = m_finest_level+1; lev <= m_max_level; lev++) {
-            m_old_head[lev]    = NULL;
-            
-            m_gradhead[lev]    = NULL;
-            m_gradhead_ec[lev] = NULL;
-
-            m_old_gapheight[lev] = NULL;
-           
-            m_Pw[lev] = NULL;
-            m_qw[lev] = NULL;
-            m_Re[lev] = NULL;
-            m_meltRate[lev]  = NULL;
-            m_iceheight[lev] = NULL;
-
-            m_bedelevation[lev]    = NULL;
-            m_overburdenpress[lev] = NULL;
-
-            m_bumpHeight[lev] = NULL;
-            m_bumpSpacing[lev] = NULL;
-        }
 
     } else {
         // we're restarting from a checkpoint file
@@ -2179,7 +2089,7 @@ AmrHydro::timeStepFAS(Real a_dt)
             } // end loop on levs
         }
         // Just in case the quad resolution gives funky results
-        Real minRe = computeMin(m_Re, m_refinement_ratios, Interval(0,0), 0);
+        Real minRe = computeMin(m_Re, m_refinement_ratios, Interval(0,0), 0, m_finest_level+1);
         if (minRe < 0.0) {
             pout() <<"        Re min is NEG !! ("<< minRe << ") abort ... "<< endl;
             MayDay::Error("Abort");
@@ -3291,7 +3201,6 @@ RefCountedPtr<LevelData<FArrayBox>> destructiveRegrid(RefCountedPtr<LevelData<FA
   CH_assert(newData);
   
   if (a_crseData) {
-
       CH_assert(a_crseData->nComp() == newData->nComp());
       CH_assert(a_crseData->ghostVect() == newData->ghostVect() );
   
@@ -3421,61 +3330,21 @@ AmrHydro::regrid()
 
             m_amrGrids[lev] = newDBL;
              
-            /* Make sure level exists */
-            if (m_head[lev] == NULL) {
-                /* NEED */
-                m_bumpHeight[lev]      = new LevelData<FArrayBox>;
-                m_bumpSpacing[lev]     = new LevelData<FArrayBox>;
-                // CST for now
-                m_iceheight[lev]       = new LevelData<FArrayBox>;
-                m_bedelevation[lev]    = new LevelData<FArrayBox>;
-                m_overburdenpress[lev] = new LevelData<FArrayBox>;
-            } else {
-                delete m_old_head[lev];
-                delete m_old_gapheight[lev];
-                delete m_Re[lev];              
-                delete m_gradhead[lev];     
-                delete m_gradhead_ec[lev];    
-                delete m_Pw[lev];              
-                delete m_qw[lev];              
-                delete m_meltRate[lev];        
-            }
-
-          
             /* NEED VARIABLE */
             // HEAD
             // old Head will be replaced by copy of head
-            m_old_head[lev]        = new LevelData<FArrayBox>(newDBL, m_old_head[0]->nComp(), m_old_head[0]->ghostVect());
+            m_old_head[lev]        = RefCountedPtr<LevelData<FArrayBox>> (new LevelData<FArrayBox>(newDBL, m_old_head[0]->nComp(), m_old_head[0]->ghostVect()));
             // Gap Height
             // old gapheight will be replaced by copy of head
-            m_old_gapheight[lev]   = new LevelData<FArrayBox>(newDBL, m_old_gapheight[0]->nComp(), m_old_gapheight[0]->ghostVect());
-            // Ice Height
-            LevelData<FArrayBox>* old_iceheightDataPtr    = m_iceheight[lev];
-            LevelData<FArrayBox>* new_iceheightDataPtr    =
-                new LevelData<FArrayBox>(newDBL, m_iceheight[0]->nComp(), m_iceheight[0]->ghostVect());
-            // Bed elevation
-            LevelData<FArrayBox>* old_bedelevationDataPtr    = m_bedelevation[lev];
-            LevelData<FArrayBox>* new_bedelevationDataPtr    =
-                new LevelData<FArrayBox>(newDBL, m_bedelevation[0]->nComp(), m_bedelevation[0]->ghostVect());
-            // Pi
-            LevelData<FArrayBox>* old_overburdenpressDataPtr = m_overburdenpress[lev];
-            LevelData<FArrayBox>* new_overburdenpressDataPtr    =
-                new LevelData<FArrayBox>(newDBL, m_overburdenpress[0]->nComp(), m_overburdenpress[0]->ghostVect());
-            // Bed randomization
-            LevelData<FArrayBox>* old_bumpHeightDataPtr     = m_bumpHeight[lev];
-            LevelData<FArrayBox>* new_bumpHeightDataPtr    =
-                new LevelData<FArrayBox>(newDBL, m_bumpHeight[0]->nComp(), m_bumpHeight[0]->ghostVect());
-            LevelData<FArrayBox>* old_bumpSpacingDataPtr     = m_bumpSpacing[lev];
-            LevelData<FArrayBox>* new_bumpSpacingDataPtr    =
-                new LevelData<FArrayBox>(newDBL, m_bumpSpacing[0]->nComp(), m_bumpSpacing[0]->ghostVect());
-
-            // Other vars: grads / Pw / Qw / mR
-            m_Re[lev]              = new LevelData<FArrayBox>(newDBL, m_Re[0]->nComp(), m_Re[0]->ghostVect());
-            m_gradhead[lev]        = new LevelData<FArrayBox>(newDBL, m_gradhead[0]->nComp(), m_gradhead[0]->ghostVect());
-            m_gradhead_ec[lev]     = new LevelData<FluxBox>(newDBL, m_gradhead_ec[0]->nComp(), IntVect::Zero);
-            m_Pw[lev]              = new LevelData<FArrayBox>(newDBL, m_Pw[0]->nComp(), m_Pw[0]->ghostVect());
-            m_qw[lev]              = new LevelData<FArrayBox>(newDBL, m_qw[0]->nComp(), m_qw[0]->ghostVect());
-            m_meltRate[lev]        = new LevelData<FArrayBox>(newDBL, m_meltRate[0]->nComp(), m_meltRate[0]->ghostVect());
+            m_old_gapheight[lev]   = RefCountedPtr<LevelData<FArrayBox>> (new LevelData<FArrayBox>(newDBL, m_old_gapheight[0]->nComp(), m_old_gapheight[0]->ghostVect()));
+            // Other vars: Re / Pw / Qw / mR
+            m_Re[lev]              = RefCountedPtr<LevelData<FArrayBox>> (new LevelData<FArrayBox>(newDBL, m_Re[0]->nComp(), m_Re[0]->ghostVect()));
+            m_Pw[lev]              = RefCountedPtr<LevelData<FArrayBox>> (new LevelData<FArrayBox>(newDBL, m_Pw[0]->nComp(), m_Pw[0]->ghostVect()));
+            m_qw[lev]              = RefCountedPtr<LevelData<FArrayBox>> (new LevelData<FArrayBox>(newDBL, m_qw[0]->nComp(), m_qw[0]->ghostVect()));
+            m_meltRate[lev]        = RefCountedPtr<LevelData<FArrayBox>> (new LevelData<FArrayBox>(newDBL, m_meltRate[0]->nComp(), m_meltRate[0]->ghostVect()));
+            // Gradients
+            m_gradhead[lev]        = RefCountedPtr<LevelData<FArrayBox>> (new LevelData<FArrayBox>(newDBL, m_gradhead[0]->nComp(), m_gradhead[0]->ghostVect()));
+            m_gradhead_ec[lev]     = RefCountedPtr<LevelData<FluxBox>> (new LevelData<FluxBox>(newDBL, m_gradhead_ec[0]->nComp(), IntVect::Zero));
 
 
             /* DEBUG VAR */
@@ -3506,105 +3375,29 @@ AmrHydro::regrid()
 
             //} // End verbosity
 
-            // Fill with interpolated data from coarser level
-            {
-                // may eventually want to do post-regrid smoothing on this!
-                FineInterp interpolator(newDBL, 1, m_refinement_ratios[lev - 1], m_amrDomains[lev]);
-
-                //limitSlopes          =  0,
-                //noSlopeLimiting      =  1,   XXXXXXXXX
-                //PCInterp             =  2,
-                //limitTangentialOnly  =  3,
-                interpolator.m_boundary_limit_type     = 3;
-
-                /* NEED */
-                // HEAD
-                // Gap Height
-                // Bed Randomization
-                interpolator.interpToFine(*new_bumpHeightDataPtr, *m_bumpHeight[lev - 1]);
-                interpolator.interpToFine(*new_bumpSpacingDataPtr, *m_bumpSpacing[lev - 1]);
-                /* CST FOR NOW */
-                // Ice Height
-                interpolator.interpToFine(*new_iceheightDataPtr, *m_iceheight[lev - 1]);
-                // Bed elevation
-                interpolator.interpToFine(*new_bedelevationDataPtr, *m_bedelevation[lev - 1]);
-                // Pi
-                interpolator.interpToFine(*new_overburdenpressDataPtr, *m_overburdenpress[lev - 1]);
-            }
-
-            // now potentially copy old-grid data on this level into new holder
-            if (old_bumpHeightDataPtr!= NULL) {
-                if (oldDBL.isClosed()) {
-                    /* NEED */
-                    // HEAD
-                    // Gap Height
-                    // Bed Randomization
-                    old_bumpHeightDataPtr->copyTo(*new_bumpHeightDataPtr);
-                    old_bumpSpacingDataPtr->copyTo(*new_bumpSpacingDataPtr);
-                    /* CST FOR NOW */
-                    // Ice Height
-                    old_iceheightDataPtr->copyTo(*new_iceheightDataPtr);
-                    // Bed elevation
-                    old_bedelevationDataPtr->copyTo(*new_bedelevationDataPtr);
-                    // Pi 
-                    old_overburdenpressDataPtr->copyTo(*new_overburdenpressDataPtr);
-                }
-                // can now delete old data
-                delete old_bumpHeightDataPtr;
-                delete old_bumpSpacingDataPtr;
-                delete old_iceheightDataPtr;
-                delete old_bedelevationDataPtr;
-                delete old_overburdenpressDataPtr;
-            } 
-
             // handle ghost cells on the coarse-fine interface
-            QuadCFInterp qcfi(m_amrGrids[lev], &m_amrGrids[lev-1],
-                              m_amrDx[lev][0], m_refinement_ratios[lev-1],  
-                              1,  // num comps
-                              m_amrDomains[lev]);
-            /* NEED */
-            // Bed Randomization
-            qcfi.coarseFineInterp(*new_bumpHeightDataPtr, *m_bumpHeight[lev-1]);
-            qcfi.coarseFineInterp(*new_bumpSpacingDataPtr, *m_bumpSpacing[lev-1]);
-            /* CST FOR NOW */
-            // Ice Height
-            qcfi.coarseFineInterp(*new_iceheightDataPtr, *m_iceheight[lev-1]);
-            // Bed elevation
-            qcfi.coarseFineInterp(*new_bedelevationDataPtr, *m_bedelevation[lev-1]);
-            // Pi 
-            qcfi.coarseFineInterp(*new_overburdenpressDataPtr, *m_overburdenpress[lev-1]);
-
-
-            // exchange is necessary to fill periodic ghost cells
-            // which aren't filled by the copyTo from oldLevelH or by
-            // CF interp OR for when there are several Grids
-            /* NEED */
-            new_bumpHeightDataPtr->exchange();
-            new_bumpSpacingDataPtr->exchange();
-            // CST FOR NOW
-            new_iceheightDataPtr->exchange();
-            new_bedelevationDataPtr->exchange();
-            new_overburdenpressDataPtr->exchange();
-
-            ExtrapGhostCells( *new_bumpHeightDataPtr, m_amrDomains[lev]);
-            ExtrapGhostCells( *new_bumpSpacingDataPtr, m_amrDomains[lev]);
-            ExtrapGhostCells( *new_iceheightDataPtr, m_amrDomains[lev]);
-            ExtrapGhostCells( *new_bedelevationDataPtr, m_amrDomains[lev]);
-            ExtrapGhostCells( *new_overburdenpressDataPtr, m_amrDomains[lev]);
-
+            //QuadCFInterp qcfi(m_amrGrids[lev], &m_amrGrids[lev-1],
+            //                  m_amrDx[lev][0], m_refinement_ratios[lev-1],  
+            //                  1,  // num comps
+            //                  m_amrDomains[lev]);
 
             // now place new holders into multilevel arrays
             /* NEED */
-            m_head[lev]            = destructiveRegrid(m_head[lev], newDBL,
-                                     m_head[lev-1], m_refinement_ratios[lev-1]);
-            m_gapheight[lev]       = destructiveRegrid(m_gapheight[lev], newDBL, m_gapheight[lev-1], m_refinement_ratios[lev-1]);;
-            m_bumpHeight[lev]      = new_bumpHeightDataPtr;
-            m_bumpSpacing[lev]     = new_bumpSpacingDataPtr;
+            m_head[lev]            = destructiveRegrid(m_head[lev], newDBL, m_head[lev-1], m_refinement_ratios[lev-1]);
+            m_gapheight[lev]       = destructiveRegrid(m_gapheight[lev], newDBL, m_gapheight[lev-1], m_refinement_ratios[lev-1]);
+            m_bumpHeight[lev]      = destructiveRegrid(m_bumpHeight[lev], newDBL, m_bumpHeight[lev-1], m_refinement_ratios[lev-1]);
+            m_bumpSpacing[lev]     = destructiveRegrid(m_bumpSpacing[lev], newDBL, m_bumpSpacing[lev-1], m_refinement_ratios[lev-1]);
             // CST FOR NOW
-            m_iceheight[lev]       = new_iceheightDataPtr;
-            m_bedelevation[lev]    = new_bedelevationDataPtr;
-            m_overburdenpress[lev] = new_overburdenpressDataPtr;
+            m_iceheight[lev]       = destructiveRegrid(m_iceheight[lev], newDBL, m_iceheight[lev-1], m_refinement_ratios[lev-1]);
+            m_bedelevation[lev]    = destructiveRegrid(m_bedelevation[lev], newDBL, m_bedelevation[lev-1], m_refinement_ratios[lev-1]);
+            m_overburdenpress[lev] = destructiveRegrid(m_overburdenpress[lev], newDBL, m_overburdenpress[lev-1], m_refinement_ratios[lev-1]);
 
+            // GC
+            ExtrapGhostCells( *m_bumpHeight[lev], m_amrDomains[lev]);
+            ExtrapGhostCells( *m_bumpSpacing[lev], m_amrDomains[lev]);
+            ExtrapGhostCells( *m_iceheight[lev], m_amrDomains[lev]);
+            ExtrapGhostCells( *m_bedelevation[lev], m_amrDomains[lev]);
+            ExtrapGhostCells( *m_overburdenpress[lev], m_amrDomains[lev]);
 
             //if (m_verbosity > 20) {
 
@@ -3630,59 +3423,6 @@ AmrHydro::regrid()
         // now ensure that any remaining levels are null pointers
         // (in case of de-refinement)
         for (int lev = new_finest_level + 1; lev < m_old_head.size(); lev++) {
-            if (m_old_head[lev] != NULL) {
-                delete m_old_head[lev];
-                m_old_head[lev] = NULL;
-            }
-            if (m_gradhead[lev] != NULL) {
-                delete m_gradhead[lev];
-                m_gradhead[lev] = NULL;
-            }
-            if (m_gradhead_ec[lev] != NULL) {
-                delete m_gradhead_ec[lev];
-                m_gradhead_ec[lev] = NULL;
-            }
-            if (m_old_gapheight[lev] != NULL) {
-                delete m_old_gapheight[lev];
-                m_old_gapheight[lev] = NULL;
-            }
-            if (m_Pw[lev] != NULL) {
-                delete m_Pw[lev];
-                m_Pw[lev] = NULL;
-            }
-            if (m_qw[lev] != NULL) {
-                delete m_qw[lev];
-                m_qw[lev] = NULL;
-            }
-            if (m_Re[lev] != NULL) {
-                delete m_Re[lev];
-                m_Re[lev] = NULL;
-            }
-            if (m_meltRate[lev] != NULL) {
-                delete m_meltRate[lev];
-                m_meltRate[lev] = NULL;
-            }
-            if (m_iceheight[lev] != NULL) {
-                delete m_iceheight[lev];
-                m_iceheight[lev] = NULL;
-            }
-            if (m_bedelevation[lev] != NULL) {
-                delete m_bedelevation[lev];
-                m_bedelevation[lev] = NULL;
-            }
-            if (m_overburdenpress[lev] != NULL) {
-                delete m_overburdenpress[lev];
-                m_overburdenpress[lev] = NULL;
-            }
-            if (m_bumpHeight[lev] != NULL) {
-                delete m_bumpHeight[lev];
-                m_bumpHeight[lev] = NULL;
-            }
-            if (m_bumpSpacing[lev] != NULL) {
-                delete m_bumpSpacing[lev];
-                m_bumpSpacing[lev] = NULL;
-            }
-
             DisjointBoxLayout emptyDBL;
             m_amrGrids[lev] = emptyDBL;
         }
@@ -4069,19 +3809,19 @@ AmrHydro::levelSetup(int a_level, const DisjointBoxLayout& a_grids)
     m_old_head[a_level]->define(a_grids, nPhiComp, HeadGhostVect);
     m_old_gapheight[a_level]->define(a_grids, nPhiComp, HeadGhostVect);
 
-    m_head[a_level]         = RefCountedPtr<LevelData<FArrayBox>> (new LevelData<FArrayBox>(a_grids, nPhiComp, HeadGhostVect));
-    m_gradhead[a_level]     = new LevelData<FArrayBox>(a_grids, SpaceDim*nPhiComp, HeadGhostVect);
-    m_gradhead_ec[a_level]  = new LevelData<FluxBox>(a_grids, nPhiComp, IntVect::Zero);
-    m_gapheight[a_level]    = RefCountedPtr<LevelData<FArrayBox>> (new LevelData<FArrayBox>(a_grids, nPhiComp, HeadGhostVect));
-    m_Pw[a_level]           = new LevelData<FArrayBox>(a_grids, nPhiComp, HeadGhostVect);
-    m_qw[a_level]           = new LevelData<FArrayBox>(a_grids, SpaceDim*nPhiComp, HeadGhostVect);
-    m_Re[a_level]           = new LevelData<FArrayBox>(a_grids, nPhiComp, HeadGhostVect);
-    m_meltRate[a_level]     = new LevelData<FArrayBox>(a_grids, nPhiComp, HeadGhostVect);
-    m_iceheight[a_level]    = new LevelData<FArrayBox>(a_grids, nPhiComp, HeadGhostVect);
-    m_bedelevation[a_level]    = new LevelData<FArrayBox>(a_grids, nPhiComp, HeadGhostVect);
-    m_overburdenpress[a_level] = new LevelData<FArrayBox>(a_grids, nPhiComp, HeadGhostVect);
-    m_bumpHeight[a_level]      = new LevelData<FArrayBox>(a_grids, nPhiComp, HeadGhostVect);
-    m_bumpSpacing[a_level]      = new LevelData<FArrayBox>(a_grids, nPhiComp, HeadGhostVect);
+    m_head[a_level]            = RefCountedPtr<LevelData<FArrayBox>> (new LevelData<FArrayBox>(a_grids, nPhiComp, HeadGhostVect));
+    m_gradhead[a_level]        = RefCountedPtr<LevelData<FArrayBox>> (new LevelData<FArrayBox>(a_grids, SpaceDim*nPhiComp, HeadGhostVect));
+    m_gradhead_ec[a_level]     = RefCountedPtr<LevelData<FluxBox>> (new LevelData<FluxBox>(a_grids, nPhiComp, IntVect::Zero));
+    m_gapheight[a_level]       = RefCountedPtr<LevelData<FArrayBox>> (new LevelData<FArrayBox>(a_grids, nPhiComp, HeadGhostVect));
+    m_Pw[a_level]              = RefCountedPtr<LevelData<FArrayBox>> (new LevelData<FArrayBox>(a_grids, nPhiComp, HeadGhostVect));
+    m_qw[a_level]              = RefCountedPtr<LevelData<FArrayBox>> (new LevelData<FArrayBox>(a_grids, SpaceDim*nPhiComp, HeadGhostVect));
+    m_Re[a_level]              = RefCountedPtr<LevelData<FArrayBox>> (new LevelData<FArrayBox>(a_grids, nPhiComp, HeadGhostVect));
+    m_meltRate[a_level]        = RefCountedPtr<LevelData<FArrayBox>> (new LevelData<FArrayBox>(a_grids, nPhiComp, HeadGhostVect));
+    m_iceheight[a_level]       = RefCountedPtr<LevelData<FArrayBox>> (new LevelData<FArrayBox>(a_grids, nPhiComp, HeadGhostVect));
+    m_bedelevation[a_level]    = RefCountedPtr<LevelData<FArrayBox>> (new LevelData<FArrayBox>(a_grids, nPhiComp, HeadGhostVect));
+    m_overburdenpress[a_level] = RefCountedPtr<LevelData<FArrayBox>> (new LevelData<FArrayBox>(a_grids, nPhiComp, HeadGhostVect));
+    m_bumpHeight[a_level]      = RefCountedPtr<LevelData<FArrayBox>> (new LevelData<FArrayBox>(a_grids, nPhiComp, HeadGhostVect));
+    m_bumpSpacing[a_level]     = RefCountedPtr<LevelData<FArrayBox>> (new LevelData<FArrayBox>(a_grids, nPhiComp, HeadGhostVect));
 }
 
 void
@@ -4837,21 +4577,21 @@ AmrHydro::readCheckpointFile(HDF5Handle& a_handle)
     m_amrDomains.resize(m_max_level + 1);
     m_amrGrids.resize(m_max_level + 1);
     m_amrDx.resize(m_max_level + 1);
-    m_old_head.resize(m_max_level + 1, NULL);
+    m_old_head.resize(m_max_level + 1);
     m_head.resize(m_max_level + 1);
-    m_gradhead.resize(m_max_level + 1, NULL);
-    m_gradhead_ec.resize(m_max_level + 1, NULL);
-    m_old_gapheight.resize(m_max_level + 1, NULL);
+    m_gradhead.resize(m_max_level + 1);
+    m_gradhead_ec.resize(m_max_level + 1);
+    m_old_gapheight.resize(m_max_level + 1);
     m_gapheight.resize(m_max_level + 1);
-    m_Pw.resize(m_max_level + 1, NULL);
-    m_qw.resize(m_max_level + 1, NULL);
-    m_Re.resize(m_max_level + 1, NULL);
-    m_meltRate.resize(m_max_level + 1, NULL);
-    m_iceheight.resize(m_max_level + 1, NULL);
-    m_bedelevation.resize(m_max_level + 1, NULL);
-    m_overburdenpress.resize(m_max_level + 1, NULL);
-    m_bumpHeight.resize(m_max_level + 1, NULL);
-    m_bumpSpacing.resize(m_max_level + 1, NULL);
+    m_Pw.resize(m_max_level + 1);
+    m_qw.resize(m_max_level + 1);
+    m_Re.resize(m_max_level + 1);
+    m_meltRate.resize(m_max_level + 1);
+    m_iceheight.resize(m_max_level + 1);
+    m_bedelevation.resize(m_max_level + 1);
+    m_overburdenpress.resize(m_max_level + 1);
+    m_bumpHeight.resize(m_max_level + 1);
+    m_bumpSpacing.resize(m_max_level + 1);
 
     // now read in level-by-level data -- go to Max lev of checkfile
     for (int lev = 0; lev <= max_level_check; lev++) {
@@ -4923,21 +4663,21 @@ AmrHydro::readCheckpointFile(HDF5Handle& a_handle)
             // allocate this level's storage
             IntVect nGhost  = m_num_head_ghost * IntVect::Unit;
             int nPhiComp = 1;
-            m_old_head[lev]      = new LevelData<FArrayBox>(levelDBL, nPhiComp, nGhost);
+            m_old_head[lev]      = RefCountedPtr<LevelData<FArrayBox>> (new LevelData<FArrayBox>(levelDBL, nPhiComp, nGhost));
             m_head[lev]          = RefCountedPtr<LevelData<FArrayBox>> (new LevelData<FArrayBox>(levelDBL, nPhiComp, nGhost));
-            m_gradhead[lev]      = new LevelData<FArrayBox>(levelDBL, SpaceDim*nPhiComp, nGhost);
-            m_gradhead_ec[lev]   = new LevelData<FluxBox>(levelDBL, nPhiComp, IntVect::Zero);
-            m_old_gapheight[lev] = new LevelData<FArrayBox>(levelDBL, nPhiComp, nGhost);
+            m_gradhead[lev]      = RefCountedPtr<LevelData<FArrayBox>> (new LevelData<FArrayBox>(levelDBL, SpaceDim*nPhiComp, nGhost));
+            m_gradhead_ec[lev]   = RefCountedPtr<LevelData<FluxBox>> (new LevelData<FluxBox>(levelDBL, nPhiComp, IntVect::Zero));
+            m_old_gapheight[lev] = RefCountedPtr<LevelData<FArrayBox>> (new LevelData<FArrayBox>(levelDBL, nPhiComp, nGhost));
             m_gapheight[lev]     = RefCountedPtr<LevelData<FArrayBox>> (new LevelData<FArrayBox>(levelDBL, nPhiComp, nGhost));
-            m_Pw[lev]            = new LevelData<FArrayBox>(levelDBL, nPhiComp, nGhost);
-            m_qw[lev]            = new LevelData<FArrayBox>(levelDBL, SpaceDim*nPhiComp, nGhost);
-            m_Re[lev]            = new LevelData<FArrayBox>(levelDBL, nPhiComp, nGhost);
-            m_meltRate[lev]      = new LevelData<FArrayBox>(levelDBL, nPhiComp, nGhost);
-            m_iceheight[lev]     = new LevelData<FArrayBox>(levelDBL, nPhiComp, nGhost);
-            m_bedelevation[lev]  = new LevelData<FArrayBox>(levelDBL, nPhiComp, nGhost);
-            m_overburdenpress[lev]   = new LevelData<FArrayBox>(levelDBL, nPhiComp, nGhost);
-            m_bumpHeight[lev]        = new LevelData<FArrayBox>(levelDBL, nPhiComp, nGhost); 
-            m_bumpSpacing[lev]       = new LevelData<FArrayBox>(levelDBL, nPhiComp, nGhost); 
+            m_Pw[lev]            = RefCountedPtr<LevelData<FArrayBox>> (new LevelData<FArrayBox>(levelDBL, nPhiComp, nGhost));
+            m_qw[lev]            = RefCountedPtr<LevelData<FArrayBox>> (new LevelData<FArrayBox>(levelDBL, SpaceDim*nPhiComp, nGhost));
+            m_Re[lev]            = RefCountedPtr<LevelData<FArrayBox>> (new LevelData<FArrayBox>(levelDBL, nPhiComp, nGhost));
+            m_meltRate[lev]      = RefCountedPtr<LevelData<FArrayBox>> (new LevelData<FArrayBox>(levelDBL, nPhiComp, nGhost));
+            m_iceheight[lev]     = RefCountedPtr<LevelData<FArrayBox>> (new LevelData<FArrayBox>(levelDBL, nPhiComp, nGhost));
+            m_bedelevation[lev]  = RefCountedPtr<LevelData<FArrayBox>> (new LevelData<FArrayBox>(levelDBL, nPhiComp, nGhost));
+            m_overburdenpress[lev]   = RefCountedPtr<LevelData<FArrayBox>> (new LevelData<FArrayBox>(levelDBL, nPhiComp, nGhost));
+            m_bumpHeight[lev]        = RefCountedPtr<LevelData<FArrayBox>> (new LevelData<FArrayBox>(levelDBL, nPhiComp, nGhost)); 
+            m_bumpSpacing[lev]       = RefCountedPtr<LevelData<FArrayBox>> (new LevelData<FArrayBox>(levelDBL, nPhiComp, nGhost)); 
 
             // read this level's data
             /* HEAD */

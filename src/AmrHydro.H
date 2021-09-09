@@ -252,7 +252,7 @@ public:
     const LevelData<FArrayBox>* zBed(int a_level) const {
         return m_bedelevation[a_level];
     }
-    Vector<LevelData<FArrayBox>*>& amrZBed() {
+    Vector<RefCountedPtr<LevelData<FArrayBox>>>& amrZBed() {
         return m_bedelevation;
     }
 
@@ -405,31 +405,31 @@ protected:
         depth-integrated  water  flux,  and degree of channelization */
     /* current old-time data */
     /* */
-    Vector<LevelData<FArrayBox>*> m_old_head;               // Hydraulic head
-    Vector<LevelData<FArrayBox>*> m_old_gapheight;          // Subglacial height
+    Vector<RefCountedPtr<LevelData<FArrayBox>> > m_old_head;               // Hydraulic head
+    Vector<RefCountedPtr<LevelData<FArrayBox>> > m_old_gapheight;          // Subglacial height
 
     /* new-time data */
     /* */
     Vector<RefCountedPtr<LevelData<FArrayBox>> > m_head;    // Hydraulic head
     Vector<RefCountedPtr<LevelData<FArrayBox>> > m_gapheight;              // Subglacial height
 
-    Vector<LevelData<FArrayBox>*> m_gradhead;               // Grad of Hydraulic head
-    Vector<LevelData<FluxBox>*> m_gradhead_ec;               // Grad of Hydraulic head
+    Vector<RefCountedPtr<LevelData<FArrayBox>>> m_gradhead;               // Grad of Hydraulic head
+    Vector<RefCountedPtr<LevelData<FluxBox>>> m_gradhead_ec;               // Grad of Hydraulic head
 
     /* */
-    Vector<LevelData<FArrayBox>*> m_Pw;                     // Water pressure
-    Vector<LevelData<FArrayBox>*> m_qw;                     // Water flux
-    Vector<LevelData<FArrayBox>*> m_Re;                     // Reynolds number
-    Vector<LevelData<FArrayBox>*> m_meltRate;               // Melting rate
-    Vector<LevelData<FArrayBox>*> m_iceheight;              // Ice slab height
+    Vector<RefCountedPtr<LevelData<FArrayBox>>> m_Pw;                     // Water pressure
+    Vector<RefCountedPtr<LevelData<FArrayBox>>> m_qw;                     // Water flux
+    Vector<RefCountedPtr<LevelData<FArrayBox>>> m_Re;                     // Reynolds number
+    Vector<RefCountedPtr<LevelData<FArrayBox>>> m_meltRate;               // Melting rate
+    Vector<RefCountedPtr<LevelData<FArrayBox>>> m_iceheight;              // Ice slab height
 
     /* Time-constant parameters */
-    Vector<LevelData<FArrayBox>*> m_bedelevation;           //
-    Vector<LevelData<FArrayBox>*> m_overburdenpress;        // rhoi*g*H
+    Vector<RefCountedPtr<LevelData<FArrayBox>>> m_bedelevation;           //
+    Vector<RefCountedPtr<LevelData<FArrayBox>>> m_overburdenpress;        // rhoi*g*H
 
     /* Bed randomization */
-    Vector<LevelData<FArrayBox>*> m_bumpHeight;            // typical ground bump height
-    Vector<LevelData<FArrayBox>*> m_bumpSpacing;           // typical ground bump spacing
+    Vector<RefCountedPtr<LevelData<FArrayBox>> > m_bumpHeight;            // typical ground bump height
+    Vector<RefCountedPtr<LevelData<FArrayBox>> > m_bumpSpacing;           // typical ground bump spacing
    
 
     //Vector<LevelData<FArrayBox>*> m_gradZb;      
