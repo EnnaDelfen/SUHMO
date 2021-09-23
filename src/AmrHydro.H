@@ -117,8 +117,8 @@ public:
                        LevelData<FluxBox>&    levelB);
 
     void dCoeff(LevelData<FluxBox>&    leveldcoef, 
-                Real                   a_dx,
-                Real                   a_dt);
+                LevelData<FluxBox>&    a_mRec, 
+                int lev);
 
     void Calc_moulin_source_term_distributed(LevelData<FArrayBox>& levelMoulinSrc);
 
