@@ -82,10 +82,10 @@ HydroIBC::initializeData(RealVect& a_dx,
     }
 
     // randomization
-    const double mean = 0.0;
-    const double stddev = 0.01;
+    const double mean2 = 0.0;
+    const double stddev2 = 0.1;
     std::default_random_engine generator;
-    std::normal_distribution<double> dist(mean, stddev);
+    std::normal_distribution<double> dist2(mean2, stddev2);
 
     IntVect regionLo = m_domain.domainBox().bigEnd();
     IntVect regionHi = m_domain.domainBox().bigEnd();
@@ -112,18 +112,17 @@ HydroIBC::initializeData(RealVect& a_dx,
             Real y_loc = (iv[1]+0.5)*a_dx[1];
 
             /* bed topography */
-            //thiszbed(iv, 0)      = std::max(Params.m_slope*x_loc, 0.0);
+            // typical
             thiszbed(iv, 0)      = Params.m_slope*x_loc;
-            //thisGradzbed(iv, 0)  = Params.m_slope;
-            //thisGradzbed(iv, 1)  = 0.0;
+            // add randomness
+            //thiszbed(iv, 0)      = std::max(Params.m_slope*x_loc + dist2(generator), 0.0);
+            // parabolic
             //thiszbed(iv, 0)      = Params.m_slope*std::sqrt(x_loc*x_loc + y_loc*y_loc);
-            //thisGradzbed(iv, 0)  = Params.m_slope*Params.m_slope*x_loc / thiszbed(iv, 0);
-            //thisGradzbed(iv, 1)  = Params.m_slope*Params.m_slope*y_loc / thiszbed(iv, 0);
             /* initial gap height */
             thisGapHeight(iv, 0) = Params.m_gapInit;
             /* Ice height (should be ice only, so surface - (bed + gap)) */
-            thisiceHeight(iv, 0) = 6.0 * (std::sqrt(x_loc + Params.m_H) - std::sqrt(Params.m_H)) + 1.0;
-            //thisiceHeight(iv, 0) = Params.m_H;
+            //thisiceHeight(iv, 0) = 6.0 * (std::sqrt(x_loc + Params.m_H) - std::sqrt(Params.m_H)) + 1.0;
+            thisiceHeight(iv, 0) = Params.m_H;
             /* Ice overburden pressure : rho_i * g * H */
             thispi(iv, 0)        = Params.m_rho_i * Params.m_gravity * thisiceHeight(iv, 0);
             
@@ -139,9 +138,11 @@ HydroIBC::initializeData(RealVect& a_dx,
             //thisPw(iv, 0)        = ( thisHead(iv, 0) - thiszbed(iv, 0) ) * (Params.m_rho_w * Params.m_gravity) ;
 
             /* Bed randomization */
-            if (Params.m_compute_bump_param) {
-                thisbumpHeight(iv, 0)      = Params.m_br; // + dist(generator);//Params.m_br*std::sin(y_loc)/10.0 + Params.m_br; 
-            }
+            // typical
+            thisbumpHeight(iv, 0)      = Params.m_br;
+            // if randomness
+            //thisbumpHeight(iv, 0)      = std::max(thiszbed(iv, 0) - Params.m_slope*x_loc, 0.0); //Params.m_br*std::sin(y_loc)/10.0 + Params.m_br; 
+            //thisbumpHeight(iv, 0)      = std::max(Params.m_br*std::sin(y_loc)/10.0 + Params.m_br, 0.0);
             thisbumpSpacing(iv, 0)     = Params.m_lr;
 
             /* dummy stuff  */
