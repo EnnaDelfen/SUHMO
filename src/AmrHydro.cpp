@@ -326,12 +326,13 @@ AmrHydro::SolveForGap_nl(const Vector<DisjointBoxLayout>&               a_grids,
                           Vector<int>& refRatio,
                           Real& coarsestDx,
                           Vector<LevelData<FArrayBox>*>& a_gapHeight, 
-                          Vector<LevelData<FArrayBox>*>& a_RHS)
+                          Vector<LevelData<FArrayBox>*>& a_RHS,
+                          Real a_dt)
 {
 
     VCAMRPoissonOp2Factory opFactory;
     Real alpha = 1.0;
-    Real beta  = -1.0*m_dt;  
+    Real beta  = - a_dt * m_suhmoParm->m_DiffFactor;  
     opFactory.define(a_domains[0],
                      a_grids,
                      refRatio,
@@ -347,18 +348,14 @@ AmrHydro::SolveForGap_nl(const Vector<DisjointBoxLayout>&               a_grids,
 
     // bottom solver ?
     BiCGStabSolver<LevelData<FArrayBox> > bottomSolver;
-    if (m_verbosity > 3) {
-        bottomSolver.m_verbosity = 4;
-    } else {
-        bottomSolver.m_verbosity = 1;
-    }
+    bottomSolver.m_verbosity = 1;
 
     int numLevels = m_finest_level + 1;
     amrSolver->define(a_domains[0], opFactoryPtr,
                       &bottomSolver, numLevels);
 
     int numSmooth = 4;  // number of relax before averaging
-    int numBottom = 8;  // num of bottom smoothings
+    int numBottom = 4;  // num of bottom smoothings
     int numMG     = 1;  // Vcycle selected
     int maxIter   = 100; // max number of v cycles
     Real eps        =  1.0e-8;  // solution tolerance
@@ -1618,7 +1615,8 @@ AmrHydro::CalcRHS_gapHeightFAS(LevelData<FArrayBox>& levelRHS_b,
                                LevelData<FArrayBox>& levelRHS_b_A, 
                                LevelData<FArrayBox>& levelRHS_b_B,
                                LevelData<FArrayBox>& levelRHS_b_C,
-                               LevelData<FArrayBox>& levelchanDegree)
+                               LevelData<FArrayBox>& levelchanDegree,
+                               Real a_dt)
 {
    DataIterator dit = levelRHS_b.dataIterator();
    for (dit.begin(); dit.ok(); ++dit) {
@@ -1667,26 +1665,17 @@ AmrHydro::CalcRHS_gapHeightFAS(LevelData<FArrayBox>& levelRHS_b,
                RHS(iv,0)   -= m_suhmoParm->m_A * std::pow(AbsPimPw, 2) * PimPw * B(iv,0) * ( 1.0 - (m_suhmoParm->m_cutOffbr - B(iv,0)) / m_suhmoParm->m_cutOffbr );
                RHS_C(iv,0) =- m_suhmoParm->m_A * std::pow(AbsPimPw, 2) * PimPw * B(iv,0) * ( 1.0 - (m_suhmoParm->m_cutOffbr - B(iv,0)) / m_suhmoParm->m_cutOffbr );
 
-               // Add a Diffusive term to mdot
-               RHS(iv,0)   += m_suhmoParm->m_DiffFactor * DT(iv,0); //* ( 1.0 - (m_suhmoParm->m_cutOffbr - B(iv,0)) / m_suhmoParm->m_cutOffbr );
-
            } else if ( m_suhmoParm->m_maxOffbr < B(iv,0) ) {
                RHS(iv,0)   -= m_suhmoParm->m_A * std::pow(AbsPimPw, 2) * PimPw * B(iv,0) * ( 1.0 - (m_suhmoParm->m_maxOffbr  - B(iv,0)) / m_suhmoParm->m_maxOffbr  );
                RHS_C(iv,0) =- m_suhmoParm->m_A * std::pow(AbsPimPw, 2) * PimPw * B(iv,0) * ( 1.0 - (m_suhmoParm->m_maxOffbr  - B(iv,0)) / m_suhmoParm->m_maxOffbr  );
 
-               // Add a Diffusive term to mdot
-               RHS(iv,0)   += m_suhmoParm->m_DiffFactor * DT(iv,0); // * ( 1.0 - (m_suhmoParm->m_maxOffbr  - B(iv,0)) / m_suhmoParm->m_maxOffbr  );
-
            } else {
                RHS(iv,0)   -= m_suhmoParm->m_A * std::pow(AbsPimPw, 2) * PimPw * B(iv,0); 
                RHS_C(iv,0) =- m_suhmoParm->m_A * std::pow(AbsPimPw, 2) * PimPw * B(iv,0);
-
-               // Add a Diffusive term to mdot
-               RHS(iv,0)   += m_suhmoParm->m_DiffFactor * DT(iv,0);
            }
            CD(iv,0) = RHS_A(iv,0) / (RHS_A(iv,0) + RHS_B(iv,0));
           
-           RHS(iv,0) = B(iv,0) + m_dt * RHS(iv,0);
+           RHS(iv,0) = B(iv,0) + a_dt * RHS(iv,0);
        }
    }
 }
@@ -1770,14 +1759,12 @@ AmrHydro::timeStepFAS(Real a_dt)
     Vector<LevelData<FluxBox>*> a_GapHeight_ec;
     Vector<LevelData<FluxBox>*> a_meltRate_ec;
     Vector<LevelData<FluxBox>*> a_gradZb_ec;
-    //Vector<LevelData<FluxBox>*> a_Dcoef;
     Vector<RefCountedPtr<LevelData<FluxBox> > > a_Dcoef(m_finest_level + 1);
     a_Qw_ec.resize(m_finest_level + 1, NULL);
     a_Re_ec.resize(m_finest_level + 1, NULL);
     a_GapHeight_ec.resize(m_finest_level + 1, NULL);
     a_meltRate_ec.resize(m_finest_level + 1, NULL);
     a_gradZb_ec.resize(m_finest_level + 1, NULL);
-    //a_Dcoef.resize(m_finest_level + 1, NULL);
     // alpha*aCoef(x)*I - beta*Div(bCoef(x)*Grad) -- note for us: alpha = 0 beta = - 1 
     Vector<RefCountedPtr<LevelData<FArrayBox> > > aCoef(m_finest_level + 1);
     Vector<RefCountedPtr<LevelData<FluxBox> > > bCoef(m_finest_level + 1);
@@ -1904,7 +1891,6 @@ AmrHydro::timeStepFAS(Real a_dt)
         a_GapHeight_ec[lev]  = new LevelData<FluxBox>(m_amrGrids[lev], 1, IntVect::Zero);
         a_meltRate_ec[lev]   = new LevelData<FluxBox>(m_amrGrids[lev], 1, IntVect::Zero);
         a_gradZb_ec[lev]     = new LevelData<FluxBox>(m_amrGrids[lev], 1, IntVect::Zero);
-        //a_Dcoef[lev]         = new LevelData<FluxBox>(m_amrGrids[lev], 1, IntVect::Zero);
         a_Dcoef[lev]         = RefCountedPtr<LevelData<FluxBox> >(new LevelData<FluxBox>(m_amrGrids[lev], 1, IntVect::Zero));
 
         // Get the valid boxes
@@ -2801,40 +2787,31 @@ AmrHydro::timeStepFAS(Real a_dt)
         CalcRHS_gapHeightFAS(levelRHS_b, levelPi, 
                              levelPw, levelmR, 
                              levelB, levelDT, levelBH, levelBL,
-                             levelRHS_b_A, levelRHS_b_B, levelRHS_b_C, levelchanDegree); 
-
-        //LevelData<FArrayBox>& leveloldB  = *m_old_gapheight[lev];    
+                             levelRHS_b_A, levelRHS_b_B, levelRHS_b_C, 
+                             levelchanDegree, a_dt); 
 
         //     Compute aCoeff (1) and bCoeff (Dif coef)
-        //Vector<DisjointBoxLayout> m_amrGrids_curr;
-        //Vector<ProblemDomain> m_amrDomains_curr;
-        //m_amrGrids_curr.resize(m_finest_level + 1);
-        //m_amrDomains_curr.resize(m_finest_level + 1);
-        //for (int lev = 0; lev <= m_finest_level; lev++) {
+        //stuff for solve -- to get SAME number of levs and not max/finest
+        LevelData<FArrayBox>& levelcurHlcl   = *a_head_curr[lev];
+         for (dit.begin(); dit.ok(); ++dit) {
+            // Copy curr into old -- copy ghost cells too 
+            levelcurHlcl[dit].copy(levelB[dit], 0, 0, 1);
+        }
         // Compute trivial GH aCoeff 
         LevelData<FArrayBox>& levelacoef = *aCoef_GH[lev];
         aCoeff_GH(levelacoef);
 
-        //stuff for solve -- to get SAME number of levs and not max/finest
-        //m_amrGrids_curr[lev]   = m_amrGrids[lev];
-        //m_amrDomains_curr[lev] = m_amrDomains[lev];
-        //LevelData<FArrayBox>& levelcurH      = *m_gapheight[lev];
-        LevelData<FArrayBox>& levelcurHlcl   = *a_head_curr[lev];
-        //DisjointBoxLayout& levelGrids        = m_amrGrids[lev];
-        //DataIterator dit                     = levelGrids.dataIterator();
-        for (dit.begin(); dit.ok(); ++dit) {
-            // Copy curr into old -- copy ghost cells too 
-            levelcurHlcl[dit].copy(levelB[dit], 0, 0, 1);
-        }
     } // loop on levs
 
     //     Solve for h with FAS scheme
     SolveForGap_nl(m_amrGrids, aCoef_GH, a_Dcoef,
                    m_amrDomains, m_refinement_ratios, coarsestDx,
-                   a_head_curr, RHS_b);
+                   a_head_curr, RHS_b, a_dt);
 
     for (int lev = 0; lev <= m_finest_level; lev++) {
-        LevelData<FArrayBox>& levelB         = *m_gapheight[lev];
+        LevelData<FArrayBox>& leveloldB  = *m_old_gapheight[lev];    
+        LevelData<FArrayBox>& levelB     = *m_gapheight[lev];
+        LevelData<FArrayBox>& levelRHS_b = *RHS_b[lev];
         LevelData<FArrayBox>& levelcurHlcl   = *a_head_curr[lev];
         DisjointBoxLayout& levelGrids        = m_amrGrids[lev];
         DataIterator dit                     = levelGrids.dataIterator();
@@ -2842,25 +2819,7 @@ AmrHydro::timeStepFAS(Real a_dt)
             // Copy curr into old -- copy ghost cells too 
             levelB[dit].copy(levelcurHlcl[dit], 0, 0, 1);
         }
-    }
-
-
-        //for (dit.begin(); dit.ok(); ++dit) {
- 
-        //    FArrayBox& oldB    = leveloldB[dit];
-        //    FArrayBox& newB    = levelB[dit];
-        //    FArrayBox& RHS     = levelRHS_b[dit];
-
-        //    // DO NOT TOUCH GHOST CELLS
-        //    BoxIterator bit(RHS.box()); 
-        //    for (bit.begin(); bit.ok(); ++bit) {
-        //        IntVect iv = bit(); 
-        //        // does not work
-        //        //newB(iv,0) = std::max(RHS(iv,0) * a_dt + oldB(iv,0), 1.0e-12);
-        //        newB(iv,0) = RHS(iv,0) * a_dt + oldB(iv,0);
-        //    }
-        //}
-    //}  // loop on levs
+    }  // loop on levs
 
 
     /* FINAL custom plt here -- debug print */

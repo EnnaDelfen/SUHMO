@@ -135,7 +135,8 @@ public:
                               LevelData<FArrayBox>& levelRHS_b_A,
                               LevelData<FArrayBox>& levelRHS_b_B,
                               LevelData<FArrayBox>& levelRHS_b_C,
-                              LevelData<FArrayBox>& levelchanDegree);
+                              LevelData<FArrayBox>& levelchanDegree,
+                              Real a_dt);
 
 
     void SolveForHead_nl(const Vector<DisjointBoxLayout>&                a_grids,
@@ -155,7 +156,8 @@ public:
                        Vector<int>& refRatio,
                        Real& coarsestDx,
                        Vector<LevelData<FArrayBox>*>& a_gapHeight, 
-                       Vector<LevelData<FArrayBox>*>& a_RHS);
+                       Vector<LevelData<FArrayBox>*>& a_RHS,
+                       Real a_dt);
 
     /* regridding */
     void regrid();
