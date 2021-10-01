@@ -116,6 +116,8 @@ public:
                        LevelData<FluxBox>&    levelRe, 
                        LevelData<FluxBox>&    levelB);
 
+    void aCoeff_GH(LevelData<FArrayBox>&  levelacoef);
+
     void dCoeff(LevelData<FluxBox>&    leveldcoef, 
                 LevelData<FluxBox>&    a_mRec, 
                 int lev);
@@ -144,6 +146,16 @@ public:
                           Real& coarsestDx,
                           Vector<LevelData<FArrayBox>*>& a_head, 
                           Vector<LevelData<FArrayBox>*>& a_RHS);
+
+
+    void SolveForGap_nl(const Vector<DisjointBoxLayout>&               a_grids,
+                       Vector<RefCountedPtr<LevelData<FArrayBox> > >& a_aCoef,
+                       Vector<RefCountedPtr<LevelData<FluxBox> > >&   a_bCoef,
+                       Vector<ProblemDomain>& a_domains,
+                       Vector<int>& refRatio,
+                       Real& coarsestDx,
+                       Vector<LevelData<FArrayBox>*>& a_gapHeight, 
+                       Vector<LevelData<FArrayBox>*>& a_RHS);
 
     /* regridding */
     void regrid();
