@@ -330,7 +330,8 @@ AmrHydro::SolveForGap_nl(const Vector<DisjointBoxLayout>&               a_grids,
                           Real a_dt)
 {
 
-    VCAMRPoissonOp2Factory opFactory;
+    //VCAMRPoissonOp2Factory opFactory;
+    AMRPoissonOpFactory opFactory;
     Real alpha = 1.0;
     Real beta  = - a_dt * m_suhmoParm->m_DiffFactor;  
     opFactory.define(a_domains[0],
@@ -338,8 +339,9 @@ AmrHydro::SolveForGap_nl(const Vector<DisjointBoxLayout>&               a_grids,
                      refRatio,
                      coarsestDx,
                      &FixedNeumBCFill,
-                     alpha, a_aCoef,
-                     beta, a_bCoef);
+                     //&mixBCValues,
+                     alpha, //a_aCoef,
+                     beta); //, a_bCoef);
 
     AMRLevelOpFactory<LevelData<FArrayBox> >& opFactoryPtr = (AMRLevelOpFactory<LevelData<FArrayBox> >& ) opFactory;
 
@@ -355,10 +357,10 @@ AmrHydro::SolveForGap_nl(const Vector<DisjointBoxLayout>&               a_grids,
                       &bottomSolver, numLevels);
 
     int numSmooth = 4;  // number of relax before averaging
-    int numBottom = 4;  // num of bottom smoothings
+    int numBottom = 8;  // num of bottom smoothings
     int numMG     = 1;  // Vcycle selected
     int maxIter   = 100; // max number of v cycles
-    Real eps        =  1.0e-8;  // solution tolerance
+    Real eps        =  1.0e-10;  // solution tolerance
     Real normThresh =  1.0e-10;  // abs tol
     Real hang       =  1.0e-6;      // next rnorm should be < (1-m_hang)*norm_last 
     //if (m_cur_step < 50) { 
@@ -575,6 +577,7 @@ AmrHydro::initialize()
     m_use_FAS        = false;
     m_compute_Bcoeff = false;
     m_use_NL         = false;
+    m_use_ImplDiff   =  false;
     ppSolver.query("use_fas", m_use_FAS); // use FAS scheme for head 
     if (m_use_FAS) {
         ppSolver.query("use_NL", m_use_NL); // use FAS formulation with NL portion 
@@ -584,6 +587,7 @@ AmrHydro::initialize()
     }
     m_eps_PicardIte = 1.0e-6;
     ppSolver.query("eps_PicardIte", m_eps_PicardIte);  
+    ppSolver.query("use_ImplDiff", m_use_ImplDiff);  
 
     m_time     = 0.0;  // start at t = 0
     m_cur_step = 0;    // start at dt = 0
@@ -1664,18 +1668,31 @@ AmrHydro::CalcRHS_gapHeightFAS(LevelData<FArrayBox>& levelRHS_b,
            if ( m_suhmoParm->m_cutOffbr > B(iv,0) ) {
                RHS(iv,0)   -= m_suhmoParm->m_A * std::pow(AbsPimPw, 2) * PimPw * B(iv,0) * ( 1.0 - (m_suhmoParm->m_cutOffbr - B(iv,0)) / m_suhmoParm->m_cutOffbr );
                RHS_C(iv,0) =- m_suhmoParm->m_A * std::pow(AbsPimPw, 2) * PimPw * B(iv,0) * ( 1.0 - (m_suhmoParm->m_cutOffbr - B(iv,0)) / m_suhmoParm->m_cutOffbr );
-
+               if (!m_use_ImplDiff) {
+                   // Add a Diffusive term to mdot
+                   RHS(iv,0)   += m_suhmoParm->m_DiffFactor * DT(iv,0); //* ( 1.0 - (m_suhmoParm->m_cutOffbr - B(iv,0)) / m_suhmoParm->m_cutOffbr );
+               }
            } else if ( m_suhmoParm->m_maxOffbr < B(iv,0) ) {
                RHS(iv,0)   -= m_suhmoParm->m_A * std::pow(AbsPimPw, 2) * PimPw * B(iv,0) * ( 1.0 - (m_suhmoParm->m_maxOffbr  - B(iv,0)) / m_suhmoParm->m_maxOffbr  );
                RHS_C(iv,0) =- m_suhmoParm->m_A * std::pow(AbsPimPw, 2) * PimPw * B(iv,0) * ( 1.0 - (m_suhmoParm->m_maxOffbr  - B(iv,0)) / m_suhmoParm->m_maxOffbr  );
-
+               if (!m_use_ImplDiff) {
+                   // Add a Diffusive term to mdot
+                   RHS(iv,0)   += m_suhmoParm->m_DiffFactor * DT(iv,0); // * ( 1.0 - (m_suhmoParm->m_maxOffbr  - B(iv,0)) / m_suhmoParm->m_maxOffbr  );
+               }
            } else {
                RHS(iv,0)   -= m_suhmoParm->m_A * std::pow(AbsPimPw, 2) * PimPw * B(iv,0); 
                RHS_C(iv,0) =- m_suhmoParm->m_A * std::pow(AbsPimPw, 2) * PimPw * B(iv,0);
+               if (!m_use_ImplDiff) {
+                   // Add a Diffusive term to mdot
+                   RHS(iv,0)   += m_suhmoParm->m_DiffFactor * DT(iv,0);
+               }
            }
            CD(iv,0) = RHS_A(iv,0) / (RHS_A(iv,0) + RHS_B(iv,0));
           
-           RHS(iv,0) = B(iv,0) + a_dt * RHS(iv,0);
+           if (m_use_ImplDiff) {
+                RHS(iv,0) = B(iv,0) + a_dt * RHS(iv,0);
+                //RHS(iv,0) = B(iv,0);
+           }
        }
    }
 }
@@ -1727,6 +1744,7 @@ AmrHydro::timeStepFAS(Real a_dt)
     // Also create and initialize tmp vectors
     Vector<LevelData<FArrayBox>*> a_head_lagged;
     Vector<LevelData<FArrayBox>*> a_head_curr;
+    Vector<LevelData<FArrayBox>*> a_gh_curr;
     Vector<LevelData<FArrayBox>*> a_gapheight_lagged;
     Vector<LevelData<FArrayBox>*> RHS_h;
     Vector<LevelData<FArrayBox>*> moulin_source_term;
@@ -1742,6 +1760,7 @@ AmrHydro::timeStepFAS(Real a_dt)
 
     a_head_lagged.resize(m_finest_level + 1, NULL);
     a_head_curr.resize(m_finest_level + 1, NULL);
+    a_gh_curr.resize(m_finest_level + 1, NULL);
     a_gapheight_lagged.resize(m_finest_level + 1, NULL);
     RHS_h.resize(m_finest_level + 1, NULL);
     moulin_source_term.resize(m_finest_level + 1, NULL);
@@ -1873,6 +1892,7 @@ AmrHydro::timeStepFAS(Real a_dt)
         // Head and B lagged for iterations
         a_head_lagged[lev]      = new LevelData<FArrayBox>(m_amrGrids[lev], 1, HeadGhostVect);
         a_head_curr[lev]        = new LevelData<FArrayBox>(m_amrGrids[lev], 1, HeadGhostVect);
+        a_gh_curr[lev]        = new LevelData<FArrayBox>(m_amrGrids[lev], 1, HeadGhostVect);
         a_gapheight_lagged[lev] = new LevelData<FArrayBox>(m_amrGrids[lev], 1, HeadGhostVect);
         // Re/Qw iterations -- testing
         a_ReQwIter[lev]         = new LevelData<FArrayBox>(m_amrGrids[lev], 1, HeadGhostVect);
@@ -2790,36 +2810,57 @@ AmrHydro::timeStepFAS(Real a_dt)
                              levelRHS_b_A, levelRHS_b_B, levelRHS_b_C, 
                              levelchanDegree, a_dt); 
 
-        //     Compute aCoeff (1) and bCoeff (Dif coef)
-        //stuff for solve -- to get SAME number of levs and not max/finest
-        LevelData<FArrayBox>& levelcurHlcl   = *a_head_curr[lev];
-         for (dit.begin(); dit.ok(); ++dit) {
-            // Copy curr into old -- copy ghost cells too 
-            levelcurHlcl[dit].copy(levelB[dit], 0, 0, 1);
+        if (m_use_ImplDiff) {
+            //     Compute aCoeff (1) and bCoeff (Dif coef)
+            //stuff for solve -- to get SAME number of levs and not max/finest
+            LevelData<FArrayBox>& levelcurBlcl   = *a_gh_curr[lev];
+             for (dit.begin(); dit.ok(); ++dit) {
+                // Copy curr into old -- copy ghost cells too 
+                levelcurBlcl[dit].copy(levelB[dit], 0, 0, 1);
+            }
+            // Compute trivial GH aCoeff 
+            LevelData<FArrayBox>& levelacoef = *aCoef_GH[lev];
+            aCoeff_GH(levelacoef);
+        } else {
+
+            LevelData<FArrayBox>& leveloldB  = *m_old_gapheight[lev];    
+
+            for (dit.begin(); dit.ok(); ++dit) {
+ 
+                FArrayBox& oldB    = leveloldB[dit];
+                FArrayBox& newB    = levelB[dit];
+                FArrayBox& RHS     = levelRHS_b[dit];
+
+                // DO NOT TOUCH GHOST CELLS
+                BoxIterator bit(RHS.box()); 
+                for (bit.begin(); bit.ok(); ++bit) {
+                    IntVect iv = bit(); 
+                    // does not work
+                    //newB(iv,0) = std::max(RHS(iv,0) * a_dt + oldB(iv,0), 1.0e-12);
+                    newB(iv,0) = RHS(iv,0) * a_dt + oldB(iv,0);
+                }
+            }
         }
-        // Compute trivial GH aCoeff 
-        LevelData<FArrayBox>& levelacoef = *aCoef_GH[lev];
-        aCoeff_GH(levelacoef);
 
     } // loop on levs
 
-    //     Solve for h with FAS scheme
-    SolveForGap_nl(m_amrGrids, aCoef_GH, a_Dcoef,
-                   m_amrDomains, m_refinement_ratios, coarsestDx,
-                   a_head_curr, RHS_b, a_dt);
+    if (m_use_ImplDiff) {
+        //     Solve for h with FAS scheme
+        SolveForGap_nl(m_amrGrids, aCoef_GH, a_Dcoef,
+                       m_amrDomains, m_refinement_ratios, coarsestDx,
+                       a_gh_curr, RHS_b, a_dt);
 
-    for (int lev = 0; lev <= m_finest_level; lev++) {
-        LevelData<FArrayBox>& leveloldB  = *m_old_gapheight[lev];    
-        LevelData<FArrayBox>& levelB     = *m_gapheight[lev];
-        LevelData<FArrayBox>& levelRHS_b = *RHS_b[lev];
-        LevelData<FArrayBox>& levelcurHlcl   = *a_head_curr[lev];
-        DisjointBoxLayout& levelGrids        = m_amrGrids[lev];
-        DataIterator dit                     = levelGrids.dataIterator();
-        for (dit.begin(); dit.ok(); ++dit) {
-            // Copy curr into old -- copy ghost cells too 
-            levelB[dit].copy(levelcurHlcl[dit], 0, 0, 1);
-        }
-    }  // loop on levs
+        for (int lev = 0; lev <= m_finest_level; lev++) {
+            LevelData<FArrayBox>& levelB         = *m_gapheight[lev];
+            LevelData<FArrayBox>& levelcurBlcl   = *a_gh_curr[lev];
+            DisjointBoxLayout& levelGrids        = m_amrGrids[lev];
+            DataIterator dit                     = levelGrids.dataIterator();
+            for (dit.begin(); dit.ok(); ++dit) {
+                // Copy curr into old -- copy ghost cells too 
+                levelB[dit].copy(levelcurBlcl[dit], 0, 0, 1);
+            }
+        }  // loop on levs
+    }
 
 
     /* FINAL custom plt here -- debug print */
@@ -2836,7 +2877,7 @@ AmrHydro::timeStepFAS(Real a_dt)
         vectName[6]="RHS_bC";
         vectName[7]="RHS_hmoul";
         vectName[8]="Channelization";
-        vectName[9]="Dcoef";
+        vectName[9]="DiffusiveTerm";
 
         Vector<Vector<LevelData<FArrayBox>*>> stuffToPlot;
         stuffToPlot.resize(nStuffToPlot);
@@ -2884,7 +2925,8 @@ AmrHydro::timeStepFAS(Real a_dt)
             LevelData<FArrayBox>& levelCDSTP     = *stuffToPlot[8][lev];
 
             //LevelData<FArrayBox>& levelqw        = *m_qw[lev];
-            LevelData<FArrayBox>& levelqw        = *a_Dcoef_cc[lev];
+            //LevelData<FArrayBox>& levelqw        = *a_Dcoef_cc[lev];
+            LevelData<FArrayBox>& levelqw        = *a_diffusiveTerm[lev];
             LevelData<FArrayBox>& levelqwSTP     = *stuffToPlot[9][lev];
 
             DataIterator dit = levelHead.dataIterator();
@@ -3283,6 +3325,7 @@ AmrHydro::timeStepFAS(Real a_dt)
     for (int lev = 0; lev <= m_finest_level; lev++) {
             delete a_head_lagged[lev];
             delete a_head_curr[lev];
+            delete a_gh_curr[lev];
             delete a_gapheight_lagged[lev];
             delete RHS_h[lev];
             delete moulin_source_term[lev];
