@@ -330,8 +330,8 @@ AmrHydro::SolveForGap_nl(const Vector<DisjointBoxLayout>&               a_grids,
                           Real a_dt)
 {
 
-    //VCAMRPoissonOp2Factory opFactory;
-    AMRPoissonOpFactory opFactory;
+    VCAMRPoissonOp2Factory opFactory;
+    //AMRPoissonOpFactory opFactory;
     Real alpha = 1.0;
     Real beta  = - a_dt * m_suhmoParm->m_DiffFactor;  
     opFactory.define(a_domains[0],
@@ -340,8 +340,8 @@ AmrHydro::SolveForGap_nl(const Vector<DisjointBoxLayout>&               a_grids,
                      coarsestDx,
                      &FixedNeumBCFill,
                      //&mixBCValues,
-                     alpha, //a_aCoef,
-                     beta); //, a_bCoef);
+                     alpha, a_aCoef,
+                     beta,  a_bCoef);
 
     AMRLevelOpFactory<LevelData<FArrayBox> >& opFactoryPtr = (AMRLevelOpFactory<LevelData<FArrayBox> >& ) opFactory;
 
@@ -356,11 +356,11 @@ AmrHydro::SolveForGap_nl(const Vector<DisjointBoxLayout>&               a_grids,
     amrSolver->define(a_domains[0], opFactoryPtr,
                       &bottomSolver, numLevels);
 
-    int numSmooth = 4;  // number of relax before averaging
-    int numBottom = 8;  // num of bottom smoothings
+    int numSmooth = 2;  // number of relax before averaging
+    int numBottom = 4;  // num of bottom smoothings
     int numMG     = 1;  // Vcycle selected
     int maxIter   = 100; // max number of v cycles
-    Real eps        =  1.0e-10;  // solution tolerance
+    Real eps        =  1.0e-8;  // solution tolerance
     Real normThresh =  1.0e-10;  // abs tol
     Real hang       =  1.0e-6;      // next rnorm should be < (1-m_hang)*norm_last 
     //if (m_cur_step < 50) { 
@@ -1479,12 +1479,21 @@ AmrHydro::aCoeff_bCoeff(LevelData<FArrayBox>&  levelacoef,
 }
 
 void
-AmrHydro::aCoeff_GH(LevelData<FArrayBox>&  levelacoef)
+AmrHydro::aCoeff_GH(LevelData<FArrayBox>&  levelacoef,
+                    LevelData<FluxBox>&    leveldcoef)
 {
     DataIterator dit = levelacoef.dataIterator();
     for (dit.begin(); dit.ok(); ++dit) {
         FArrayBox& aC     = levelacoef[dit];
         aC.setVal(1.0);
+
+        // DEBUG
+        FluxBox& dC       = leveldcoef[dit];
+        // loop over directions
+        for (int dir = 0; dir<SpaceDim; dir++) {
+            FArrayBox& dirFlux  = dC[dir];
+            dirFlux *= (- 1.0);
+        }
     }
 }
 
@@ -1538,8 +1547,11 @@ AmrHydro::Calc_moulin_source_term_distributed (LevelData<FArrayBox>& levelMoulin
        for (bit.begin(); bit.ok(); ++bit) {
            IntVect iv = bit();
            // Position of centroid
-           Real x_loc = (iv[0]+0.5)*m_amrDx[curr_level][0];
-           Real y_loc = (iv[1]+0.5)*m_amrDx[curr_level][1];
+           //Real x_loc = (iv[0]+0.5)*m_amrDx[curr_level][0];
+           //Real y_loc = (iv[1]+0.5)*m_amrDx[curr_level][1];
+           Real x_loc = iv[0]*m_amrDx[curr_level][0];
+           Real y_loc = iv[1]*m_amrDx[curr_level][1];
+
            // Loop over all moulins
            for (int m = 0; m<m_suhmoParm->m_n_moulins; m++) {
                // Radius
@@ -2820,7 +2832,8 @@ AmrHydro::timeStepFAS(Real a_dt)
             }
             // Compute trivial GH aCoeff 
             LevelData<FArrayBox>& levelacoef = *aCoef_GH[lev];
-            aCoeff_GH(levelacoef);
+            LevelData<FluxBox>& leveldcoef   = *a_Dcoef[lev];
+            aCoeff_GH(levelacoef, leveldcoef);
         } else {
 
             LevelData<FArrayBox>& leveloldB  = *m_old_gapheight[lev];    
