@@ -21,35 +21,9 @@
 #include "PhysIBC.H"
 #include "BCFunc.H"
 #include "suhmo_params.H"
-#include "AMRMultiGrid.H"
-#include "VCAMRPoissonOp2.H"
 
 #include "NamespaceHeader.H"
 
-//class VCPoissonParameters
-//{
-//public:
-//
-//  void getPoissonParameters (VCPoissonParameters&  a_params);
-//
-//  IntVect      nCells;
-//  int          maxGridSize;
-//  int          blockFactor;
-//  int          bufferSize;
-//  Real         fillRatio;
-//  Real         refineThresh;
-//  int          domBcType;
-//  int          maxLevel;
-//  int          numLevels;
-//  Vector<int>  refRatio;
-//  ProblemDomain coarsestDomain;
-//  Real         coarsestDx;
-//  RealVect     domainLength;
-//  RealVect     probLo;
-//  RealVect     probHi;
-//  Real         alpha;
-//  Real         beta;
-//};
 
 /// Physical/domain initial and boundary conditions
 /**
@@ -112,16 +86,6 @@ public:
                                 LevelData<FArrayBox>& a_bumpHeight,
                                 LevelData<FArrayBox>& a_bumpSpacing);
 
-
-    virtual void BCData(RealVect& a_dx,
-                        DisjointBoxLayout& a_grids,
-                        const ProblemDomain& a_domain,
-                        suhmo_params Params,     
-                        LevelData<FArrayBox>& a_zbed,
-                        LevelData<FArrayBox>& a_Pi,
-                        LevelData<FArrayBox>& a_iceHeight);
-
-
     /// Set boundary fluxes
     /**
      */
@@ -148,10 +112,6 @@ public:
 
 
 protected:
-    RealVect m_domainSize;
-
-    // have bc's been set up?
-    bool m_isBCsetUp;
 
 private:
     // Disallowed for all the usual reasons

@@ -300,10 +300,6 @@ protected:
     /// initialize data on hierarchy
     void initData(Vector<RefCountedPtr<LevelData<FArrayBox>> >& a_initialVelocity);
 
-    void BCDataRegrid(int a_level,
-                      LevelData<FArrayBox>& a_levzBed,
-                      LevelData<FArrayBox>& a_levPi,
-                      LevelData<FArrayBox>& a_levIceHeight);
 
     /// compute timestep
     Real computeDt();

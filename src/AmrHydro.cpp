@@ -53,6 +53,8 @@ using std::string;
 
 #include "AMRFASMultiGrid.H"
 #include "VCAMRNonLinearPoissonOp.H"
+#include "AMRMultiGrid.H"
+#include "VCAMRPoissonOp2.H"
 
 #include "NamespaceHeader.H"
 
@@ -333,7 +335,7 @@ AmrHydro::SolveForGap_nl(const Vector<DisjointBoxLayout>&               a_grids,
     VCAMRPoissonOp2Factory opFactory;
     //AMRPoissonOpFactory opFactory;
     Real alpha = 1.0;
-    Real beta  = - a_dt * m_suhmoParm->m_DiffFactor;  
+    Real beta  = a_dt * m_suhmoParm->m_DiffFactor;  
     opFactory.define(a_domains[0],
                      a_grids,
                      refRatio,
@@ -1486,14 +1488,6 @@ AmrHydro::aCoeff_GH(LevelData<FArrayBox>&  levelacoef,
     for (dit.begin(); dit.ok(); ++dit) {
         FArrayBox& aC     = levelacoef[dit];
         aC.setVal(1.0);
-
-        // DEBUG
-        FluxBox& dC       = leveldcoef[dit];
-        // loop over directions
-        for (int dir = 0; dir<SpaceDim; dir++) {
-            FArrayBox& dirFlux  = dC[dir];
-            dirFlux *= (- 1.0);
-        }
     }
 }
 
@@ -4172,27 +4166,6 @@ AmrHydro::initData(Vector<RefCountedPtr<LevelData<FArrayBox>> >& a_head)
 
 }
 
-
-
-void
-AmrHydro::BCDataRegrid(int a_level,
-                       LevelData<FArrayBox>& a_levzBed,
-                       LevelData<FArrayBox>& a_levPi,
-                       LevelData<FArrayBox>& a_levIceHeight)
-{
-    if (m_verbosity > 3) {
-        pout() << "AmrHydro::BCDataRegrid" << endl;
-        pout()<<  "  .. lev " << a_level << endl;
-    }
-
-
-    RealVect levelDx = m_amrDx[a_level] * RealVect::Unit;
-    m_IBCPtr->BCData(levelDx, m_amrGrids[a_level],
-                      m_amrDomains[a_level],  
-                      *m_suhmoParm,       
-                      a_levzBed, a_levPi,
-                      a_levIceHeight);
-}
 
 
 // compute timestep
