@@ -79,13 +79,22 @@ main(int argc, char* argv[])
 
         AmrHydro amrObject;
 
+        HydroIBC* hydroIBCPtr = NULL;
+
         // ---------------------------------------------
         // set IBC -- this includes initial conditon
         // and boundary conditions
         // ---------------------------------------------
-        HydroIBC* thisIBC = new HydroIBC();
+        std::string problem_type;
+        ppMain.get("problem_type", problem_type);
 
-        amrObject.setIBC(thisIBC);
+        if (problem_type == "basic") {
+            hydroIBCPtr = new HydroIBC();
+        } else {
+            MayDay::Error("bad problem_type !");
+        }
+
+        amrObject.setIBC(hydroIBCPtr);
 
         amrObject.setDomainSize(domainSize);
 
@@ -100,10 +109,10 @@ main(int argc, char* argv[])
 
         amrObject.run(maxTime, maxStep);
 
-        if (thisIBC != NULL)
+        if (hydroIBCPtr != NULL)
         {
-            delete thisIBC;
-            thisIBC = NULL;
+            delete hydroIBCPtr;
+            hydroIBCPtr = NULL;
         }
 
     } // end nested scope
