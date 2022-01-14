@@ -36,6 +36,7 @@ public:
     m_lambdaNeedsResetting = true;
     m_verbosity = 3;
     m_update_operator = true;
+    m_print = false;
   }
 
   ///
@@ -250,6 +251,7 @@ protected:
   virtual void levelGSRB(LevelData<FArrayBox>&       a_phi,
                          const LevelData<FArrayBox>& a_rhs,
                          int                         a_ite,           
+                         int                         a_AMRFASMGiter, 
                          int                         a_depth);
 
   virtual void levelMultiColor(LevelData<FArrayBox>&       a_phi,
@@ -314,6 +316,7 @@ public:
               const Real&                                    a_beta,
               Vector<RefCountedPtr<LevelData<FluxBox> > >&   a_bCoef,
               AmrHydro* a_amrHydro, NL_level a_nllevel, waterFlux_level a_wFlvl,
+              printData a_PDfunc,
               Vector<RefCountedPtr<LevelData<FArrayBox> > >& a_B,
               Vector<RefCountedPtr<LevelData<FArrayBox> > >& a_Pi,
               Vector<RefCountedPtr<LevelData<FArrayBox> > >& a_zb,
@@ -369,6 +372,7 @@ private:
 
   Real m_verbosity;
   bool m_update_operator;
+  bool m_print;
  
   Vector<RefCountedPtr<LevelData<FArrayBox> > > m_aCoef;
   Vector<RefCountedPtr<LevelData<FluxBox> > >   m_bCoef;
@@ -380,7 +384,8 @@ private:
 
   NL_level m_nllevel               = nullptr;
   waterFlux_level m_waterFluxlevel = nullptr;
-  AmrHydro* m_amrHydro             = nullptr;
+  printData       m_print_data     = nullptr;
+  AmrHydro*       m_amrHydro       = nullptr;
 
   Vector<RefCountedPtr<LevelData<FArrayBox> > > m_lambda;
 

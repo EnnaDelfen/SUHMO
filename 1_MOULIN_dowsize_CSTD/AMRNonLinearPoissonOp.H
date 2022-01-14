@@ -37,6 +37,8 @@ typedef void (AmrHydro::*waterFlux_level) (LevelData<FluxBox>& a_Bcoef, const Le
                                            const LevelData<FArrayBox>*  a_ucoarse, LevelData<FArrayBox>& a_B,
                                            LevelData<FArrayBox>& a_Pi,
                                            Real a_dx, bool a_print, int a_smooth, int a_depth);
+typedef void (AmrHydro::*printData)       (const LevelData<FArrayBox>&  a_u, 
+                                           int a_smooth, int a_depth, int a_AMRFASMGiter);
 
 ///
 /**
@@ -242,15 +244,17 @@ public:
   virtual void relax(LevelData<FArrayBox>&       a_e,
                      const LevelData<FArrayBox>& a_residual,
                      int                         a_iterations,
+                     int                         a_AMRFASMGiter,
                      int                         a_depth);
 
   // For FAS stuff - do CF interpolation then relax as normal
   virtual void relaxNF(LevelData<FArrayBox>& a_phi,
                        const LevelData<FArrayBox>* a_phiCoarse,
                        const LevelData<FArrayBox>& a_rhs,
-                       int a_iterations,
-                       int a_depth,
-                       bool a_print = false);
+                       int   a_iterations,
+                       int   a_AMRFASMGiter,
+                       int   a_depth,
+                       bool  a_print = false);
 
   virtual void createCoarser(LevelData<FArrayBox>&       a_coarse,
                              const LevelData<FArrayBox>& a_fine,
@@ -477,7 +481,7 @@ public:
                             int a_coarseningFactor);
 
   /// public constants
-  Real m_alpha, m_beta, m_aCoef, m_bCoef;
+  Real m_alpha, m_beta; 
   Real m_verbosity;
   bool m_print;
 
@@ -488,7 +492,8 @@ public:
 
   NL_level m_nllevel               = nullptr;
   waterFlux_level m_waterFluxlevel = nullptr;
-  AmrHydro* m_amrHydro             = nullptr;
+  printData       m_print_data     = nullptr;
+  AmrHydro*       m_amrHydro       = nullptr;
 
   // needed for homogeneous interpolation
   // set by the factory
@@ -529,6 +534,7 @@ protected:
   virtual void levelGSRB(LevelData<FArrayBox>&       a_phi,
                          const LevelData<FArrayBox>& a_rhs,
                          int                         a_ite,
+                         int                         a_AMRFASMGiter,
                          int                         a_depth);
 
   virtual void levelGS(LevelData<FArrayBox>&       a_phi,
@@ -645,6 +651,7 @@ private:
   Real m_beta;
 
   Real m_verbosity;
+  bool m_print;
 
   // Problem SPECIFIC
   Vector<RefCountedPtr<LevelData<FArrayBox> > > m_B;  // Gap Height
@@ -653,7 +660,8 @@ private:
 
   NL_level m_nllevel               = nullptr;
   waterFlux_level m_waterFluxlevel = nullptr;
-  AmrHydro* m_amrHydro             = nullptr;
+  printData       m_print_data     = nullptr;
+  AmrHydro*       m_amrHydro       = nullptr;
 
   Vector<Copier>   m_exchangeCopiers;
   Vector<CFRegion> m_cfregion;

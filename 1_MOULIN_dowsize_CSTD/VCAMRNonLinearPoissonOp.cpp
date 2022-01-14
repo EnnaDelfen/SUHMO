@@ -204,7 +204,8 @@ void VCAMRNonLinearPoissonOp::preCond(LevelData<FArrayBox>&       a_phi,
       a_phi[dit].mult(m_lambda[dit], gridBox, 0, 0, ncomp);
     }
   int dummyDepth = 0;
-  relax(a_phi, a_rhs, 2, dummyDepth);
+  m_print = false;
+  relax(a_phi, a_rhs, 2, dummyDepth, dummyDepth);
 }
 
 void VCAMRNonLinearPoissonOp::applyOpMg(LevelData<FArrayBox>& a_lhs,
@@ -596,9 +597,13 @@ void VCAMRNonLinearPoissonOp::reflux(const LevelData<FArrayBox>&        a_phiFin
 void VCAMRNonLinearPoissonOp::levelGSRB(LevelData<FArrayBox>&       a_phi,
                                         const LevelData<FArrayBox>& a_rhs,
                                         int                         a_ite,
+                                        int                         a_AMRFASMGiter, 
                                         int                         a_depth)
 {
   CH_TIME("VCAMRNonLinearPoissonOp::levelGSRB");
+    if (m_print) {
+        pout() << "VCAMRNonLinearPoissonOp::levelGSRB, smooth, depth, AMRFASMGit = " << a_ite << " " << a_depth << " " << a_AMRFASMGiter << endl;
+    }
 
   CH_assert(a_phi.isDefined());
   CH_assert(a_rhs.isDefined());
@@ -687,6 +692,10 @@ void VCAMRNonLinearPoissonOp::levelGSRB(LevelData<FArrayBox>&       a_phi,
     // Uodate GC for purpose of recomputing bCoeff
     // not sure we still need this
     a_phi.exchange(a_phi.interval(), m_exchangeCopier);
+    if (m_print) {
+        //pout() << "VCAMRNonLinearPoissonOp::levelGSRB, smooth, depth, AMRFASMGit = " << a_ite << " " << a_depth << " " << a_AMRFASMGiter << endl;
+        MEMBER_FUNC_PTR(*m_amrHydro, m_print_data)(a_phi, a_ite, a_depth, a_AMRFASMGiter);
+    }
 
     for (dit.begin(); dit.ok(); ++dit) {
         m_bc(a_phi[dit], dbl[dit()], m_domain, m_dx, true);
@@ -819,6 +828,7 @@ void VCAMRNonLinearPoissonOpFactory::define(const ProblemDomain&         a_coars
                                             Vector<RefCountedPtr<LevelData<FluxBox> > >&   a_bCoef,
                                             AmrHydro* a_amrHydro, NL_level a_nllevel,
                                             waterFlux_level a_wFlvl,
+                                            printData a_PDfunc,
                                             Vector<RefCountedPtr<LevelData<FArrayBox> > >& a_B,
                                             Vector<RefCountedPtr<LevelData<FArrayBox> > >& a_Pi,
                                             Vector<RefCountedPtr<LevelData<FArrayBox> > >& a_zb,
@@ -869,9 +879,11 @@ void VCAMRNonLinearPoissonOpFactory::define(const ProblemDomain&         a_coars
   m_amrHydro   = a_amrHydro;
   m_nllevel    = a_nllevel;
   m_waterFluxlevel = a_wFlvl;
+  m_print_data     = a_PDfunc;
 
   m_verbosity = 3;
   m_update_operator = a_update_operator;
+  m_print = false;
 
   m_B  = a_B;  // Gap Height
   m_Pi = a_Pi; // Overb Press  
@@ -901,6 +913,7 @@ VCAMRNonLinearPoissonOpFactory::define(const ProblemDomain&   a_coarseDomain,
   AmrHydro* amrHydro;
   NL_level  nllevel; 
   waterFlux_level wFlevel;
+  printData PDfunc;
   for (int i = 0; i < a_grids.size(); ++i)
   {
     aCoef[i] = RefCountedPtr<LevelData<FArrayBox> >(
@@ -930,7 +943,7 @@ VCAMRNonLinearPoissonOpFactory::define(const ProblemDomain&   a_coarseDomain,
   // these choices are weird and not in accordance with the default Lapl
   Real alpha = 1.0, beta = 1.0;
   define(a_coarseDomain, a_grids, a_refRatios, a_coarsedx, a_bc,
-         alpha, aCoef, beta, bCoef, amrHydro, nllevel, wFlevel,
+         alpha, aCoef, beta, bCoef, amrHydro, nllevel, wFlevel, PDfunc,
          B, Pri, zb, true);
 }
 
@@ -997,10 +1010,12 @@ MGLevelOp<LevelData<FArrayBox> >* VCAMRNonLinearPoissonOpFactory::MGnewOp(const 
 
   newOp->m_update_operator = m_update_operator;
   newOp->m_verbosity      = m_verbosity;
+  newOp->m_print          = m_print;
 
   newOp->m_amrHydro    = m_amrHydro; 
   newOp->m_nllevel     = m_nllevel;
   newOp->m_waterFluxlevel = m_waterFluxlevel;
+  newOp->m_print_data     = m_print_data;
 
   if (a_depth == 0) {
       // don't need to coarsen anything for this
@@ -1166,6 +1181,7 @@ AMRLevelOp<LevelData<FArrayBox> >* VCAMRNonLinearPoissonOpFactory::AMRnewOp(cons
 
   newOp->m_update_operator = m_update_operator;
   newOp->m_verbosity      = m_verbosity;
+  newOp->m_print          = m_print;
 
   newOp->m_aCoef = m_aCoef[ref];
   newOp->m_bCoef = m_bCoef[ref];
@@ -1173,6 +1189,7 @@ AMRLevelOp<LevelData<FArrayBox> >* VCAMRNonLinearPoissonOpFactory::AMRnewOp(cons
   newOp->m_amrHydro       = m_amrHydro;
   newOp->m_nllevel        = m_nllevel;
   newOp->m_waterFluxlevel = m_waterFluxlevel;
+  newOp->m_print_data     = m_print_data;
 
   // Problem SPECIFIC
   newOp->m_B  = m_B[ref];  // Gap Height
