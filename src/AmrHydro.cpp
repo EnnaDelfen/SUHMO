@@ -1237,11 +1237,6 @@ void AmrHydro::NonLinear_level(LevelData<FArrayBox>&        a_NL,
                                       CHF_CONST_REAL(m_suhmoParm->m_cutOffbr),
                                       CHF_CONST_REAL(m_suhmoParm->m_maxOffbr));
 
-          //    // Correction Colin 03/18
-          //    if ( m_suhmoParm->m_br > thisB(iv,0) ) {
-          //        //thisNL(iv, 0) = thisNL(iv, 0)  * std::tanh( std::pow(thisB(iv,0),3) / std::pow(m_suhmoParm->m_br,3) );
-          //        //thisdNL(iv, 0) = thisdNL(iv, 0) * std::tanh( std::pow(thisB(iv,0),3) / std::pow(m_suhmoParm->m_br,3) );
-          //    }
       } // end loop over grids on this level
   }
 }
@@ -1504,8 +1499,6 @@ AmrHydro::Calc_moulin_source_term_distributed (LevelData<FArrayBox>& levelMoulin
                                                int curr_level) 
 {
    // UNITS FOR m_moulin_flux SHOULD BE M3/S
-   // WOrk on coarser level
-   int curr_level = 0;
 
    // keep track of each moulin contrib separately
    LevelData<FArrayBox> levelMoulinSrcTmp(m_amrGrids[curr_level], m_suhmoParm->m_n_moulins, IntVect::Zero);
@@ -1648,14 +1641,9 @@ AmrHydro::Calc_moulin_source_term_distributed (LevelData<FArrayBox>& levelMoulin
            for (int m = 0; m<m_suhmoParm->m_n_moulins; m++) {
                moulinSrc(iv,0) += moulinSrcTmp(iv,m) * ( 1.0 - m_suhmoParm->m_runoff * std::sin(2.0 * Pi * m_time / 86400. ) )  
                                   / a_moulinsInteg[m] *  m_suhmoParm->m_moulin_flux[m] ; 
-               //pout() << iv << " " << moulinSrc(iv, m) << endl;
                a_moulinsIntegFinal[m] += moulinSrcTmp(iv,m) * ( 1.0 - m_suhmoParm->m_runoff * std::sin(2.0 * Pi * m_time / 86400. ) )   
                                   / a_moulinsInteg[m] * m_suhmoParm->m_moulin_flux[m] * m_amrDx[curr_level][0] * m_amrDx[curr_level][1]; 
            }
-           //if (iv[0] == 31) {
-           //    Real y_loc = (iv[1]+0.5)*m_amrDx[curr_level][1];
-           //    pout() << y_loc << " " << moulinSrc(iv,0) << endl;
-           //}
        }
    }
 
@@ -2410,22 +2398,17 @@ AmrHydro::timeStepFAS(Real a_dt)
                     // Add sliding term 
                     // mR -- turn off fric heat and geot heat
                     Pressw(iv,0) = m_suhmoParm->m_gravity * m_suhmoParm->m_rho_w * (currH(iv,0) - zb(iv,0));
-                    Real sca_prod = 0.0; //20. * 20. * m_suhmoParm->m_ub[0] * std::abs(Pressi(iv,0) - Pressw(iv,0)) * m_suhmoParm->m_ub[0];
+                    Real sca_prod = 0.0; 
+                    if (m_suhmoParm->m_basal_friction) {
+                        sca_prod = 20. * 20. * m_suhmoParm->m_ub[0] * std::abs(Pressi(iv,0) - Pressw(iv,0)) * m_suhmoParm->m_ub[0];
+                    }
                     RHSh(iv,0) += sca_prod * rho_coef / m_suhmoParm->m_L ;
 
                     // Add moulin 
                     RHSh(iv,0) += moulinSrc(iv,0);
 
-                    //if ( m_suhmoParm->m_cutOffbr > B(iv,0) ) {
-                    //    // Add a Diffusive term to mdot
-                    //    RHSh(iv,0)   += m_suhmoParm->m_DiffFactor * DiffusiveTerm(iv,0) * B(iv,0) * ( 1.0 - (m_suhmoParm->m_cutOffbr - B(iv,0)) / m_suhmoParm->m_cutOffbr );
-                    //} else if ( m_suhmoParm->m_maxOffbr < B(iv,0) ) {
-                    //    // Add a Diffusive term to mdot
-                    //    RHSh(iv,0)   += m_suhmoParm->m_DiffFactor * DiffusiveTerm(iv,0) * B(iv,0) * ( 1.0 - (m_suhmoParm->m_maxOffbr  - B(iv,0)) / m_suhmoParm->m_maxOffbr  );
-                    //} else {
-                        // Add a Diffusive term to mdot
-                        RHSh(iv,0) += m_suhmoParm->m_DiffFactor * DiffusiveTerm(iv,0);
-                    //}
+                    // Diffusive term
+                    RHSh(iv,0) += m_suhmoParm->m_DiffFactor * DiffusiveTerm(iv,0);
                 }
             }
         }// loop on levs
@@ -2518,97 +2501,6 @@ AmrHydro::timeStepFAS(Real a_dt)
         if (m_verbosity > 3) {
             pout() <<ite_idx<< "         x(h) "<<max_resH<<endl;
         }
-
-        /* custom plt here -- debug print */
-        //if (m_PrintCustom && (m_cur_step > 45)) {
-        //    int nStuffToPlot = 12;
-        //    Vector<std::string> vectName;
-        //    vectName.resize(nStuffToPlot);
-        //    vectName[0]="head";
-        //    vectName[1]="gapHeight";
-        //    vectName[2]="head_residual";
-        //    vectName[3]="RHS_head";
-        //    vectName[4]="RHS_b";
-        //    vectName[5]="Qw_X";
-        //    vectName[6]="Qw_Y";
-        //    vectName[7]="sourceMoulin";
-        //    vectName[8]="Pwater";
-        //    vectName[9]="metingRate";
-        //    vectName[10]="Reynolds";
-        //    vectName[11]="Zbed";
-
-        //    Vector<Vector<LevelData<FArrayBox>*>> stuffToPlot;
-        //    stuffToPlot.resize(nStuffToPlot);
-        //    for (int zz = 0; zz < nStuffToPlot; zz++) {
-        //        stuffToPlot[zz].resize(m_max_level + 1, NULL);
-        //    }
-
-        //    for (int lev = 0; lev <= m_finest_level; lev++) {
-        //        stuffToPlot[0][lev]  = new LevelData<FArrayBox>(m_amrGrids[lev], 1, IntVect::Zero);
-        //        stuffToPlot[1][lev]  = new LevelData<FArrayBox>(m_amrGrids[lev], 1, IntVect::Zero);
-        //        stuffToPlot[2][lev]  = new LevelData<FArrayBox>(m_amrGrids[lev], 1, IntVect::Zero);
-        //        stuffToPlot[3][lev]  = new LevelData<FArrayBox>(m_amrGrids[lev], 1, IntVect::Zero);
-        //        stuffToPlot[4][lev]  = new LevelData<FArrayBox>(m_amrGrids[lev], 1, IntVect::Zero);
-        //        stuffToPlot[5][lev]  = new LevelData<FArrayBox>(m_amrGrids[lev], 1, IntVect::Zero);
-        //        stuffToPlot[6][lev]  = new LevelData<FArrayBox>(m_amrGrids[lev], 1, IntVect::Zero);
-        //        stuffToPlot[7][lev]  = new LevelData<FArrayBox>(m_amrGrids[lev], 1, IntVect::Zero);
-        //        stuffToPlot[8][lev]  = new LevelData<FArrayBox>(m_amrGrids[lev], 1, IntVect::Zero);
-        //        stuffToPlot[9][lev]  = new LevelData<FArrayBox>(m_amrGrids[lev], 1, IntVect::Zero);
-        //        stuffToPlot[10][lev]  = new LevelData<FArrayBox>(m_amrGrids[lev], 1, IntVect::Zero);
-        //        stuffToPlot[11][lev]  = new LevelData<FArrayBox>(m_amrGrids[lev], 1, IntVect::Zero);
-
-        //        LevelData<FArrayBox>& levelHead      = *m_head[lev];
-        //        LevelData<FArrayBox>& levelHeadSTP   = *stuffToPlot[0][lev];
-
-        //        LevelData<FArrayBox>& levelGap       = *m_gapheight[lev];    
-        //        LevelData<FArrayBox>& levelGapSTP    = *stuffToPlot[1][lev];
-
-        //        LevelData<FArrayBox>& levelRes       = *a_head_lagged[lev];
-        //        LevelData<FArrayBox>& levelResSTP    = *stuffToPlot[2][lev];
-
-        //        LevelData<FArrayBox>& levelRHS       = *RHS_h[lev];
-        //        LevelData<FArrayBox>& levelRHSSTP    = *stuffToPlot[3][lev];
-
-        //        LevelData<FArrayBox>& levelRHSB       = *RHS_b[lev];
-        //        LevelData<FArrayBox>& levelRHSBSTP    = *stuffToPlot[4][lev];
-
-        //        LevelData<FArrayBox>& levelQw         = *m_qw[lev];
-        //        LevelData<FArrayBox>& levelQwXSTP     = *stuffToPlot[5][lev];
-        //        LevelData<FArrayBox>& levelQwYSTP     = *stuffToPlot[6][lev];
-
-        //        LevelData<FArrayBox>& levelSourceM    = *moulin_source_term[lev];
-        //        LevelData<FArrayBox>& levelSourceMSTP = *stuffToPlot[7][lev];
-
-        //        LevelData<FArrayBox>& levelPw        = *m_Pw[lev];
-        //        LevelData<FArrayBox>& levelPwSTP     = *stuffToPlot[8][lev];
-
-        //        LevelData<FArrayBox>& levelMR        = *m_meltRate[lev];
-        //        LevelData<FArrayBox>& levelMRSTP     = *stuffToPlot[9][lev];
-
-        //        LevelData<FArrayBox>& levelRe        = *m_Re[lev];
-        //        LevelData<FArrayBox>& levelReSTP     = *stuffToPlot[10][lev];
-
-        //        LevelData<FArrayBox>& levelZb        = *m_bedelevation[lev];
-        //        LevelData<FArrayBox>& levelZbSTP     = *stuffToPlot[11][lev];
-
-        //        DataIterator dit = levelHead.dataIterator();
-        //        for (dit.begin(); dit.ok(); ++dit) {
-        //            levelHeadSTP[dit].copy(levelHead[dit], 0, 0, 1);
-        //            levelGapSTP[dit].copy(levelGap[dit], 0, 0, 1);
-        //            levelResSTP[dit].copy(levelRes[dit], 0, 0, 1);
-        //            levelRHSSTP[dit].copy(levelRHS[dit], 0, 0, 1);
-        //            levelRHSBSTP[dit].copy(levelRHSB[dit], 0, 0, 1);
-        //            levelQwXSTP[dit].copy(levelQw[dit], 0, 0, 1);
-        //            levelQwYSTP[dit].copy(levelQw[dit], 1, 0, 1);
-        //            levelSourceMSTP[dit].copy(levelSourceM[dit], 0, 0, 1);
-        //            levelPwSTP[dit].copy(levelPw[dit], 0, 0, 1);
-        //            levelMRSTP[dit].copy(levelMR[dit], 0, 0, 1);
-        //            levelReSTP[dit].copy(levelRe[dit], 0, 0, 1);
-        //            levelZbSTP[dit].copy(levelZb[dit], 0, 0, 1);
-        //        }
-        //    } // loop on levs
-        //    writePltCustom(nStuffToPlot, vectName, stuffToPlot, std::to_string(ite_idx));
-        //} // end customPlt
 
         if (ite_idx > 100) {
             pout() <<"        does not converge (Picard iterations > 100)."<< endl;
@@ -2790,7 +2682,10 @@ AmrHydro::timeStepFAS(Real a_dt)
                 //Pw
                 Pressw(iv,0) = m_suhmoParm->m_gravity * m_suhmoParm->m_rho_w * (newH(iv,0) - zb(iv,0));
                 // mR -- turn off fric heat and geot heat
-                Real sca_prod = 0.0; //20. * 20. * m_suhmoParm->m_ub[0] * std::abs(Pressi(iv,0) - Pressw(iv,0)) * m_suhmoParm->m_ub[0];
+                Real sca_prod = 0.0; 
+                if (m_suhmoParm->m_basal_friction) {
+                    sca_prod = 20. * 20. * m_suhmoParm->m_ub[0] * std::abs(Pressi(iv,0) - Pressw(iv,0)) * m_suhmoParm->m_ub[0];
+                }
                 mR(iv,0)   = m_suhmoParm->m_G + 
                              sca_prod
                              - m_suhmoParm->m_ct * m_suhmoParm->m_cw * m_suhmoParm->m_rho_w * m_suhmoParm->m_rho_w * m_suhmoParm->m_gravity *
@@ -3572,12 +3467,6 @@ AmrHydro::regrid()
             //    }
 
             //} // End verbosity
-
-            // handle ghost cells on the coarse-fine interface
-            //QuadCFInterp qcfi(m_amrGrids[lev], &m_amrGrids[lev-1],
-            //                  m_amrDx[lev][0], m_refinement_ratios[lev-1],  
-            //                  1,  // num comps
-            //                  m_amrDomains[lev]);
 
             // now place new holders into multilevel arrays
             /* NEED */
