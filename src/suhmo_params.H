@@ -38,6 +38,7 @@ public:
     Real m_ct;            // Change of pressure melting point with temperature K.Pa-1
     Real m_cw;            // Heat capacity of water J.kg-1.K-1
     Real m_omega;         // Parameter controlling nonlinear transition between lam and turbu flow
+    bool m_basal_friction;  // Activate or not the basal friction in the melt Rate
     // BC
     std::vector<Real> m_ub;    // m.s-1 Sliding velocity
     Real m_br;            // height between bed bumps m

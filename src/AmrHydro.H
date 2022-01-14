@@ -85,6 +85,11 @@ public:
                          LevelData<FArrayBox>&        a_Pi,
                          LevelData<FArrayBox>&        a_zb);
 
+    void PD_level(const LevelData<FArrayBox>&  a_u,
+                  int                          a_smooth,
+                  int                          a_depth,
+                  int                          a_AMRFASMGiter);
+
     void WFlx_level(LevelData<FluxBox>&          a_bcoef, 
                     const LevelData<FArrayBox>&  a_u,
                     const LevelData<FArrayBox>*  a_ucoarse,
@@ -99,11 +104,6 @@ public:
  
     void compute_grad_head(int lev);
 
-    void compute_grad_var(int lev,
-                          Vector<LevelData<FArrayBox>*>&  a_var,
-                          Vector<LevelData<FArrayBox>*>&  a_gradvar,
-                          Vector<LevelData<FluxBox>*>&    a_gradvar_ec);
-
     void evaluate_Qw_ec(int lev, 
                         LevelData<FluxBox>& levelQw_ec, 
                         LevelData<FluxBox>& levelB_ec,
@@ -114,7 +114,8 @@ public:
     void aCoeff_bCoeff(LevelData<FArrayBox>&  levelacoef, 
                        LevelData<FluxBox>&    levelbcoef, 
                        LevelData<FluxBox>&    levelRe, 
-                       LevelData<FluxBox>&    levelB);
+                       LevelData<FluxBox>&    levelB, 
+                       LevelData<FluxBox>&    levelPi);
 
     void aCoeff_GH(LevelData<FArrayBox>&  levelacoef,
                    LevelData<FluxBox>&    leveldcoef);
@@ -124,7 +125,8 @@ public:
                 LevelData<FluxBox>&    a_Bec,
                 int lev);
 
-    void Calc_moulin_source_term_distributed(LevelData<FArrayBox>& levelMoulinSrc);
+    void Calc_moulin_source_term_distributed(LevelData<FArrayBox>& levelMoulinSrc,
+                                             int lev);
 
     void CalcRHS_gapHeightFAS(LevelData<FArrayBox>& levelRHS_b, 
                               LevelData<FArrayBox>& levelPi, 
@@ -183,7 +185,8 @@ public:
                         Vector<Vector<LevelData<FArrayBox>*>> stp,
                         const ProblemDomain& a_pbDom, 
                         const DisjointBoxLayout& a_dbl,
-                        int a_smooth, int a_depth);
+                        int a_smooth, int a_depth, 
+                        int a_AMRFASMGiter);
 
 
     /** writes plotfile to the standard location; filename is
@@ -355,7 +358,8 @@ protected:
     Vector<int> m_tag_min;               // min level concerned by tag var - one per tag var
     Vector<int> m_tag_cap;               // max level concerned by tag var - one per tag var
 
-    Vector<Real> m_tagging_val;          // tagging value - one per tag var
+    Vector<Real> m_tagging_val_min;          // tagging value - one per tag var
+    Vector<Real> m_tagging_val_max;          // tagging value - one per tag var
 
     Vector<IntVectSet> m_vectTags;       // stores tags from previous regrids 
     IntVectSet m_tag_subset;             // only allow tagging within a subset of the coarse domain 
@@ -456,6 +460,7 @@ protected:
     /* plotting and restarting */
     bool m_do_restart;  // bool : true if we are restarting from checkfile
     int m_restart_step;  //if starting from a restart, timestep of restart
+    Real m_restart_time;        // time of restart -- Care when using this ! It is used in transient moulins inputs
 
     string m_check_prefix;  // name of checkpoint files
     int m_check_interval;   // write checkfile every ... ite

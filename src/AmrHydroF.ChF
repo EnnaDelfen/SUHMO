@@ -193,6 +193,7 @@ C     ------------------------------------------------------------------
       subroutine COMPUTEBCOEFF(
      &     CHF_CONST_FRA[aB],
      &     CHF_CONST_FRA[aRe],
+     &     CHF_CONST_FRA[aPi],
      &     CHF_BOX[region],
      &     CHF_CONST_FRA[Bcoeff],
      &     CHF_CONST_REAL[omegaparam],

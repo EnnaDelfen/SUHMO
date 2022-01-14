@@ -16,6 +16,7 @@ void suhmo_params::setDefaults()
     m_ct = 0.0;
     m_cw = 0.0;
     m_omega = 0.0;
+    m_basal_friction = true;
     // BC
     m_br = 0.0 ;
     m_lr = 0.0;
@@ -52,6 +53,7 @@ void suhmo_params::readInputs()
     ppParams.get("ct", m_ct);
     ppParams.get("cw", m_cw);
     ppParams.get("turbulentParam", m_omega);
+    ppParams.get("basalFriction", m_basal_friction);
     m_ub.resize(SpaceDim,0.0);
     ppParams.getarr("SlidingVelocity", m_ub, 0, SpaceDim);
     ppParams.get("br", m_br);

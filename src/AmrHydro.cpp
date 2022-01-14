@@ -592,6 +592,7 @@ AmrHydro::initialize()
     ppSolver.query("use_ImplDiff", m_use_ImplDiff);  
 
     m_time     = 0.0;  // start at t = 0
+    m_restart_time = 0.0;
     m_cur_step = 0;    // start at dt = 0
     m_cur_PicardIte = 0;
 
@@ -662,8 +663,10 @@ AmrHydro::initialize()
         m_tag_cap.resize(m_n_tag_var,0.0); 
         ppAmr.getarr("tagging_caps", m_tag_cap, 0, m_n_tag_var);
         //
-        m_tagging_val.resize(m_n_tag_var,0.0); 
-        ppAmr.getarr("tagging_values", m_tagging_val, 0, m_n_tag_var);
+        m_tagging_val_min.resize(m_n_tag_var,0.0); 
+        m_tagging_val_max.resize(m_n_tag_var,0.0); 
+        ppAmr.getarr("tagging_values_min", m_tagging_val_min, 0, m_n_tag_var);
+        ppAmr.getarr("tagging_values_max", m_tagging_val_max, 0, m_n_tag_var);
         //
         m_tag_defined = true;
     } else {
@@ -1047,6 +1050,53 @@ AmrHydro::run(Real a_max_time, int a_max_step)
 }
 
 /* Needed routines for timeStep */
+void AmrHydro::PD_level(const LevelData<FArrayBox>&  a_u,
+                        int                          a_smooth,
+                        int                          a_depth,
+                        int                          a_AMRFASMGiter)
+{
+
+   if (m_cur_step == 0) {
+       const DisjointBoxLayout& levelGrids  = a_u.disjointBoxLayout();
+       const ProblemDomain&     levelDomain = levelGrids.physDomain();
+
+       /* custom plt here -- debug print */
+       int nStuffToPlot = 1;
+       Vector<std::string> vectName;
+       vectName.resize(nStuffToPlot);
+       vectName[0]="Head";
+
+       Vector<Vector<LevelData<FArrayBox>*>> stuffToPlot;
+       stuffToPlot.resize(nStuffToPlot);
+       for (int zz = 0; zz < nStuffToPlot; zz++) {
+           stuffToPlot[zz].resize(1, NULL);
+       }
+
+       stuffToPlot[0][0]  = new LevelData<FArrayBox>(levelGrids, 1, a_u.ghostVect());
+
+       LevelData<FArrayBox>& levelHeadSTP  = *stuffToPlot[0][0];
+
+       DataIterator dit = levelHeadSTP.dataIterator();
+       for (dit.begin(); dit.ok(); ++dit) {
+           levelHeadSTP[dit].copy(a_u[dit], 0, 0, 1);
+           //const FArrayBox& HH  = a_u[dit];
+           //BoxIterator bit(HH.box());
+           //for (bit.begin(); bit.ok(); ++bit) {
+           //    IntVect iv = bit();
+           //    if (isnan(HH(iv,0)) || ( HH(iv,0) < -0.0 ) ) {
+           //        if (iv[0] != -1) {
+           //            pout() << iv << " (In WFX) currH : " << HH(iv,0)  << endl;
+           //        }
+           //    }
+           //}
+       }
+       writePltWFX(nStuffToPlot, vectName, stuffToPlot, 
+                   levelDomain, levelGrids, 
+                   a_smooth, a_depth, a_AMRFASMGiter);
+    }
+
+}
+
 void AmrHydro::WFlx_level(LevelData<FluxBox>&          a_bcoef, 
                           const LevelData<FArrayBox>&  a_u,
                           const LevelData<FArrayBox>*  a_ucoarse,
@@ -1123,49 +1173,14 @@ void AmrHydro::WFlx_level(LevelData<FluxBox>&          a_bcoef,
                         CHF_CONST_REAL(m_suhmoParm->m_nu) );
     }
 
-    //if (a_print_WFX) {
-    //    /* custom plt here -- debug print */
-    //        int nStuffToPlot = 4;
-    //        Vector<std::string> vectName;
-    //        vectName.resize(nStuffToPlot);
-    //        vectName[0]="GapHeight";
-    //        vectName[1]="Head";
-    //        vectName[2]="Reynolds";
-    //        vectName[3]="GradH";
-
-    //        Vector<Vector<LevelData<FArrayBox>*>> stuffToPlot;
-    //        stuffToPlot.resize(nStuffToPlot);
-    //        for (int zz = 0; zz < nStuffToPlot; zz++) {
-    //            stuffToPlot[zz].resize(1, NULL);
-    //        }
-
-    //        stuffToPlot[0][0]  = new LevelData<FArrayBox>(levelGrids, 1, a_u.ghostVect());
-    //        stuffToPlot[1][0]  = new LevelData<FArrayBox>(levelGrids, 1, a_u.ghostVect());
-    //        stuffToPlot[2][0]  = new LevelData<FArrayBox>(levelGrids, 1, a_u.ghostVect());
-    //        stuffToPlot[3][0]  = new LevelData<FArrayBox>(levelGrids, 1, a_u.ghostVect());
-
-    //        LevelData<FArrayBox>& levelGapSTP   = *stuffToPlot[0][0];
-    //        LevelData<FArrayBox>& levelHeadSTP  = *stuffToPlot[1][0];
-    //        LevelData<FArrayBox>& levelReSTP    = *stuffToPlot[2][0];
-    //        LevelData<FArrayBox>& levelGradHSTP = *stuffToPlot[3][0];
-
-    //        DataIterator dit = levelHeadSTP.dataIterator();
-    //        for (dit.begin(); dit.ok(); ++dit) {
-    //            levelGapSTP[dit].copy(a_B[dit], 0, 0, 1);
-    //            levelHeadSTP[dit].copy(lcl_u[dit], 0, 0, 1);
-    //            levelReSTP[dit].copy(lvlRe[dit], 0, 0, 1);
-    //            levelGradHSTP[dit].copy(lvlgradH[dit], 0, 0, 1);
-    //        }
-    //        writePltWFX(nStuffToPlot, vectName, stuffToPlot, 
-    //                    levelDomain, levelGrids, 
-    //                    a_smooth, a_depth);
-    //}
     
     // CC -> EC
     LevelData<FluxBox>   lvlB_ec(levelGrids, 1, IntVect::Zero);
     LevelData<FluxBox>   lvlRe_ec(levelGrids, 1, IntVect::Zero);
+    LevelData<FluxBox>   lvlPi_ec(levelGrids, 1, IntVect::Zero);
     CellToEdge(lvlRe, lvlRe_ec);
     CellToEdge(a_B, lvlB_ec);
+    CellToEdge(a_Pi, lvlPi_ec);
 
     // Update Bcoef
     dit = a_bcoef.dataIterator();
@@ -1173,6 +1188,7 @@ void AmrHydro::WFlx_level(LevelData<FluxBox>&          a_bcoef,
         FluxBox& bC        = a_bcoef[dit];
         FluxBox& B_ec      = lvlB_ec[dit];
         FluxBox& Re_ec     = lvlRe_ec[dit];
+        FluxBox& Pressi    = lvlPi_ec[dit];
         // loop over directions
         for (int dir = 0; dir<SpaceDim; dir++) {
 
@@ -1180,10 +1196,12 @@ void AmrHydro::WFlx_level(LevelData<FluxBox>&          a_bcoef,
 
             FORT_COMPUTEBCOEFF( CHF_FRA(B_ec[dir]),
                                 CHF_FRA(Re_ec[dir]),
+                                CHF_FRA(Pressi[dir]),
                                 CHF_BOX(region),
                                 CHF_FRA(bC[dir]),
                                 CHF_CONST_REAL(m_suhmoParm->m_omega),
                                 CHF_CONST_REAL(m_suhmoParm->m_nu) );
+
         }
     }
 
@@ -1262,6 +1280,9 @@ AmrHydro::compute_grad_head(int lev)
     LevelData<FArrayBox>& levelgradH    = *m_gradhead[lev];
     LevelData<FluxBox>&   levelgradH_ec = *m_gradhead_ec[lev];
 
+    // TEST
+    LevelData<FArrayBox>& levelPi       = *m_overburdenpress[lev];
+
     LevelData<FArrayBox>* crsePsiPtr = NULL;
     LevelData<FArrayBox>* finePsiPtr = NULL;
     int nRefCrse=-1;
@@ -1299,54 +1320,6 @@ AmrHydro::compute_grad_head(int lev)
                              m_amrDomains[lev]);
 }
 
-
-void
-AmrHydro::compute_grad_var(int lev,
-                           Vector<LevelData<FArrayBox>*>&  a_var,
-                           Vector<LevelData<FArrayBox>*>&  a_gradvar,
-                           Vector<LevelData<FluxBox>*>&    a_gradvar_ec)
-{
-    // Compute grad(h) -EC and CC- 
-    LevelData<FArrayBox>& levelvar        = *a_var[lev];
-    LevelData<FArrayBox>& levelgradvar    = *a_gradvar[lev];
-    LevelData<FluxBox>&   levelgradvar_ec = *a_gradvar_ec[lev];
-
-    LevelData<FArrayBox>* crsePsiPtr = NULL;
-    LevelData<FArrayBox>* finePsiPtr = NULL;
-    int nRefCrse=-1;
-    int nRefFine=-1;
-    if (lev > 0) {
-        crsePsiPtr = a_var[lev-1];
-        nRefCrse = m_refinement_ratios[lev-1];
-    }
-    if (lev < m_finest_level) {
-        finePsiPtr = a_var[lev+1];  // What does it do with the fine stuff ???
-        nRefFine = m_refinement_ratios[lev];
-    }
-    Real dx = m_amrDx[lev][0];  
-    // CC version
-    Gradient::compGradientCC(levelgradvar, levelvar,
-                             crsePsiPtr, finePsiPtr,
-                             dx, nRefCrse, nRefFine,
-                             m_amrDomains[lev]);
-    // handle ghost cells on the coarse-fine interface
-    if (lev > 0) {
-        QuadCFInterp qcfi(m_amrGrids[lev], &m_amrGrids[lev-1],
-                          m_amrDx[lev][0], m_refinement_ratios[lev-1],  
-                          2,  // num comps
-                          m_amrDomains[lev]);
-        qcfi.coarseFineInterp(*a_gradvar[lev], *a_gradvar[lev-1]);
-    }
-    // Need to fill the ghost cells of gradH -- extrapolate on the no perio boundaries   
-    levelgradvar.exchange();
-    ExtrapGhostCells( levelgradvar, m_amrDomains[lev]);
-
-    // EC version
-    Gradient::compGradientMAC(levelgradvar_ec, levelvar,
-                             crsePsiPtr, finePsiPtr,
-                             dx, nRefCrse, nRefFine,
-                             m_amrDomains[lev]);
-}
 
 void 
 AmrHydro::evaluate_Qw_ec(int lev, 
@@ -1389,6 +1362,7 @@ AmrHydro::evaluate_Re_quadratic(int lev, bool computeGrad)
     LevelData<FArrayBox>& levelRe       = *m_Re[lev]; 
     LevelData<FArrayBox>& levelgradH    = *m_gradhead[lev];
     LevelData<FArrayBox>& levelB        = *m_gapheight[lev];    
+    LevelData<FArrayBox>& levelPi       = *m_overburdenpress[lev];    
 
     if (computeGrad) {
         // Compute grad(h) -EC and CC- 
@@ -1453,7 +1427,8 @@ void
 AmrHydro::aCoeff_bCoeff(LevelData<FArrayBox>&  levelacoef, 
                         LevelData<FluxBox>&    levelbcoef, 
                         LevelData<FluxBox>&    levelRe, 
-                        LevelData<FluxBox>&    levelB)
+                        LevelData<FluxBox>&    levelB,
+                        LevelData<FluxBox>&    levelPi)
 {
     DataIterator dit = levelbcoef.dataIterator();
     for (dit.begin(); dit.ok(); ++dit) {
@@ -1462,6 +1437,7 @@ AmrHydro::aCoeff_bCoeff(LevelData<FArrayBox>&  levelacoef,
         FArrayBox& aC     = levelacoef[dit];
         FluxBox& bC       = levelbcoef[dit];
         FluxBox& Re       = levelRe[dit];
+        FluxBox& Pressi   = levelPi[dit];
 
         aC.setVal(0.0);
 
@@ -1472,6 +1448,7 @@ AmrHydro::aCoeff_bCoeff(LevelData<FArrayBox>&  levelacoef,
 
             FORT_COMPUTEBCOEFF( CHF_FRA(B[dir]),
                                 CHF_FRA(Re[dir]),
+                                CHF_FRA(Pressi[dir]),
                                 CHF_BOX(region),
                                 CHF_FRA(bC[dir]),
                                 CHF_CONST_REAL(m_suhmoParm->m_omega),
@@ -1513,16 +1490,17 @@ AmrHydro::dCoeff(LevelData<FluxBox>&    leveldcoef,
             FORT_COMPUTEDCOEFF( CHF_BOX(region),
                                 CHF_FRA(bC[dir]),
                                 CHF_CONST_REAL(m_amrDx[lev][0]), 
-                                CHF_CONST_REAL(m_suhmoParm->m_rho_w),
+                                CHF_CONST_REAL(m_suhmoParm->m_rho_i),
                                 CHF_FRA(MRec[dir]), 
-                                CHF_FRA(Bec[dir]));
+                                CHF_FRA(Bec[dir]) );
         }
     }
 }
 
 
 void 
-AmrHydro::Calc_moulin_source_term_distributed (LevelData<FArrayBox>& levelMoulinSrc) 
+AmrHydro::Calc_moulin_source_term_distributed (LevelData<FArrayBox>& levelMoulinSrc,
+                                               int curr_level) 
 {
    // UNITS FOR m_moulin_flux SHOULD BE M3/S
    // WOrk on coarser level
@@ -1869,12 +1847,14 @@ AmrHydro::timeStepFAS(Real a_dt)
     Vector<LevelData<FluxBox>*> a_Qw_ec;
     Vector<LevelData<FluxBox>*> a_Re_ec;
     Vector<LevelData<FluxBox>*> a_GapHeight_ec;
+    Vector<LevelData<FluxBox>*> a_Pi_ec;
     Vector<LevelData<FluxBox>*> a_meltRate_ec;
     Vector<LevelData<FluxBox>*> a_gradZb_ec;
     Vector<RefCountedPtr<LevelData<FluxBox> > > a_Dcoef(m_finest_level + 1);
     a_Qw_ec.resize(m_finest_level + 1, NULL);
     a_Re_ec.resize(m_finest_level + 1, NULL);
     a_GapHeight_ec.resize(m_finest_level + 1, NULL);
+    a_Pi_ec.resize(m_finest_level + 1, NULL);
     a_meltRate_ec.resize(m_finest_level + 1, NULL);
     a_gradZb_ec.resize(m_finest_level + 1, NULL);
     // alpha*aCoef(x)*I - beta*Div(bCoef(x)*Grad) -- note for us: alpha = 0 beta = - 1 
@@ -1887,65 +1867,6 @@ AmrHydro::timeStepFAS(Real a_dt)
         pout() <<"   ...Copy current into old & take care of ghost cells and BCs "<< endl;
     }
 
-        /* custom plt here -- debug print */
-        //if (m_PrintCustom && (m_cur_step > 100045)) {
-        //    int nStuffToPlot = 6;
-        //    Vector<std::string> vectName;
-        //    vectName.resize(nStuffToPlot);
-        //    // H/B/Pice/Zb/Re/Hice/BH/BL are stuff that are read in case of restart
-        //    vectName[0]="head";
-        //    vectName[1]="gapHeight";
-        //    vectName[2]="Pwater";
-        //    vectName[3]="metingRate";
-        //    vectName[4]="Reynolds";
-        //    vectName[5]="Zbed";
-
-        //    Vector<Vector<LevelData<FArrayBox>*>> stuffToPlot;
-        //    stuffToPlot.resize(nStuffToPlot);
-        //    for (int zz = 0; zz < nStuffToPlot; zz++) {
-        //        stuffToPlot[zz].resize(m_max_level + 1, NULL);
-        //    }
-
-        //    for (int lev = 0; lev <= m_finest_level; lev++) {
-        //        stuffToPlot[0][lev]  = new LevelData<FArrayBox>(m_amrGrids[lev], 1, HeadGhostVect);
-        //        stuffToPlot[1][lev]  = new LevelData<FArrayBox>(m_amrGrids[lev], 1, HeadGhostVect);
-        //        stuffToPlot[2][lev]  = new LevelData<FArrayBox>(m_amrGrids[lev], 1, HeadGhostVect);
-        //        stuffToPlot[3][lev]  = new LevelData<FArrayBox>(m_amrGrids[lev], 1, HeadGhostVect);
-        //        stuffToPlot[4][lev]  = new LevelData<FArrayBox>(m_amrGrids[lev], 1, HeadGhostVect);
-        //        stuffToPlot[5][lev]  = new LevelData<FArrayBox>(m_amrGrids[lev], 1, HeadGhostVect);
-
-        //        LevelData<FArrayBox>& levelHead      = *m_head[lev];
-        //        LevelData<FArrayBox>& levelHeadSTP   = *stuffToPlot[0][lev];
-
-        //        LevelData<FArrayBox>& levelGap       = *m_gapheight[lev];    
-        //        LevelData<FArrayBox>& levelGapSTP    = *stuffToPlot[1][lev];
-
-        //        LevelData<FArrayBox>& levelPw        = *m_Pw[lev];
-        //        LevelData<FArrayBox>& levelPwSTP     = *stuffToPlot[2][lev];
-
-        //        LevelData<FArrayBox>& levelMR        = *m_meltRate[lev];
-        //        LevelData<FArrayBox>& levelMRSTP     = *stuffToPlot[3][lev];
-
-        //        LevelData<FArrayBox>& levelRe        = *m_Re[lev];
-        //        LevelData<FArrayBox>& levelReSTP     = *stuffToPlot[4][lev];
-
-        //        LevelData<FArrayBox>& levelZb        = *m_bedelevation[lev];
-        //        LevelData<FArrayBox>& levelZbSTP     = *stuffToPlot[5][lev];
-
-        //        DataIterator dit = levelHead.dataIterator();
-        //        for (dit.begin(); dit.ok(); ++dit) {
-        //            levelHeadSTP[dit].copy(levelHead[dit], 0, 0, 1);
-        //            levelGapSTP[dit].copy(levelGap[dit], 0, 0, 1);
-        //            levelPwSTP[dit].copy(levelPw[dit], 0, 0, 1);
-        //            levelMRSTP[dit].copy(levelMR[dit], 0, 0, 1);
-        //            levelReSTP[dit].copy(levelRe[dit], 0, 0, 1);
-        //            levelZbSTP[dit].copy(levelZb[dit], 0, 0, 1);
-        //        }
-        //    } // loop on levs
-        //    writePltCustom(nStuffToPlot, vectName, stuffToPlot, std::to_string(-10));
-        //} // end customPlt
-
-
     for (int lev = 0; lev <= m_finest_level; lev++) {
         LevelData<FArrayBox>& oldH       = *m_old_head[lev];
         LevelData<FArrayBox>& currentH   = *m_head[lev];
@@ -1954,6 +1875,7 @@ AmrHydro::timeStepFAS(Real a_dt)
         LevelData<FArrayBox>& currentB   = *m_gapheight[lev];
 
         LevelData<FArrayBox>& currentRe  = *m_Re[lev];
+        LevelData<FArrayBox>& levelcurPi = *m_overburdenpress[lev];
 
         // handle ghost cells on the coarse-fine interface
         // Linear interp better
@@ -1985,7 +1907,7 @@ AmrHydro::timeStepFAS(Real a_dt)
         // Head and B lagged for iterations
         a_head_lagged[lev]      = new LevelData<FArrayBox>(m_amrGrids[lev], 1, HeadGhostVect);
         a_head_curr[lev]        = new LevelData<FArrayBox>(m_amrGrids[lev], 1, HeadGhostVect);
-        a_gh_curr[lev]        = new LevelData<FArrayBox>(m_amrGrids[lev], 1, HeadGhostVect);
+        a_gh_curr[lev]          = new LevelData<FArrayBox>(m_amrGrids[lev], 1, HeadGhostVect);
         a_gapheight_lagged[lev] = new LevelData<FArrayBox>(m_amrGrids[lev], 1, HeadGhostVect);
         // Re/Qw iterations -- testing
         a_ReQwIter[lev]         = new LevelData<FArrayBox>(m_amrGrids[lev], 1, HeadGhostVect);
@@ -2002,6 +1924,7 @@ AmrHydro::timeStepFAS(Real a_dt)
         a_Qw_ec[lev]         = new LevelData<FluxBox>(m_amrGrids[lev], 1, IntVect::Zero);
         a_Re_ec[lev]         = new LevelData<FluxBox>(m_amrGrids[lev], 1, IntVect::Zero);
         a_GapHeight_ec[lev]  = new LevelData<FluxBox>(m_amrGrids[lev], 1, IntVect::Zero);
+        a_Pi_ec[lev]         = new LevelData<FluxBox>(m_amrGrids[lev], 1, IntVect::Zero);
         a_meltRate_ec[lev]   = new LevelData<FluxBox>(m_amrGrids[lev], 1, IntVect::Zero);
         a_gradZb_ec[lev]     = new LevelData<FluxBox>(m_amrGrids[lev], 1, IntVect::Zero);
         a_Dcoef[lev]         = RefCountedPtr<LevelData<FluxBox> >(new LevelData<FluxBox>(m_amrGrids[lev], 1, IntVect::Zero));
@@ -2023,8 +1946,10 @@ AmrHydro::timeStepFAS(Real a_dt)
         }
         ExtrapGhostCells( currentRe, m_amrDomains[lev]);
 
-    } // there. We should start with consistent b and h, GC BC and all ...
+        LevelData<FluxBox>&   levelPi_ec   = *a_Pi_ec[lev];
+        CellToEdge(levelcurPi, levelPi_ec);
 
+    } // there. We should start with consistent b and h, GC BC and all ...
 
     /* II h calc */
 
@@ -2040,7 +1965,6 @@ AmrHydro::timeStepFAS(Real a_dt)
         //         Put h into h_lag (GC too) and b into b_lag
         //         Interp CC b to EC
         for (int lev = 0; lev <= m_finest_level; lev++) {
-            pout() << "LEVEL = " << lev << endl;
             LevelData<FArrayBox>& levelcurH      = *m_head[lev];
             LevelData<FArrayBox>& levelnewH_lag  = *a_head_lagged[lev];
 
@@ -2094,15 +2018,6 @@ AmrHydro::timeStepFAS(Real a_dt)
             CellToEdge(levelcurB, levelnewB_ec);
             CellToEdge(levelmR, levelmR_ec);
 
-            // CHECK
-            //for (dit.begin(); dit.ok(); ++dit) {
-            //    FArrayBox& mR  = levelmR[dit];
-            //    BoxIterator bitEC(mR.box()); // can use gridBox? 
-            //    for (bitEC.begin(); bitEC.ok(); ++bitEC) {
-            //        IntVect iv = bitEC();
-            //        pout() << "Point, mR = " << iv << ", " << mR(iv, 0) << endl;
-            //    }
-            //}
         }  // loop on levs -- same thing, we should start with consistent b and h GC/BC and all
 
 
@@ -2118,7 +2033,7 @@ AmrHydro::timeStepFAS(Real a_dt)
             LevelData<FluxBox>& levelgradZb_ec  = *a_gradZb_ec[lev];
             compute_grad_zb_ec(lev, levelgradZb_ec);
 
-            // Compute dCoeff 
+            // Compute dCoeff -- LAZY version using all of the mR  
             LevelData<FluxBox>&   levelDcoef    = *a_Dcoef[lev]; 
             LevelData<FluxBox>&   levelmR_ec    = *a_meltRate_ec[lev];
             LevelData<FluxBox>&   levelB_ec     = *a_GapHeight_ec[lev];
@@ -2349,7 +2264,7 @@ AmrHydro::timeStepFAS(Real a_dt)
             // UNITS FOR m_distributed_input SHOULD BE M/S
             if (m_suhmoParm->m_n_moulins > 0) {
                 if (lev == 0) {
-                    Calc_moulin_source_term_distributed(levelmoulin_source_term);
+                    Calc_moulin_source_term_distributed(levelmoulin_source_term, lev);
                 } else {
                     FineInterp interpolator(m_amrGrids[lev], 1, m_refinement_ratios[lev - 1], m_amrDomains[lev]);
                     interpolator.interpToFine(*moulin_source_term[lev], *moulin_source_term[lev - 1]);
@@ -2526,9 +2441,10 @@ AmrHydro::timeStepFAS(Real a_dt)
             LevelData<FluxBox>& levelbcoef  = *bCoef[lev];
             LevelData<FluxBox>& levelRe_ec  = *a_Re_ec[lev]; 
             LevelData<FluxBox>& levelB_ec   = *a_GapHeight_ec[lev];    
+            LevelData<FluxBox>& levelPi_ec  = *a_Pi_ec[lev];    
 
             // Compute aCoeff and bCoeff using updated qtites
-            aCoeff_bCoeff(levelacoef, levelbcoef, levelRe_ec, levelB_ec);
+            aCoeff_bCoeff(levelacoef, levelbcoef, levelRe_ec, levelB_ec, levelPi_ec);
 
             //stuff for solve -- to get SAME number of levs and not max/finest
             m_amrGrids_curr[lev]   = m_amrGrids[lev];
@@ -2579,8 +2495,6 @@ AmrHydro::timeStepFAS(Real a_dt)
                               m_amrDomains[lev]);
             qcfi.coarseFineInterp(*m_head[lev], *m_head[lev-1]);
         }
-
-
 
         /* CONVERGENCE TESTS with LAGGED quantities */
         Real maxHead = computeMax(m_head, m_refinement_ratios, Interval(0,0), 0, m_finest_level+1);
@@ -2695,8 +2609,8 @@ AmrHydro::timeStepFAS(Real a_dt)
         //    writePltCustom(nStuffToPlot, vectName, stuffToPlot, std::to_string(ite_idx));
         //} // end customPlt
 
-        if (ite_idx > 500) {
-            pout() <<"        does not converge (Picard iterations > 500)."<< endl;
+        if (ite_idx > 100) {
+            pout() <<"        does not converge (Picard iterations > 100)."<< endl;
             if (m_verbosity > 0) {
                 pout() <<ite_idx<< "         x(h) "<<max_resH<<endl;
             }
@@ -2912,7 +2826,7 @@ AmrHydro::timeStepFAS(Real a_dt)
                 // Copy curr into old -- copy ghost cells too 
                 levelcurBlcl[dit].copy(levelB[dit], 0, 0, 1);
             }
-            // Compute trivial GH aCoeff 
+            // Compute trivial GH aCoeff -- reuse old Diff coef for now  
             LevelData<FArrayBox>& levelacoef = *aCoef_GH[lev];
             LevelData<FluxBox>& leveldcoef   = *a_Dcoef[lev];
             aCoeff_GH(levelacoef, leveldcoef);
@@ -3020,8 +2934,8 @@ AmrHydro::timeStepFAS(Real a_dt)
             LevelData<FArrayBox>& levelCDSTP     = *stuffToPlot[8][lev];
 
             //LevelData<FArrayBox>& levelqw        = *m_qw[lev];
-            //LevelData<FArrayBox>& levelqw        = *a_Dcoef_cc[lev];
-            LevelData<FArrayBox>& levelqw        = *a_diffusiveTerm[lev];
+            LevelData<FArrayBox>& levelqw        = *a_Dcoef_cc[lev];
+            //LevelData<FArrayBox>& levelqw        = *a_diffusiveTerm[lev];
             LevelData<FArrayBox>& levelqwSTP     = *stuffToPlot[9][lev];
 
             DataIterator dit = levelHead.dataIterator();
@@ -3038,7 +2952,7 @@ AmrHydro::timeStepFAS(Real a_dt)
                 levelqwSTP[dit].copy(levelqw[dit], 0, 0, 1);
             }
         } // loop on levs
-        writePltCustom(nStuffToPlot, vectName, stuffToPlot, "");
+        writePltCustom(nStuffToPlot, vectName, stuffToPlot, ".2d");
 
         for (int lev = 0; lev <= m_finest_level; lev++) {
             delete stuffToPlot[0][lev];
@@ -3161,10 +3075,10 @@ AmrHydro::timeStepFAS(Real a_dt)
                 }  
 
                 // TEMPORARY
-                int time_tmp = (int) m_time;
-                if ((iv[0] == 0) && (iv[1] == 2) && (time_tmp % 86400 == 0)) {
-                    pout() << "Time(d) moulin = " <<  m_time / 86400. << " " << MS(iv, 0) << endl;
-                }
+                //int time_tmp = (int) m_time;
+                //if ((iv[0] == 0) && (iv[1] == 2)) {  // && (time_tmp % 86400 == 0)) {
+                //    pout() << "Time(d) moulin = " <<  (m_time-m_restart_time)  << " " << MS(iv, 0) << endl;
+                //}
             }
         } 
 
@@ -3331,6 +3245,10 @@ AmrHydro::timeStepFAS(Real a_dt)
 
         // TEMPORAL POSTPROC
         //int time_tmp = (int) m_time + a_dt;
+        pout() << "Time(h - d) moulin N_LB  N_MB  N_HB = " <<  (m_time-m_restart_time)/3600.  << " " << (m_time-m_restart_time)/86400 << " " << out_recharge[0] 
+                                                                                    << " " << out_avgN[0]/count_avgNLow 
+                                                                                    << " " << out_avgN[1]/count_avgNMed 
+                                                                                    << " " << out_avgN[2]/count_avgNHigh << endl;
         //if (time_tmp % 86400 == 0) {
         //    pout() << idx_bandMin_lo << " " << idx_bandMin_hi << " " << idx_bandMed_lo << " "<< idx_bandMed_hi << endl;
         //    pout() << "1-Time  2-disTOT  3-disEFF  4-disINEF  " 
@@ -3357,13 +3275,13 @@ AmrHydro::timeStepFAS(Real a_dt)
         //}
  
         // SPATIAL POSTPROC
-        for (int xi = 0; xi < DomSize; xi++) {
-            Real x_loc = (xi+0.5)*m_amrDx[0][0];    
-            pout() << "Xpos avN recharge discharge EFFdischarge INEFdischarge "
-                   << " " << x_loc << " " << avPressure[xi]/DomSizeY << " " << out_recharge[xi] 
-                   << " " << -out_water_flux_x_tot[xi] << " " << -out_water_flux_x_chan[xi] << " " << -out_water_flux_x_distrib[xi]
-                   << endl;
-        }
+        //for (int xi = 0; xi < DomSize; xi++) {
+        //    Real x_loc = (xi+0.5)*m_amrDx[0][0];    
+        //    pout() << "1-Xpos 2-avN 3-recharge 4-discharge 5-EFFdischarge 6-INEFdischarge "
+        //           << " " << x_loc << " " << avPressure[xi]/DomSizeY << " " << out_recharge[xi] 
+        //           << " " << -out_water_flux_x_tot[xi] << " " << -out_water_flux_x_chan[xi] << " " << -out_water_flux_x_distrib[xi]
+        //           << endl;
+        //}
         //pout() <<" -          contrib from CHANNEL (%)   = "<< channel_water_flux_x << " (" << channel_water_flux_x/out_water_flux_x * 100. << ")"<< endl;
         //pout() <<" -          contrib from DISTRIB (%)   = "<< distrib_water_flux_x << " (" << distrib_water_flux_x/out_water_flux_x * 100. << ")"<< endl;
         //pout() << "END\n\n\n";
@@ -3435,11 +3353,9 @@ AmrHydro::timeStepFAS(Real a_dt)
             delete a_Qw_ec[lev];
             delete a_Re_ec[lev];
             delete a_GapHeight_ec[lev];
-            delete a_gradZb_ec[lev];
-            //delete a_Dcoef[lev];
+            delete a_Pi_ec[lev];
             delete a_meltRate_ec[lev];
-            //delete aCoef[lev];
-            //delete bCoef[lev];
+            delete a_gradZb_ec[lev];
     }
 
     /* write diagnostic info */
@@ -3623,7 +3539,6 @@ AmrHydro::regrid()
             m_Re[lev]              = RefCountedPtr<LevelData<FArrayBox>> (new LevelData<FArrayBox>(newDBL, m_Re[0]->nComp(), m_Re[0]->ghostVect()));
             m_Pw[lev]              = RefCountedPtr<LevelData<FArrayBox>> (new LevelData<FArrayBox>(newDBL, m_Pw[0]->nComp(), m_Pw[0]->ghostVect()));
             m_qw[lev]              = RefCountedPtr<LevelData<FArrayBox>> (new LevelData<FArrayBox>(newDBL, m_qw[0]->nComp(), m_qw[0]->ghostVect()));
-            //m_meltRate[lev]        = RefCountedPtr<LevelData<FArrayBox>> (new LevelData<FArrayBox>(newDBL, m_meltRate[0]->nComp(), m_meltRate[0]->ghostVect()));
             // Gradients
             m_gradhead[lev]        = RefCountedPtr<LevelData<FArrayBox>> (new LevelData<FArrayBox>(newDBL, m_gradhead[0]->nComp(), m_gradhead[0]->ghostVect()));
             m_gradhead_ec[lev]     = RefCountedPtr<LevelData<FluxBox>> (new LevelData<FluxBox>(newDBL, m_gradhead_ec[0]->nComp(), IntVect::Zero));
@@ -3789,41 +3704,61 @@ AmrHydro::tagCellsLevel(IntVectSet& a_tags, int a_level, int a_tag)
     // first stab -- don't do BC's; just do one-sided
     // stencils at box edges (hopefully good enough),
     // since doing BC's properly is somewhat expensive.
-        if (m_tag_var[a_tag] == "meltingRate") { 
-            DataIterator dit = m_meltRate[a_level]->dataIterator();
-            LevelData<FArrayBox>& levelPhi = *m_meltRate[a_level];
-            const DisjointBoxLayout& levelGrids = m_amrGrids[a_level];
-
-            // need to ensure that ghost cells are set properly
-            levelPhi.exchange(levelPhi.interval());
-
-            IntVectSet local_tags;
-            for (dit.begin(); dit.ok(); ++dit) {
-                FArrayBox& phi   = levelPhi[dit];
-                // now tag cells based on values
-                BoxIterator bit(levelGrids[dit()]);
-                for (bit.begin(); bit.ok(); ++bit) {
-                    const IntVect& iv = bit();
-                    if (fabs(phi(iv, 0)) > m_tagging_val[a_tag]) local_tags |= iv;
-                } // end loop over cells
-            }         // end loop over grids
-
-            // now buffer tags
-            local_tags.grow(m_tags_grow);
-            for (int dir = 0; dir < SpaceDim; dir++) {
-                if (m_tags_grow_dir[dir] > m_tags_grow) local_tags.grow(dir, std::max(0, m_tags_grow_dir[dir] - m_tags_grow));
-            }
-            local_tags &= m_amrDomains[a_level];
-            if (a_tags.isEmpty()) {
-                a_tags = local_tags;
-            } else {
-                a_tags |= local_tags;
-            }
-        } else if (m_tag_var[a_tag] == "someother") {
-            /* to do */
-        } else {
-            MayDay::Error(" Wrong tagging value ... ");
+    DataIterator dit = m_meltRate[a_level]->dataIterator();
+    LevelData<FArrayBox> levelPhi(m_amrGrids[a_level], 1, IntVect::Unit);
+    if (m_tag_var[a_tag] == "meltingRate") { 
+        //pout() << " Taggin on mR !! " << endl;
+	    (*m_meltRate[a_level]).copyTo(levelPhi);
+    } else if (m_tag_var[a_tag] == "Pi") { 
+        //pout() << " Taggin on Ice Press !! " << endl;
+        dit = m_overburdenpress[a_level]->dataIterator();
+	    (*m_overburdenpress[a_level]).copyTo(levelPhi);
+    } else if (m_tag_var[a_tag] == "GapHeight") { 
+        dit = m_gapheight[a_level]->dataIterator();
+	    (*m_gapheight[a_level]).copyTo(levelPhi);
+    } else if (m_tag_var[a_tag] == "Qx") { 
+        LevelData<FArrayBox>& levelqw        = *m_qw[a_level];
+        dit = m_qw[a_level]->dataIterator();
+        for (dit.begin(); dit.ok(); ++dit) {
+            FArrayBox& phi      = levelPhi[dit];
+            FArrayBox& thisqw   = levelqw[dit];
+            phi.copy(thisqw, 0, 0, 1);
         }
+    } else if (m_tag_var[a_tag] == "someother") {
+        /* to do */
+    } else {
+        MayDay::Error(" Wrong tagging value ... ");
+    }
+
+    const DisjointBoxLayout& levelGrids = m_amrGrids[a_level];
+
+    // need to ensure that ghost cells are set properly
+    levelPhi.exchange(levelPhi.interval());
+
+    IntVectSet local_tags;
+    for (dit.begin(); dit.ok(); ++dit) {
+        FArrayBox& phi   = levelPhi[dit];
+        // now tag cells based on values
+        BoxIterator bit(levelGrids[dit()]);
+        for (bit.begin(); bit.ok(); ++bit) {
+            const IntVect& iv = bit();
+            if ( (phi(iv, 0) > m_tagging_val_min[a_tag]) && 
+                 (phi(iv, 0) < m_tagging_val_max[a_tag]) ) local_tags |= iv;
+        } // end loop over cells
+    }         // end loop over grids
+
+    // now buffer tags
+    local_tags.grow(m_tags_grow);
+    for (int dir = 0; dir < SpaceDim; dir++) {
+        if (m_tags_grow_dir[dir] > m_tags_grow) local_tags.grow(dir, std::max(0, m_tags_grow_dir[dir] - m_tags_grow));
+    }
+    local_tags &= m_amrDomains[a_level];
+    if (a_tags.isEmpty()) {
+        a_tags = local_tags;
+    } else {
+        // should be taking union
+        a_tags |= local_tags;
+    }
 
 }
 
@@ -4240,10 +4175,10 @@ AmrHydro::writePltWFX(int numPlotComps,
                       Vector<Vector<LevelData<FArrayBox>*>> stuffToPlot,
                       const ProblemDomain& pbDom,
                       const DisjointBoxLayout& dbl,
-                      int nbSmooth, int nbDepth)
+                      int nbSmooth, int nbDepth, int nbAMRFASMGiter)
 {
     if (m_verbosity > 4) {
-        pout() << "AmrHydro::writePltWFX, AMRFASMGit/ depth = " << nbSmooth << " " << nbDepth <<endl;
+        pout() << "AmrHydro::writePltWFX, GSRB smooth / depth / MGit = " << nbSmooth << " " << nbDepth << " " << nbAMRFASMGiter;
     }
 
     Box domain = pbDom.domainBox();
@@ -4271,9 +4206,12 @@ AmrHydro::writePltWFX(int numPlotComps,
 
     // generate plotfile name
     char iter_str[100];
-    sprintf(iter_str, "%s%06d_PI%03d_WFX-AMRFASMG%01d_DEPTH%01d", m_plot_prefix.c_str(), m_cur_step, m_cur_PicardIte, nbSmooth, nbDepth);
+    sprintf(iter_str, "%s%06d_PI%03d_WFX-MG%01d_SMOOTH%01d_DEPTH%01d", m_plot_prefix.c_str(), m_cur_step, m_cur_PicardIte, nbAMRFASMGiter, nbSmooth, nbDepth);
 
     string filename(iter_str);
+    if (m_verbosity > 4) {
+        pout() << filename <<endl;
+    }
     
     //filename.append(namePlot);
     filename.append(".hdf5");
@@ -4386,7 +4324,7 @@ AmrHydro::writePlotFile()
     string meltRateName("meltRate"); 
     string xGradName("GradHead_x");
     string yGradName("GradHead_y");
-    string BumpHeight("bumpHeight");
+    string BumpHeight("iceHeight");
 
     Vector<string> vectName(numPlotComps);
     vectName[0] = headName;
@@ -4429,7 +4367,7 @@ AmrHydro::writePlotFile()
         const LevelData<FArrayBox>& levelqw        = *m_qw[lev];
         const LevelData<FArrayBox>& levelRe        = *m_Re[lev];
         const LevelData<FArrayBox>& levelmR        = *m_meltRate[lev];
-        const LevelData<FArrayBox>& levelBH        = *m_bumpHeight[lev];
+        const LevelData<FArrayBox>& levelBH      = *m_iceheight[lev];
         //LevelData<FArrayBox> levelGradPhi;
         //if (m_write_gradPhi)
         //{
@@ -4767,6 +4705,8 @@ AmrHydro::readCheckpointFile(HDF5Handle& a_handle)
         MayDay::Error("checkpoint file does not contain time");
     }
     m_time = header.m_real["time"];
+    m_restart_time = m_time;
+    pout() << "restart time ? " << m_restart_time << endl;
     //optionally, over-ride the time in the restart checkpoint file with one specified in the inputs 
     if (ppAmr.contains("restart_time") ) { 
         bool set_time = true;
@@ -5043,6 +4983,13 @@ AmrHydro::restart(string& a_restart_file)
     // first read in data from checkpoint file
     readCheckpointFile(handle);
     handle.close();
+
+    // now loop through levels and redefine if necessary
+    //RealVect levelDx = m_amrDx[0] * RealVect::Unit;
+    //m_IBCPtr->initializeBed(levelDx, *m_suhmoParm, *m_bedelevation[0], *m_bumpHeight[0], *m_bumpHeight[0]);  
+    for (int lev = 0; lev <= m_finest_level; lev++) {
+        m_IBCPtr->resetCovered(*m_suhmoParm, *m_head[lev], *m_overburdenpress[lev]);
+    }
 }
 
 #endif
