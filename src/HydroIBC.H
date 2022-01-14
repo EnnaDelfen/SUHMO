@@ -86,6 +86,31 @@ public:
                                 LevelData<FArrayBox>& a_bumpHeight,
                                 LevelData<FArrayBox>& a_bumpSpacing);
 
+    virtual void initializePi(RealVect& a_dx,
+                              suhmo_params Params,     
+                              LevelData<FArrayBox>& a_Pi);
+
+    virtual void initializePi(RealVect& a_dx,
+                              suhmo_params Params,     
+                              LevelData<FArrayBox>& a_head,
+                              LevelData<FArrayBox>& a_gapHeight,
+                              LevelData<FArrayBox>& a_Pw,
+                              LevelData<FArrayBox>& a_zbed,
+                              LevelData<FArrayBox>& a_Pi,
+                              LevelData<FArrayBox>& a_iceHeight,
+                              LevelData<FArrayBox>& a_bumpHeight,
+                              LevelData<FArrayBox>& a_bumpSpacing);
+
+    virtual void initializeBed(RealVect& a_dx,
+                               suhmo_params Params,     
+                               LevelData<FArrayBox>& a_zbed,
+                               LevelData<FArrayBox>& a_bumpHeight,
+                               LevelData<FArrayBox>& a_bumpSpacing);
+
+    virtual void resetCovered(suhmo_params Params,
+                              LevelData<FArrayBox>& a_head,
+                              LevelData<FArrayBox>& a_Pi);
+
     /// Set boundary fluxes
     /**
      */
