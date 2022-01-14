@@ -35,6 +35,7 @@ typedef void (AmrHydro::*NL_level) (LevelData<FArrayBox>& a_NL, LevelData<FArray
 
 typedef void (AmrHydro::*waterFlux_level) (LevelData<FluxBox>& a_Bcoef, const LevelData<FArrayBox>&  a_u, 
                                            const LevelData<FArrayBox>*  a_ucoarse, LevelData<FArrayBox>& a_B,
+                                           LevelData<FArrayBox>& a_Pi,
                                            Real a_dx, bool a_print, int a_smooth, int a_depth);
 
 ///
@@ -487,7 +488,7 @@ public:
 
   NL_level m_nllevel               = nullptr;
   waterFlux_level m_waterFluxlevel = nullptr;
-  AmrHydro* m_amrHydro = nullptr;
+  AmrHydro* m_amrHydro             = nullptr;
 
   // needed for homogeneous interpolation
   // set by the factory
@@ -652,7 +653,7 @@ private:
 
   NL_level m_nllevel               = nullptr;
   waterFlux_level m_waterFluxlevel = nullptr;
-  AmrHydro* m_amrHydro  = nullptr;
+  AmrHydro* m_amrHydro             = nullptr;
 
   Vector<Copier>   m_exchangeCopiers;
   Vector<CFRegion> m_cfregion;

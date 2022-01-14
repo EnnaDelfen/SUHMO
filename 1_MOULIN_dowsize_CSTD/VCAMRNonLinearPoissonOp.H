@@ -380,7 +380,7 @@ private:
 
   NL_level m_nllevel               = nullptr;
   waterFlux_level m_waterFluxlevel = nullptr;
-  AmrHydro* m_amrHydro    = nullptr;
+  AmrHydro* m_amrHydro             = nullptr;
 
   Vector<RefCountedPtr<LevelData<FArrayBox> > > m_lambda;
 
