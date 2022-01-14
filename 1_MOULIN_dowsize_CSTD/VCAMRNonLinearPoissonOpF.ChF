@@ -150,7 +150,7 @@ C     petermc, 26 april 2001
      &             ) * dxinv
      &          + nlfunc(CHF_IX[i;j;k],n)
 
-              denom = lambda(CHF_IX[i;j;k],n) + nlDfunc(CHF_IX[i;j;k],n)
+              denom = 1.0d-16 + lambda(CHF_IX[i;j;k],n) + nlDfunc(CHF_IX[i;j;k],n)
 
               phi(CHF_IX[i;j;k],n) = phi(CHF_IX[i;j;k],n)
      &          + (rhs(CHF_IX[i;j;k],n) - lofphi) / denom
