@@ -28,11 +28,13 @@ c  ULcornerBox => "upper left" corner box
 c  URcornerBox => "upper right" corner box
 c -----------------------------------------------------------------
       subroutine NEWMACGRAD(CHF_FRA1[edgeGrad],
-     &                   CHF_CONST_FRA1[phi],
-     &                   CHF_BOX[edgeGrid],
-     &                   CHF_CONST_REAL[dx],
-     &                   CHF_INT[dir],
-     &                   CHF_INT[edgeDir])
+     &                      CHF_FRA1[mask],
+     &                      CHF_FRA1[phi],
+     &                      CHF_BOX[edgeGrid],
+     &                      CHF_CONST_REAL[dx],
+     &                      CHF_INT[dir],
+     &                      CHF_INT[hasMask],
+     &                      CHF_INT[edgeDir])
 
 c ::: local variables
       integer CHF_DDECL[i;j;k]
@@ -74,6 +76,7 @@ c ::: this is a transverse derivative
       endif
 
       return
+
       end
 
 c ----------------------------------------------------------------------
@@ -96,7 +99,9 @@ c ------------------------------------------------------------------------
      &                           CHF_BOX[hiEdgeBox],
      &                           CHF_INT[dir],
      &                           CHF_INT[doLo],
-     &                           CHF_INT[doHi])
+     &                           CHF_INT[doHi],
+     &                           CHF_FRA1[usermask],
+     &                           CHF_INT[hasMask])
 
 c ::: local variables
       integer CHF_DDECL[i;j;k]
@@ -174,10 +179,12 @@ c gridBox => grid interior over which gradient is computed
 c dir     => direction in which to compute gradient
 c ----------------------------------------------------------------
       subroutine GRADCC(CHF_FRA1[gradPhi],
-     &                  CHF_CONST_FRA1[phi],
+     &                  CHF_FRA1[phi],
      &                  CHF_BOX[gridBox],
      &                  CHF_CONST_REAL[dx],
-     &                  CHF_INT[dir])
+     &                  CHF_INT[dir],
+     &                  CHF_FRA1[usermask],
+     &                  CHF_INT[hasMask])
 
 c ::: local variables
       integer CHF_DDECL[i;j;k]

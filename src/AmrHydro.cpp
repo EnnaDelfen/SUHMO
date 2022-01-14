@@ -1129,7 +1129,7 @@ void AmrHydro::WFlx_level(LevelData<FluxBox>&          a_bcoef,
     Gradient::compGradientCC(lvlgradH, lcl_u,
                              crsePsiPtr, finePsiPtr,
                              a_dx, nRefCrse, nRefFine,
-                             levelDomain);
+                             levelDomain, &a_Pi);
     lvlgradH.exchange();
     ExtrapGhostCells( lvlgradH, levelDomain);
 
@@ -1151,7 +1151,7 @@ void AmrHydro::WFlx_level(LevelData<FluxBox>&          a_bcoef,
         Gradient::compGradientCC(lvlgradHcoarse, lcl_ucoarse,
                                  crsePsiPtr, finePsiPtr,
                                  a_dxcoarse, nRefCrse, nRefFine,
-                                 levelDomaincoarse);
+                                 levelDomaincoarse, m_overburdenpress[a_depth-1]);
         lvlgradHcoarse.exchange();
         ExtrapGhostCells( lvlgradHcoarse, levelDomaincoarse);
 
@@ -1267,7 +1267,7 @@ AmrHydro::compute_grad_zb_ec(int                 lev,
     Gradient::compGradientMAC(a_levelgradZb_ec, levelZb,
                               crsePsiPtr, finePsiPtr,
                               dx, nRefCrse, nRefFine,
-                              m_amrDomains[lev]);
+                              m_amrDomains[lev], m_overburdenpress[lev]);
 }
 
 void
@@ -1298,7 +1298,7 @@ AmrHydro::compute_grad_head(int lev)
     Gradient::compGradientCC(levelgradH, levelcurrentH,
                              crsePsiPtr, finePsiPtr,
                              dx, nRefCrse, nRefFine,
-                             m_amrDomains[lev]);
+                             m_amrDomains[lev], &levelPi);
     // handle ghost cells on the coarse-fine interface
     if (lev > 0) {
         QuadCFInterp qcfi(m_amrGrids[lev], &m_amrGrids[lev-1],
@@ -1315,7 +1315,7 @@ AmrHydro::compute_grad_head(int lev)
     Gradient::compGradientMAC(levelgradH_ec, levelcurrentH,
                              crsePsiPtr, finePsiPtr,
                              dx, nRefCrse, nRefFine,
-                             m_amrDomains[lev]);
+                             m_amrDomains[lev], &levelPi);
 }
 
 
@@ -1384,7 +1384,7 @@ AmrHydro::evaluate_Re_quadratic(int lev, bool computeGrad)
         Gradient::compGradientCC(levelgradH, levelcurrentH,
                                  crsePsiPtr, finePsiPtr,
                                  dx, nRefCrse, nRefFine,
-                                 m_amrDomains[lev]);
+                                 m_amrDomains[lev], &levelPi);
         // handle ghost cells on the coarse-fine interface
         if (lev > 0) {
             QuadCFInterp qcfi(m_amrGrids[lev], &m_amrGrids[lev-1],
@@ -1401,7 +1401,7 @@ AmrHydro::evaluate_Re_quadratic(int lev, bool computeGrad)
         Gradient::compGradientMAC(levelgradH_ec, levelcurrentH,
                                  crsePsiPtr, finePsiPtr,
                                  dx, nRefCrse, nRefFine,
-                                 m_amrDomains[lev]);
+                                 m_amrDomains[lev], &levelPi);
     }
 
     // Compute Re at CC
@@ -2407,6 +2407,9 @@ AmrHydro::timeStepFAS(Real a_dt)
                     RHSh(iv,0) += sca_prod * rho_coef / m_suhmoParm->m_L ;
 
                     // Add moulin 
+                    if (isnan(moulinSrc(iv,0))) {
+                        pout() << "MS is nan ?? " << iv << std::endl;
+                    }
                     RHSh(iv,0) += moulinSrc(iv,0);
 
                     // Diffusive term
@@ -3435,7 +3438,6 @@ AmrHydro::regrid()
             m_old_gapheight[lev]   = RefCountedPtr<LevelData<FArrayBox>> (new LevelData<FArrayBox>(newDBL, m_old_gapheight[0]->nComp(), m_old_gapheight[0]->ghostVect()));
             // Other vars: Re / Pw / Qw / mR
             m_Re[lev]              = RefCountedPtr<LevelData<FArrayBox>> (new LevelData<FArrayBox>(newDBL, m_Re[0]->nComp(), m_Re[0]->ghostVect()));
-            m_Pw[lev]              = RefCountedPtr<LevelData<FArrayBox>> (new LevelData<FArrayBox>(newDBL, m_Pw[0]->nComp(), m_Pw[0]->ghostVect()));
             m_qw[lev]              = RefCountedPtr<LevelData<FArrayBox>> (new LevelData<FArrayBox>(newDBL, m_qw[0]->nComp(), m_qw[0]->ghostVect()));
             // Gradients
             m_gradhead[lev]        = RefCountedPtr<LevelData<FArrayBox>> (new LevelData<FArrayBox>(newDBL, m_gradhead[0]->nComp(), m_gradhead[0]->ghostVect()));
@@ -3482,6 +3484,8 @@ AmrHydro::regrid()
             m_overburdenpress[lev] = destructiveRegrid(m_overburdenpress[lev], newDBL, m_overburdenpress[lev-1], m_refinement_ratios[lev-1]);
             // Diffusion - needed
             m_meltRate[lev]        = destructiveRegrid(m_meltRate[lev], newDBL, m_meltRate[lev-1], m_refinement_ratios[lev-1]);
+            // other reason
+            m_Pw[lev]              = destructiveRegrid(m_Pw[lev], newDBL, m_Pw[lev-1], m_refinement_ratios[lev-1]);
 
             // GC
             ExtrapGhostCells( *m_bumpHeight[lev], m_amrDomains[lev]);
@@ -3490,6 +3494,21 @@ AmrHydro::regrid()
             ExtrapGhostCells( *m_bedelevation[lev], m_amrDomains[lev]);
             ExtrapGhostCells( *m_overburdenpress[lev], m_amrDomains[lev]);
             ExtrapGhostCells( *m_meltRate[lev], m_amrDomains[lev]);
+            ExtrapGhostCells( *m_Pw[lev], m_amrDomains[lev]);
+
+            // Special treatment for Pi ?
+            RealVect levelDx = m_amrDx[lev] * RealVect::Unit;
+            m_IBCPtr->initializePi(levelDx, 
+                                   *m_suhmoParm,       
+                                   *m_head[lev],
+                                   *m_gapheight[lev],
+                                   *m_Pw[lev],
+                                   *m_bedelevation[lev],
+                                   *m_overburdenpress[lev],
+                                   *m_iceheight[lev],
+                                   *m_bumpHeight[lev],
+                                   *m_bumpSpacing[lev]);
+
 
             //if (m_verbosity > 20) {
 
