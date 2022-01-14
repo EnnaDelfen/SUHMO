@@ -94,6 +94,7 @@ public:
                     const LevelData<FArrayBox>&  a_u,
                     const LevelData<FArrayBox>*  a_ucoarse,
                     LevelData<FArrayBox>&        a_B,
+                    LevelData<FArrayBox>&        a_Pi,
                     Real                         a_dx,
                     bool                         a_print,
                     int                          a_smooth,
