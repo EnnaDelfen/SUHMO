@@ -426,6 +426,7 @@ AmrHydro::SolveForHead_nl(const Vector<DisjointBoxLayout>&               a_grids
     VCAMRNonLinearPoissonOpFactory poissonOpF_head;
     NL_level NLfunctTmp        = &AmrHydro::NonLinear_level;
     waterFlux_level wFfunctTmp = &AmrHydro::WFlx_level;
+    printData       PDfunctTmp = &AmrHydro::PD_level;
     poissonOpF_head.define(a_domains[0],
                            a_grids,
                            refRatio,
@@ -434,6 +435,7 @@ AmrHydro::SolveForHead_nl(const Vector<DisjointBoxLayout>&               a_grids
                            0.0, a_aCoef,
                            - 1.0, a_bCoef,
                           this, NLfunctTmp, wFfunctTmp,
+                          PDfunctTmp,
                           B, Pri, zb, m_compute_Bcoeff);
 
     AMRLevelOpFactory<LevelData<FArrayBox> >& opFactoryPtr = (AMRLevelOpFactory<LevelData<FArrayBox> >& ) poissonOpF_head;
