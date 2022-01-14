@@ -1495,6 +1495,7 @@ AmrHydro::aCoeff_GH(LevelData<FArrayBox>&  levelacoef,
 void
 AmrHydro::dCoeff(LevelData<FluxBox>&    leveldcoef, 
                  LevelData<FluxBox>&    a_mRec,
+                 LevelData<FluxBox>&    a_Bec,
                  int lev)
 {
     DataIterator dit = leveldcoef.dataIterator();
@@ -1502,6 +1503,7 @@ AmrHydro::dCoeff(LevelData<FluxBox>&    leveldcoef,
 
         FluxBox& bC       = leveldcoef[dit];
         FluxBox& MRec     = a_mRec[dit];
+        FluxBox& Bec     = a_Bec[dit];
 
         // loop over directions
         for (int dir = 0; dir<SpaceDim; dir++) {
@@ -1512,7 +1514,8 @@ AmrHydro::dCoeff(LevelData<FluxBox>&    leveldcoef,
                                 CHF_FRA(bC[dir]),
                                 CHF_CONST_REAL(m_amrDx[lev][0]), 
                                 CHF_CONST_REAL(m_suhmoParm->m_rho_w),
-                                CHF_FRA(MRec[dir]));
+                                CHF_FRA(MRec[dir]), 
+                                CHF_FRA(Bec[dir]));
         }
     }
 }
@@ -2118,7 +2121,8 @@ AmrHydro::timeStepFAS(Real a_dt)
             // Compute dCoeff 
             LevelData<FluxBox>&   levelDcoef    = *a_Dcoef[lev]; 
             LevelData<FluxBox>&   levelmR_ec    = *a_meltRate_ec[lev];
-            dCoeff(levelDcoef, levelmR_ec, lev);
+            LevelData<FluxBox>&   levelB_ec     = *a_GapHeight_ec[lev];
+            dCoeff(levelDcoef, levelmR_ec, levelB_ec, lev);
         } // end loop levels
 
 
@@ -2490,7 +2494,7 @@ AmrHydro::timeStepFAS(Real a_dt)
                     // Add sliding term 
                     // mR -- turn off fric heat and geot heat
                     Pressw(iv,0) = m_suhmoParm->m_gravity * m_suhmoParm->m_rho_w * (currH(iv,0) - zb(iv,0));
-                    Real sca_prod = 20. * 20. * m_suhmoParm->m_ub[0] * std::abs(Pressi(iv,0) - Pressw(iv,0)) * m_suhmoParm->m_ub[0];
+                    Real sca_prod = 0.0; //20. * 20. * m_suhmoParm->m_ub[0] * std::abs(Pressi(iv,0) - Pressw(iv,0)) * m_suhmoParm->m_ub[0];
                     RHSh(iv,0) += sca_prod * rho_coef / m_suhmoParm->m_L ;
 
                     // Add moulin 
@@ -2871,7 +2875,7 @@ AmrHydro::timeStepFAS(Real a_dt)
                 //Pw
                 Pressw(iv,0) = m_suhmoParm->m_gravity * m_suhmoParm->m_rho_w * (newH(iv,0) - zb(iv,0));
                 // mR -- turn off fric heat and geot heat
-                Real sca_prod = 20. * 20. * m_suhmoParm->m_ub[0] * std::abs(Pressi(iv,0) - Pressw(iv,0)) * m_suhmoParm->m_ub[0];
+                Real sca_prod = 0.0; //20. * 20. * m_suhmoParm->m_ub[0] * std::abs(Pressi(iv,0) - Pressw(iv,0)) * m_suhmoParm->m_ub[0];
                 mR(iv,0)   = m_suhmoParm->m_G + 
                              sca_prod
                              - m_suhmoParm->m_ct * m_suhmoParm->m_cw * m_suhmoParm->m_rho_w * m_suhmoParm->m_rho_w * m_suhmoParm->m_gravity *

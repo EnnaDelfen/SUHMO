@@ -121,6 +121,7 @@ public:
 
     void dCoeff(LevelData<FluxBox>&    leveldcoef, 
                 LevelData<FluxBox>&    a_mRec, 
+                LevelData<FluxBox>&    a_Bec,
                 int lev);
 
     void Calc_moulin_source_term_distributed(LevelData<FArrayBox>& levelMoulinSrc);
