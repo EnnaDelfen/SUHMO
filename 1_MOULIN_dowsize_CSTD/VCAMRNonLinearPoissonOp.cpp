@@ -54,7 +54,7 @@ void VCAMRNonLinearPoissonOp::UpdateOperator(const LevelData<FArrayBox>&   a_phi
 
    //test for updating the Re
    MEMBER_FUNC_PTR(*m_amrHydro, m_waterFluxlevel)(*m_bCoef, a_phi, a_phicoarsePtr,
-                                                  *m_B, m_dx, 
+                                                  *m_B, *m_Pi, m_dx, 
                                                    false, a_AMRFASMGiter, a_depth);
 
   // Recompute the relaxation coef after updating m_bCoef
