@@ -2452,7 +2452,7 @@ AmrHydro::timeStepFAS(Real a_dt)
                     RHSh(iv,0) += moulinSrc(iv,0);
 
                     // Diffusive term
-                    RHSh(iv,0) += m_suhmoParm->m_DiffFactor * DiffusiveTerm(iv,0);
+                    RHSh(iv,0) -= m_suhmoParm->m_DiffFactor * DiffusiveTerm(iv,0);
 
                     if (Pressi(iv,0) == 0.0 ) {
                         RHSh(iv,0) = 0.0;
