@@ -1629,6 +1629,11 @@ AmrHydro::Calc_moulin_source_term_distributed (LevelData<FArrayBox>& levelMoulin
 #endif
  
    // Rescale each moulins
+   for (int m = 0; m<m_suhmoParm->m_n_moulins; m++) {
+       if (a_moulinsInteg[m] == 0.0) {
+           a_moulinsInteg[m] = 1.0;
+       }
+   }
    std::vector<Real> a_moulinsIntegFinal;    // m.s-1 Sliding velocity
    a_moulinsIntegFinal.resize(m_suhmoParm->m_n_moulins, 0.0);
    for (dit.begin(); dit.ok(); ++dit) {
@@ -1641,9 +1646,9 @@ AmrHydro::Calc_moulin_source_term_distributed (LevelData<FArrayBox>& levelMoulin
        for (bit.begin(); bit.ok(); ++bit) {
            IntVect iv = bit();
            for (int m = 0; m<m_suhmoParm->m_n_moulins; m++) {
-               moulinSrc(iv,0) += moulinSrcTmp(iv,m) * ( 1.0 - m_suhmoParm->m_runoff * std::sin(2.0 * Pi * m_time / 86400. ) )  
+               moulinSrc(iv,0) += moulinSrcTmp(iv,m) * std::max( (1.0 - m_suhmoParm->m_runoff * std::sin(2.0 * Pi * (m_time - m_restart_time) / 86400.)), 0.0)  
                                   / a_moulinsInteg[m] *  m_suhmoParm->m_moulin_flux[m] ; 
-               a_moulinsIntegFinal[m] += moulinSrcTmp(iv,m) * ( 1.0 - m_suhmoParm->m_runoff * std::sin(2.0 * Pi * m_time / 86400. ) )   
+               a_moulinsIntegFinal[m] += moulinSrcTmp(iv,m) * std::max( (1.0 - m_suhmoParm->m_runoff * std::sin(2.0 * Pi * (m_time - m_restart_time) / 86400.)), 0.0)   
                                   / a_moulinsInteg[m] * m_suhmoParm->m_moulin_flux[m] * m_amrDx[curr_level][0] * m_amrDx[curr_level][1]; 
            }
        }
