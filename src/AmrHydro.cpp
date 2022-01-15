@@ -1725,41 +1725,47 @@ AmrHydro::CalcRHS_gapHeightFAS(LevelData<FArrayBox>& levelRHS_b,
        BoxIterator bit(RHS.box()); // can use gridBox? 
        for (bit.begin(); bit.ok(); ++bit) {
            IntVect iv = bit();
-           if ( B(iv,0) < BH(iv,0)) {
-               RHS(iv,0) +=  ub_norm * (BH(iv,0) - B(iv,0)) / BL(iv,0);
-               RHS_B(iv,0) = ub_norm * (BH(iv,0) - B(iv,0)) / BL(iv,0);
-           }
-           // second term ... assume  n = 3 !!
-           Real PimPw = (Pressi(iv,0) - Pw(iv,0));
-           Real AbsPimPw = std::abs(PimPw);
-           if ( m_suhmoParm->m_cutOffbr > B(iv,0) ) {
-               RHS(iv,0)   -= m_suhmoParm->m_A * std::pow(AbsPimPw, 2) * PimPw * B(iv,0) * ( 1.0 - (m_suhmoParm->m_cutOffbr - B(iv,0)) / m_suhmoParm->m_cutOffbr );
-               RHS_C(iv,0) =- m_suhmoParm->m_A * std::pow(AbsPimPw, 2) * PimPw * B(iv,0) * ( 1.0 - (m_suhmoParm->m_cutOffbr - B(iv,0)) / m_suhmoParm->m_cutOffbr );
-               if (!m_use_ImplDiff) {
-                   // Add a Diffusive term to mdot
-                   RHS(iv,0)   += m_suhmoParm->m_DiffFactor * DT(iv,0); //* ( 1.0 - (m_suhmoParm->m_cutOffbr - B(iv,0)) / m_suhmoParm->m_cutOffbr );
-               }
-           } else if ( m_suhmoParm->m_maxOffbr < B(iv,0) ) {
-               RHS(iv,0)   -= m_suhmoParm->m_A * std::pow(AbsPimPw, 2) * PimPw * B(iv,0) * ( 1.0 - (m_suhmoParm->m_maxOffbr  - B(iv,0)) / m_suhmoParm->m_maxOffbr  );
-               RHS_C(iv,0) =- m_suhmoParm->m_A * std::pow(AbsPimPw, 2) * PimPw * B(iv,0) * ( 1.0 - (m_suhmoParm->m_maxOffbr  - B(iv,0)) / m_suhmoParm->m_maxOffbr  );
-               if (!m_use_ImplDiff) {
-                   // Add a Diffusive term to mdot
-                   RHS(iv,0)   += m_suhmoParm->m_DiffFactor * DT(iv,0); // * ( 1.0 - (m_suhmoParm->m_maxOffbr  - B(iv,0)) / m_suhmoParm->m_maxOffbr  );
-               }
+           
+           if (Pressi(iv,0) == 0.0 ) {
+               RHS(iv,0) =  0.0;
+               CD(iv,0) = 0.0;
            } else {
-               RHS(iv,0)   -= m_suhmoParm->m_A * std::pow(AbsPimPw, 2) * PimPw * B(iv,0); 
-               RHS_C(iv,0) =- m_suhmoParm->m_A * std::pow(AbsPimPw, 2) * PimPw * B(iv,0);
-               if (!m_use_ImplDiff) {
-                   // Add a Diffusive term to mdot
-                   RHS(iv,0)   += m_suhmoParm->m_DiffFactor * DT(iv,0);
+               if ( B(iv,0) < BH(iv,0)) {
+                   RHS(iv,0) +=  ub_norm * (BH(iv,0) - B(iv,0)) / BL(iv,0);
+                   RHS_B(iv,0) = ub_norm * (BH(iv,0) - B(iv,0)) / BL(iv,0);
                }
-           }
-           CD(iv,0) = RHS_A(iv,0) / (RHS_A(iv,0) + RHS_B(iv,0));
+               // second term ... assume  n = 3 !!
+               Real PimPw = (Pressi(iv,0) - Pw(iv,0));
+               Real AbsPimPw = std::abs(PimPw);
+               if ( m_suhmoParm->m_cutOffbr > B(iv,0) ) {
+                   RHS(iv,0)   -= m_suhmoParm->m_A * std::pow(AbsPimPw, 2) * PimPw * B(iv,0) * ( 1.0 - (m_suhmoParm->m_cutOffbr - B(iv,0)) / m_suhmoParm->m_cutOffbr );
+                   RHS_C(iv,0) =- m_suhmoParm->m_A * std::pow(AbsPimPw, 2) * PimPw * B(iv,0) * ( 1.0 - (m_suhmoParm->m_cutOffbr - B(iv,0)) / m_suhmoParm->m_cutOffbr );
+                   if (!m_use_ImplDiff) {
+                       // Add a Diffusive term to mdot
+                       RHS(iv,0)   += m_suhmoParm->m_DiffFactor * DT(iv,0); //* ( 1.0 - (m_suhmoParm->m_cutOffbr - B(iv,0)) / m_suhmoParm->m_cutOffbr );
+                   }
+               } else if ( m_suhmoParm->m_maxOffbr < B(iv,0) ) {
+                   RHS(iv,0)   -= m_suhmoParm->m_A * std::pow(AbsPimPw, 2) * PimPw * B(iv,0) * ( 1.0 - (m_suhmoParm->m_maxOffbr  - B(iv,0)) / m_suhmoParm->m_maxOffbr  );
+                   RHS_C(iv,0) =- m_suhmoParm->m_A * std::pow(AbsPimPw, 2) * PimPw * B(iv,0) * ( 1.0 - (m_suhmoParm->m_maxOffbr  - B(iv,0)) / m_suhmoParm->m_maxOffbr  );
+                   if (!m_use_ImplDiff) {
+                       // Add a Diffusive term to mdot
+                       RHS(iv,0)   += m_suhmoParm->m_DiffFactor * DT(iv,0); // * ( 1.0 - (m_suhmoParm->m_maxOffbr  - B(iv,0)) / m_suhmoParm->m_maxOffbr  );
+                   }
+               } else {
+                   RHS(iv,0)   -= m_suhmoParm->m_A * std::pow(AbsPimPw, 2) * PimPw * B(iv,0); 
+                   RHS_C(iv,0) =- m_suhmoParm->m_A * std::pow(AbsPimPw, 2) * PimPw * B(iv,0);
+                   if (!m_use_ImplDiff) {
+                       // Add a Diffusive term to mdot
+                       RHS(iv,0)   += m_suhmoParm->m_DiffFactor * DT(iv,0);
+                   }
+               }
+               CD(iv,0) = RHS_A(iv,0) / (RHS_A(iv,0) + RHS_B(iv,0));
           
-           if (m_use_ImplDiff) {
-                RHS(iv,0) = B(iv,0) + a_dt * RHS(iv,0);
-                //RHS(iv,0) = B(iv,0);
-           }
+               if (m_use_ImplDiff) {
+                    RHS(iv,0) = B(iv,0) + a_dt * RHS(iv,0);
+                    //RHS(iv,0) = B(iv,0);
+               }
+           } 
        }
    }
 }
@@ -2219,6 +2225,72 @@ AmrHydro::timeStepFAS(Real a_dt)
             MayDay::Error("Abort");
         }
 
+        // Compute MoulinSrc 
+        if (m_verbosity > 3) {
+            pout() <<"        Compute Moulins "<< endl;
+        }
+        // UNITS FOR m_moulin_flux SHOULD BE M3/S
+        // UNITS FOR m_distributed_input SHOULD BE M/S
+        for (int lev = 0; lev <= m_finest_level; lev++) {
+            LevelData<FArrayBox>& levelmoulin_source_term = *moulin_source_term[lev];
+            LevelData<FArrayBox>& levelPi                 = *m_overburdenpress[lev];
+            DisjointBoxLayout& levelGrids                 = m_amrGrids[lev];
+            DataIterator dit                              = levelGrids.dataIterator();
+            if (m_suhmoParm->m_n_moulins > 0) {
+                Calc_moulin_source_term_distributed(levelmoulin_source_term, lev);
+            } else if (m_suhmoParm->m_n_moulins < 0) {
+                if (m_suhmoParm->m_time_varying_input) {
+
+                    Real T_K   = -16.0 * std::cos( 2.0 * Pi * m_time / ( 365.*24*60*60.) ) - 5.0 + m_suhmoParm->m_deltaT;
+
+                    LevelData<FArrayBox>& levelIceHeight = *m_iceheight[lev];
+                    for (dit.begin(); dit.ok(); ++dit) {
+                        const Box& region = levelmoulin_source_term[dit].box();
+                        FORT_COMPUTE_TIMEVARYINGRECHARGE( CHF_FRA(levelIceHeight[dit]),
+                                                          CHF_BOX(region),
+                                                          CHF_FRA(levelmoulin_source_term[dit]),
+                                                          CHF_CONST_REAL(T_K),
+                                                          CHF_CONST_REAL(m_suhmoParm->m_distributed_input) );
+                    }
+                } else {
+                    for (dit.begin(); dit.ok(); ++dit) {
+                        FArrayBox& moulinSrc = levelmoulin_source_term[dit];
+                        FArrayBox& pressi    = levelPi[dit];
+                        BoxIterator bit(moulinSrc.box());
+                        for (bit.begin(); bit.ok(); ++bit) {
+                            IntVect iv = bit();
+                            if (pressi(iv,0) > 0.0) {
+                                moulinSrc(iv,0) = m_suhmoParm->m_distributed_input;
+                            } else {
+                                moulinSrc(iv,0) = 0.0;
+                            }
+                        }
+                    }
+                }
+            } else {
+                for (dit.begin(); dit.ok(); ++dit) {
+                    FArrayBox& moulinSrc = levelmoulin_source_term[dit];
+                    moulinSrc.setVal(0.0);
+                }
+            }
+        }
+        for (int lev = m_finest_level; lev > 0; lev--) {
+            if (m_suhmoParm->m_n_moulins > 0) {
+                if (lev > 0 ) {
+                    CoarseAverage averager(m_amrGrids[lev], 1, m_refinement_ratios[lev-1]);
+                    averager.averageToCoarse(*moulin_source_term[lev - 1], *moulin_source_term[lev]);
+                }
+            }
+        }
+        // handle ghost cells on the coarse-fine interface
+        for (int lev = 1; lev <= m_finest_level; lev++) {
+            QuadCFInterp qcfi(m_amrGrids[lev], &m_amrGrids[lev-1],
+                              m_amrDx[lev][0], m_refinement_ratios[lev-1],  
+                              1,  // num comps
+                              m_amrDomains[lev]);
+            qcfi.coarseFineInterp(*moulin_source_term[lev], *moulin_source_term[lev-1]);
+        }
+
 
         //     Update  RHS = f(Qw, grad(zb)) 
         //     Compute lagged adv term = f((Qw, grad(h))
@@ -2256,44 +2328,6 @@ AmrHydro::timeStepFAS(Real a_dt)
             LevelData<FArrayBox> leveltmp2_cc(levelGrids, 1*SpaceDim, HeadGhostVect);
 
            
-            // UNITS FOR m_moulin_flux SHOULD BE M3/S
-            // UNITS FOR m_distributed_input SHOULD BE M/S
-            if (m_suhmoParm->m_n_moulins > 0) {
-                if (lev == 0) {
-                    Calc_moulin_source_term_distributed(levelmoulin_source_term, lev);
-                } else {
-                    FineInterp interpolator(m_amrGrids[lev], 1, m_refinement_ratios[lev - 1], m_amrDomains[lev]);
-                    interpolator.interpToFine(*moulin_source_term[lev], *moulin_source_term[lev - 1]);
-                }
-            } else if (m_suhmoParm->m_n_moulins < 0) {
-                if (m_suhmoParm->m_time_varying_input) {
-
-                    Real T_K   = -16.0 * std::cos( 2.0 * Pi * m_time / ( 365.*24*60*60.) ) - 5.0 + m_suhmoParm->m_deltaT;
-
-                    LevelData<FArrayBox>& levelIceHeight = *m_iceheight[lev];
-                    for (dit.begin(); dit.ok(); ++dit) {
-
-                        const Box& region = levelmoulin_source_term[dit].box();
-
-                        FORT_COMPUTE_TIMEVARYINGRECHARGE( CHF_FRA(levelIceHeight[dit]),
-                                                          CHF_BOX(region),
-                                                          CHF_FRA(levelmoulin_source_term[dit]),
-                                                          CHF_CONST_REAL(T_K),
-                                                          CHF_CONST_REAL(m_suhmoParm->m_distributed_input) );
-                    }
-                } else {
-                    for (dit.begin(); dit.ok(); ++dit) {
-                        FArrayBox& moulinSrc = levelmoulin_source_term[dit];
-                        moulinSrc.setVal(m_suhmoParm->m_distributed_input);
-                    }
-                }
-            } else {
-                for (dit.begin(); dit.ok(); ++dit) {
-                    FArrayBox& moulinSrc = levelmoulin_source_term[dit];
-                    moulinSrc.setVal(0.0);
-                }
-            }
-
             for (dit.begin(); dit.ok(); ++dit) {
                 // EC quantities
                 FluxBox& Qwater_ec = levelQw_ec[dit];
@@ -2419,6 +2453,10 @@ AmrHydro::timeStepFAS(Real a_dt)
 
                     // Diffusive term
                     RHSh(iv,0) += m_suhmoParm->m_DiffFactor * DiffusiveTerm(iv,0);
+
+                    if (Pressi(iv,0) == 0.0 ) {
+                        RHSh(iv,0) = 0.0;
+                    }
                 }
             }
         }// loop on levs
@@ -2702,6 +2740,10 @@ AmrHydro::timeStepFAS(Real a_dt)
                              (tmp_cc(iv, 0) + tmp_cc(iv, 1) - tmp2_cc(iv, 0) - tmp2_cc(iv, 1)) -
                              m_suhmoParm->m_rho_w * m_suhmoParm->m_gravity * (tmp_cc(iv, 0) + tmp_cc(iv, 1));
                 mR(iv,0)   = mR(iv,0) / m_suhmoParm->m_L;
+                if (Pressi(iv, 0) == 0.0) {
+                    mR(iv,0)   = 0.0;
+                }
+
             }
         }
 
