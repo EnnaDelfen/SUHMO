@@ -2420,15 +2420,15 @@ AmrHydro::timeStepFAS(Real a_dt)
                 for (bit.begin(); bit.ok(); ++bit) {
                     IntVect iv = bit();
                     // Actual RHS
+                    // mR
+                    RHSh(iv,0) = rho_coef / m_suhmoParm->m_L * 
+                                 (  m_suhmoParm->m_G 
+                                  + m_suhmoParm->m_ct * m_suhmoParm->m_cw * m_suhmoParm->m_rho_w * m_suhmoParm->m_rho_w * m_suhmoParm->m_gravity * 
+                                 (tmp2_cc(iv, 0) + tmp2_cc(iv, 1)) ); 
+                                 
+                    // sliding  
                     if ( B(iv,0) < bumpHeight(iv,0)) {
-                        RHSh(iv,0) = rho_coef / m_suhmoParm->m_L * (  m_suhmoParm->m_G 
-                                     + m_suhmoParm->m_ct * m_suhmoParm->m_cw * m_suhmoParm->m_rho_w * m_suhmoParm->m_rho_w * m_suhmoParm->m_gravity *
-                                      (tmp2_cc(iv, 0) + tmp2_cc(iv, 1)) )  
-                                     - ub_norm * (bumpHeight(iv,0) - B(iv,0)) / bumpSpacing(iv,0);
-                    } else {
-                        RHSh(iv,0) = rho_coef / m_suhmoParm->m_L * (  m_suhmoParm->m_G 
-                                     + m_suhmoParm->m_ct * m_suhmoParm->m_cw * m_suhmoParm->m_rho_w * m_suhmoParm->m_rho_w * m_suhmoParm->m_gravity *
-                                      (tmp2_cc(iv, 0) + tmp2_cc(iv, 1)) ); 
+                        RHSh(iv,0) -= ub_norm * (bumpHeight(iv,0) - B(iv,0)) / bumpSpacing(iv,0);
                     }
 
                     // Adv term right now in RHS
@@ -2436,7 +2436,7 @@ AmrHydro::timeStepFAS(Real a_dt)
                                   + m_suhmoParm->m_ct * m_suhmoParm->m_cw * m_suhmoParm->m_rho_w) * 
                                   (tmp_cc(iv, 0) + tmp_cc(iv, 1));
 
-                    // Add sliding term 
+                    // friction 
                     // mR -- turn off fric heat and geot heat
                     Pressw(iv,0) = m_suhmoParm->m_gravity * m_suhmoParm->m_rho_w * (currH(iv,0) - zb(iv,0));
                     Real sca_prod = 0.0; 
