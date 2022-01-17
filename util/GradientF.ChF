@@ -56,9 +56,12 @@ c ::: local variables
 c ::: this is a normal derivative (simpler stencil)
          factor = one/dx
          CHF_MULTIDO[edgeGrid;i;j;k]
-         edgeGrad(CHF_IX[i;j;k]) = factor*(phi(CHF_IX[i;j;k])
+         if ( (mask(CHF_IX[i;j;k])<1E-16) .OR. (mask(CHF_IX[i-ii;j-jj;k-kk])<1E-16) ) then
+             edgeGrad(CHF_IX[i;j;k]) =  0.0;
+         else
+             edgeGrad(CHF_IX[i;j;k]) = factor*(phi(CHF_IX[i;j;k])
      &                                    -phi(CHF_IX[i-ii;j-jj;k-kk]))
-
+         endif
          CHF_ENDDO
 
       else
