@@ -36,24 +36,29 @@ C     ------------------------------------------------------------------
 
       CHF_MULTIDO[region; i; j; k]
 
-         nlfunc(CHF_IX[i;j;k],0) = - Aparam * aB(CHF_IX[i;j  ;k  ],0) * 
-     &                            (aPi(CHF_IX[i;j  ;k  ],0) - 1000.0 * 9.8 * (phi(CHF_IX[i;j  ;k  ],0) - aZb(CHF_IX[i;j  ;k  ],0)))  *
-     &                            (aPi(CHF_IX[i;j  ;k  ],0) - 1000.0 * 9.8 * (phi(CHF_IX[i;j  ;k  ],0) - aZb(CHF_IX[i;j  ;k  ],0)))  *
-     &                            (aPi(CHF_IX[i;j  ;k  ],0) - 1000.0 * 9.8 * (phi(CHF_IX[i;j  ;k  ],0) - aZb(CHF_IX[i;j  ;k  ],0)))  
+         if ( aPi(CHF_IX[i;j;k],0) < 1e-16 )  then 
+             nlfunc(CHF_IX[i;j;k],0) = 0.0
+             dnlfunc(CHF_IX[i;j;k],0) = 0.0
+         else
+             nlfunc(CHF_IX[i;j;k],0) = - Aparam * aB(CHF_IX[i;j  ;k  ],0) * 
+     &                                   (aPi(CHF_IX[i;j  ;k  ],0) - 1000.0 * 9.8 * (phi(CHF_IX[i;j  ;k  ],0) - aZb(CHF_IX[i;j  ;k  ],0)))  *
+     &                                   (aPi(CHF_IX[i;j  ;k  ],0) - 1000.0 * 9.8 * (phi(CHF_IX[i;j  ;k  ],0) - aZb(CHF_IX[i;j  ;k  ],0)))  *
+     &                                   (aPi(CHF_IX[i;j  ;k  ],0) - 1000.0 * 9.8 * (phi(CHF_IX[i;j  ;k  ],0) - aZb(CHF_IX[i;j  ;k  ],0)))  
 
-         dnlfunc(CHF_IX[i;j;k],0) = 3.0 * Aparam * aB(CHF_IX[i;j  ;k  ],0) * 
-     &                            1000.0 * 9.8 * 
-     &                            (aPi(CHF_IX[i;j  ;k  ],0) - 1000.0 * 9.8 * (phi(CHF_IX[i;j  ;k  ],0) - aZb(CHF_IX[i;j  ;k  ],0)))  *
-     &                            (aPi(CHF_IX[i;j  ;k  ],0) - 1000.0 * 9.8 * (phi(CHF_IX[i;j  ;k  ],0) - aZb(CHF_IX[i;j  ;k  ],0)))  
+             dnlfunc(CHF_IX[i;j;k],0) = 3.0 * Aparam * aB(CHF_IX[i;j  ;k  ],0) * 
+     &                                  1000.0 * 9.8 * 
+     &                                  (aPi(CHF_IX[i;j  ;k  ],0) - 1000.0 * 9.8 * (phi(CHF_IX[i;j  ;k  ],0) - aZb(CHF_IX[i;j  ;k  ],0)))  *
+     &                                  (aPi(CHF_IX[i;j  ;k  ],0) - 1000.0 * 9.8 * (phi(CHF_IX[i;j  ;k  ],0) - aZb(CHF_IX[i;j  ;k  ],0)))  
 
-         if ( brparam > aB(CHF_IX[i;j  ;k  ],0) ) then
-             nlfunc(CHF_IX[i;j;k],0)  = nlfunc(CHF_IX[i;j;k],0) * (1.0 - (brparam - aB(CHF_IX[i;j  ;k  ],0)) / brparam )
-             dnlfunc(CHF_IX[i;j;k],0) = dnlfunc(CHF_IX[i;j;k],0) * aB(CHF_IX[i;j  ;k  ],0) /  brparam 
-         endif
+             if ( brparam > aB(CHF_IX[i;j  ;k  ],0) ) then
+                 nlfunc(CHF_IX[i;j;k],0)  = nlfunc(CHF_IX[i;j;k],0) * (1.0 - (brparam - aB(CHF_IX[i;j  ;k  ],0)) / brparam )
+                 dnlfunc(CHF_IX[i;j;k],0) = dnlfunc(CHF_IX[i;j;k],0) * aB(CHF_IX[i;j  ;k  ],0) /  brparam 
+             endif
 
-         if ( brparamMax < aB(CHF_IX[i;j  ;k  ],0) ) then
-             nlfunc(CHF_IX[i;j;k],0)  = nlfunc(CHF_IX[i;j;k],0) * (1.0 - (brparamMax - aB(CHF_IX[i;j  ;k  ],0)) / brparamMax )
-             dnlfunc(CHF_IX[i;j;k],0) = dnlfunc(CHF_IX[i;j;k],0) * aB(CHF_IX[i;j  ;k  ],0) / brparamMax 
+             if ( brparamMax < aB(CHF_IX[i;j  ;k  ],0) ) then
+                 nlfunc(CHF_IX[i;j;k],0)  = nlfunc(CHF_IX[i;j;k],0) * (1.0 - (brparamMax - aB(CHF_IX[i;j  ;k  ],0)) / brparamMax )
+                 dnlfunc(CHF_IX[i;j;k],0) = dnlfunc(CHF_IX[i;j;k],0) * aB(CHF_IX[i;j  ;k  ],0) / brparamMax 
+             endif
          endif
 
       CHF_ENDDO
