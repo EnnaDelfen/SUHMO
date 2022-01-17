@@ -2420,16 +2420,11 @@ AmrHydro::timeStepFAS(Real a_dt)
                 for (bit.begin(); bit.ok(); ++bit) {
                     IntVect iv = bit();
                     // Actual RHS
-                    // mR
+                    /* mR */
                     RHSh(iv,0) = rho_coef / m_suhmoParm->m_L * 
                                  (  m_suhmoParm->m_G 
                                   + m_suhmoParm->m_ct * m_suhmoParm->m_cw * m_suhmoParm->m_rho_w * m_suhmoParm->m_rho_w * m_suhmoParm->m_gravity * 
                                  (tmp2_cc(iv, 0) + tmp2_cc(iv, 1)) ); 
-                                 
-                    // sliding  
-                    if ( B(iv,0) < bumpHeight(iv,0)) {
-                        RHSh(iv,0) -= ub_norm * (bumpHeight(iv,0) - B(iv,0)) / bumpSpacing(iv,0);
-                    }
 
                     // Adv term right now in RHS
                     RHSh(iv,0) -= rho_coef / m_suhmoParm->m_L * m_suhmoParm->m_rho_w * m_suhmoParm->m_gravity * (1.0 
@@ -2444,6 +2439,13 @@ AmrHydro::timeStepFAS(Real a_dt)
                         sca_prod = 20. * 20. * m_suhmoParm->m_ub[0] * std::abs(Pressi(iv,0) - Pressw(iv,0)) * m_suhmoParm->m_ub[0];
                     }
                     RHSh(iv,0) += sca_prod * rho_coef / m_suhmoParm->m_L ;
+
+                    RHSh(iv,0) = std::max(RHSh(iv,0), 0.0);
+                                 
+                    // sliding  
+                    if ( B(iv,0) < bumpHeight(iv,0)) {
+                        RHSh(iv,0) -= ub_norm * (bumpHeight(iv,0) - B(iv,0)) / bumpSpacing(iv,0);
+                    }
 
                     // Add moulin 
                     if (isnan(moulinSrc(iv,0))) {
@@ -2739,7 +2741,7 @@ AmrHydro::timeStepFAS(Real a_dt)
                              - m_suhmoParm->m_ct * m_suhmoParm->m_cw * m_suhmoParm->m_rho_w * m_suhmoParm->m_rho_w * m_suhmoParm->m_gravity *
                              (tmp_cc(iv, 0) + tmp_cc(iv, 1) - tmp2_cc(iv, 0) - tmp2_cc(iv, 1)) -
                              m_suhmoParm->m_rho_w * m_suhmoParm->m_gravity * (tmp_cc(iv, 0) + tmp_cc(iv, 1));
-                mR(iv,0)   = mR(iv,0) / m_suhmoParm->m_L;
+                mR(iv,0)   = std::max(mR(iv,0) / m_suhmoParm->m_L, 0.0);
                 if (Pressi(iv, 0) == 0.0) {
                     mR(iv,0)   = 0.0;
                 }
