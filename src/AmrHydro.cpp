@@ -2824,7 +2824,7 @@ AmrHydro::timeStepFAS(Real a_dt)
 
     /* FINAL custom plt here -- debug print */
     if ((m_PrintCustom) && (m_cur_step % m_plot_interval == 0) ) {
-        int nStuffToPlot = 10;
+        int nStuffToPlot = 12;
         Vector<std::string> vectName;
         vectName.resize(nStuffToPlot);
         vectName[0]="head";
@@ -2837,6 +2837,8 @@ AmrHydro::timeStepFAS(Real a_dt)
         vectName[7]="RHS_hmoul";
         vectName[8]="Channelization";
         vectName[9]="DiffusiveTerm";
+        vectName[10]="Dcoef_x";
+        vectName[11]="Dcoef_y";
 
         Vector<Vector<LevelData<FArrayBox>*>> stuffToPlot;
         stuffToPlot.resize(nStuffToPlot);
@@ -2855,6 +2857,8 @@ AmrHydro::timeStepFAS(Real a_dt)
             stuffToPlot[7][lev]  = new LevelData<FArrayBox>(m_amrGrids[lev], 1, IntVect::Zero);
             stuffToPlot[8][lev]  = new LevelData<FArrayBox>(m_amrGrids[lev], 1, IntVect::Zero);
             stuffToPlot[9][lev]  = new LevelData<FArrayBox>(m_amrGrids[lev], 1, IntVect::Zero);
+            stuffToPlot[10][lev]  = new LevelData<FArrayBox>(m_amrGrids[lev], 1, IntVect::Zero);
+            stuffToPlot[11][lev]  = new LevelData<FArrayBox>(m_amrGrids[lev], 1, IntVect::Zero);
 
             LevelData<FArrayBox>& levelHead      = *m_head[lev];
             LevelData<FArrayBox>& levelHeadSTP   = *stuffToPlot[0][lev];
@@ -2883,10 +2887,12 @@ AmrHydro::timeStepFAS(Real a_dt)
             LevelData<FArrayBox>& levelCD        = *a_chanDegree[lev];
             LevelData<FArrayBox>& levelCDSTP     = *stuffToPlot[8][lev];
 
-            //LevelData<FArrayBox>& levelqw        = *m_qw[lev];
-            LevelData<FArrayBox>& levelqw        = *a_Dcoef_cc[lev];
-            //LevelData<FArrayBox>& levelqw        = *a_diffusiveTerm[lev];
+            LevelData<FArrayBox>& levelqw        = *a_diffusiveTerm[lev];
             LevelData<FArrayBox>& levelqwSTP     = *stuffToPlot[9][lev];
+
+            LevelData<FArrayBox>& levelDc        = *a_Dcoef_cc[lev];
+            LevelData<FArrayBox>& levelDcXSTP     = *stuffToPlot[10][lev];
+            LevelData<FArrayBox>& levelDcYSTP     = *stuffToPlot[11][lev];
 
             DataIterator dit = levelHead.dataIterator();
             for (dit.begin(); dit.ok(); ++dit) {
@@ -2900,6 +2906,8 @@ AmrHydro::timeStepFAS(Real a_dt)
                 levelRHSH1STP[dit].copy(levelRHSH1[dit], 0, 0, 1);
                 levelCDSTP[dit].copy(levelCD[dit], 0, 0, 1);
                 levelqwSTP[dit].copy(levelqw[dit], 0, 0, 1);
+                levelDcXSTP[dit].copy(levelDc[dit], 0, 0, 1);
+                levelDcYSTP[dit].copy(levelDc[dit], 1, 0, 1);
             }
         } // loop on levs
         writePltCustom(nStuffToPlot, vectName, stuffToPlot, ".2d");
@@ -2915,6 +2923,8 @@ AmrHydro::timeStepFAS(Real a_dt)
             delete stuffToPlot[7][lev];
             delete stuffToPlot[8][lev];
             delete stuffToPlot[9][lev];
+            delete stuffToPlot[10][lev];
+            delete stuffToPlot[11][lev];
         }
     } // end customPlt
 
