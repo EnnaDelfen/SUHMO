@@ -1524,9 +1524,9 @@ AmrHydro::Calc_moulin_source_term_distributed (LevelData<FArrayBox>& levelMoulin
    // X dir -- same in Y dir for now
    //Real l_m1 = - std::sqrt(3.0) / 3.0;
    //Real l_p1 =   std::sqrt(3.0) / 3.0;
-   Real l_m1 = - 0.77459;
+   Real l_m1 = - 0.77459/2.0;
    Real l_c1 =   0.0;
-   Real l_p1 =   0.77459;
+   Real l_p1 =   0.77459/2.0;
 
    // Loop over points and moulins to get influx at each location
    DataIterator dit = levelMoulinSrcTmp.dataIterator();
