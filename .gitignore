@@ -16,3 +16,5 @@ inputs.compare
 pout.*
 *_bu
 
+*lev_tooLarge
+*.agr
