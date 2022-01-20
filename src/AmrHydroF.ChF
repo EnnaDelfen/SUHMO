@@ -244,8 +244,8 @@ C     ------------------------------------------------------------------
 
       CHF_MULTIDO[region; i; j; k]
 C        m2/s
-         Dcoeff(CHF_IX[i;j;k],0) = 1.0
-C         Dcoeff(CHF_IX[i;j;k],0) = max(Bec(CHF_IX[i;j;k],0) * MRec(CHF_IX[i;j;k],0) / rho , 0.0)
+C         Dcoeff(CHF_IX[i;j;k],0) = 1.0
+         Dcoeff(CHF_IX[i;j;k],0) = max(Bec(CHF_IX[i;j;k],0) * MRec(CHF_IX[i;j;k],0) / rho , 5.0e-6)
 
       CHF_ENDDO
 
