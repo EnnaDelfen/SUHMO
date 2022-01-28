@@ -362,8 +362,8 @@ AmrHydro::SolveForGap_nl(const Vector<DisjointBoxLayout>&               a_grids,
     int numBottom = 4;  // num of bottom smoothings
     int numMG     = 1;  // Vcycle selected
     int maxIter   = 100; // max number of v cycles
-    Real eps        =  1.0e-8;  // solution tolerance
-    Real normThresh =  1.0e-10;  // abs tol
+    Real eps        =  1.0e-12;  // solution tolerance
+    Real normThresh =  1.0e-12;  // abs tol
     Real hang       =  1.0e-6;      // next rnorm should be < (1-m_hang)*norm_last 
     //if (m_cur_step < 50) { 
     //    numBottom  = 10;  // num of bottom smoothings
@@ -459,8 +459,8 @@ AmrHydro::SolveForHead_nl(const Vector<DisjointBoxLayout>&               a_grids
     int numBottom = 8;  // num of bottom smoothings
     int numMG     = 1;  // Vcycle selected
     int maxIter   = 100; // max number of v cycles
-    Real eps        =  1.0e-8;  // solution tolerance
-    Real normThresh =  1.0e-10;  // abs tol
+    Real eps        =  1.0e-12;  // solution tolerance
+    Real normThresh =  1.0e-12;  // abs tol
     Real hang       =  0.01;      // next rnorm should be < (1-m_hang)*norm_last 
     if (m_cur_step < 50) { 
         numBottom  = 10;  // num of bottom smoothings
@@ -1496,17 +1496,11 @@ AmrHydro::dCoeff(LevelData<FluxBox>&    leveldcoef,
 }
 
 
-void 
-AmrHydro::Calc_moulin_source_term_distributed (LevelData<FArrayBox>& levelMoulinSrc,
-                                               int curr_level) 
+
+void
+AmrHydro::Calc_moulin_integral(std::vector<Real>& a_moulinsInteg,
+                               Vector<LevelData<FArrayBox>*>& a_MS_noNorm) 
 {
-   // UNITS FOR m_moulin_flux SHOULD BE M3/S
-
-   // keep track of each moulin contrib separately
-   LevelData<FArrayBox> levelMoulinSrcTmp(m_amrGrids[curr_level], m_suhmoParm->m_n_moulins, IntVect::Zero);
-   std::vector<Real> a_moulinsInteg;    // m.s-1 Sliding velocity
-   a_moulinsInteg.resize(m_suhmoParm->m_n_moulins, 0.0);
-
    //GL quadrature points
    // X dir
    //Real v_1 = 1.0;
@@ -1528,93 +1522,117 @@ AmrHydro::Calc_moulin_source_term_distributed (LevelData<FArrayBox>& levelMoulin
    Real l_c1 =   0.0;
    Real l_p1 =   0.77459/2.0;
 
-   // Loop over points and moulins to get influx at each location
-   DataIterator dit = levelMoulinSrcTmp.dataIterator();
-   for (dit.begin(); dit.ok(); ++dit) {
-       FArrayBox& moulinSrcTmp   = levelMoulinSrcTmp[dit];
+   for (int lev = m_finest_level; lev >= 0; lev--) {
+       LevelData<FArrayBox>& levelMoulinSrcTmp  =  *a_MS_noNorm[lev];
+       // Loop over points and moulins to get influx at each location
+       DataIterator dit = levelMoulinSrcTmp.dataIterator();
+       for (dit.begin(); dit.ok(); ++dit) {
+           FArrayBox& moulinSrcTmp   = levelMoulinSrcTmp[dit];
+           // Initialize with 0
+           moulinSrcTmp.setVal(0.0);
 
-       moulinSrcTmp.setVal(0.0);
+           // Fill the levelMoulinSrcTmp
+           BoxIterator bit(moulinSrcTmp.box());
+           for (bit.begin(); bit.ok(); ++bit) {
+               IntVect iv = bit();
+             
+               // Position of GL nodes
+               Real x_loc_l_m1 = (iv[0]+0.5+l_m1)*m_amrDx[lev][0];
+               Real x_loc_l_c1 = (iv[0]+0.5+l_c1)*m_amrDx[lev][0];
+               Real x_loc_l_p1 = (iv[0]+0.5+l_p1)*m_amrDx[lev][0];
+               Real y_loc_l_m1 = (iv[1]+0.5+l_m1)*m_amrDx[lev][1];
+               Real y_loc_l_c1 = (iv[1]+0.5+l_c1)*m_amrDx[lev][1];
+               Real y_loc_l_p1 = (iv[1]+0.5+l_p1)*m_amrDx[lev][1];
 
-       BoxIterator bit(moulinSrcTmp.box());
-       for (bit.begin(); bit.ok(); ++bit) {
-           IntVect iv = bit();
-           // Position of centroid
-           //Real x_loc = (iv[0]+0.5)*m_amrDx[curr_level][0];
-           //Real y_loc = (iv[1]+0.5)*m_amrDx[curr_level][1];
-           //pout() << "Dealing with cell idx " << iv << " actual coord " << x_loc << " " << y_loc << endl;
-           //pout() << " Moulins coords: " << m_suhmoParm->m_moulin_position[0] << " "
-           //                              << m_suhmoParm->m_moulin_position[1] << endl;
-           //pout() << " Dist cell to moulin: " <<  x_loc-m_suhmoParm->m_moulin_position[0] << " "
-           //                                   <<  y_loc-m_suhmoParm->m_moulin_position[1] << ", radius "
-           //                                   << std::sqrt(std::pow(x_loc-m_suhmoParm->m_moulin_position[0],2)+
-           //                                                std::pow(y_loc-m_suhmoParm->m_moulin_position[1],2)) << endl;
-         
-           // Position of GL nodes
-           Real x_loc_l_m1 = (iv[0]+0.5+l_m1)*m_amrDx[curr_level][0];
-           Real x_loc_l_c1 = (iv[0]+0.5+l_c1)*m_amrDx[curr_level][0];
-           Real x_loc_l_p1 = (iv[0]+0.5+l_p1)*m_amrDx[curr_level][0];
-           Real y_loc_l_m1 = (iv[1]+0.5+l_m1)*m_amrDx[curr_level][1];
-           Real y_loc_l_c1 = (iv[1]+0.5+l_c1)*m_amrDx[curr_level][1];
-           Real y_loc_l_p1 = (iv[1]+0.5+l_p1)*m_amrDx[curr_level][1];
+               // Loop over all moulins
+               for (int m = 0; m<m_suhmoParm->m_n_moulins; m++) {
+                   Real prefac       =   1.0 /( m_suhmoParm->m_sigma[m] * std::sqrt(2.0 * 3.14) );
+                   // 7 8 9
+                   // 4 5 6
+                   // 1 2 3
+                   // point (1)
+                   Real rad_loc_1    =   std::pow(x_loc_l_m1 - m_suhmoParm->m_moulin_position[m*2 + 0], 2) 
+                                       + std::pow(y_loc_l_m1 - m_suhmoParm->m_moulin_position[m*2 + 1], 2);
+                   Real MS_1         =   prefac * std::exp(- 1.0 / (2.0 * m_suhmoParm->m_sigma[m] * m_suhmoParm->m_sigma[m]) * 
+                                         rad_loc_1 );
+                   // point (2)
+                   Real rad_loc_2    =   std::pow(x_loc_l_c1 - m_suhmoParm->m_moulin_position[m*2 + 0], 2) 
+                                       + std::pow(y_loc_l_m1 - m_suhmoParm->m_moulin_position[m*2 + 1], 2);
+                   Real MS_2         =   prefac * std::exp(- 1.0 / (2.0 * m_suhmoParm->m_sigma[m] * m_suhmoParm->m_sigma[m]) * 
+                                         rad_loc_2 );
+                   // point (3)
+                   Real rad_loc_3    =   std::pow(x_loc_l_p1 - m_suhmoParm->m_moulin_position[m*2 + 0], 2) 
+                                       + std::pow(y_loc_l_m1 - m_suhmoParm->m_moulin_position[m*2 + 1], 2);
+                   Real MS_3         =   prefac * std::exp(- 1.0 / (2.0 * m_suhmoParm->m_sigma[m] * m_suhmoParm->m_sigma[m]) * 
+                                         rad_loc_3 );
+                   // point (4)
+                   Real rad_loc_4    =   std::pow(x_loc_l_m1 - m_suhmoParm->m_moulin_position[m*2 + 0], 2) 
+                                       + std::pow(y_loc_l_c1 - m_suhmoParm->m_moulin_position[m*2 + 1], 2);
+                   Real MS_4         =   prefac * std::exp(- 1.0 / (2.0 * m_suhmoParm->m_sigma[m] * m_suhmoParm->m_sigma[m]) * 
+                                         rad_loc_4 );
+                   // point (5)
+                   Real rad_loc_5    =   std::pow(x_loc_l_c1 - m_suhmoParm->m_moulin_position[m*2 + 0], 2) 
+                                       + std::pow(y_loc_l_c1 - m_suhmoParm->m_moulin_position[m*2 + 1], 2);
+                   Real MS_5         =   prefac * std::exp(- 1.0 / (2.0 * m_suhmoParm->m_sigma[m] * m_suhmoParm->m_sigma[m]) * 
+                                         rad_loc_5 );
+                   // point (6)
+                   Real rad_loc_6    =   std::pow(x_loc_l_p1 - m_suhmoParm->m_moulin_position[m*2 + 0], 2) 
+                                       + std::pow(y_loc_l_c1 - m_suhmoParm->m_moulin_position[m*2 + 1], 2);
+                   Real MS_6         =   prefac * std::exp(- 1.0 / (2.0 * m_suhmoParm->m_sigma[m] * m_suhmoParm->m_sigma[m]) * 
+                                         rad_loc_6 );
+                   // point (7)
+                   Real rad_loc_7    =   std::pow(x_loc_l_m1 - m_suhmoParm->m_moulin_position[m*2 + 0], 2) 
+                                       + std::pow(y_loc_l_p1 - m_suhmoParm->m_moulin_position[m*2 + 1], 2);
+                   Real MS_7         =   prefac * std::exp(- 1.0 / (2.0 * m_suhmoParm->m_sigma[m] * m_suhmoParm->m_sigma[m]) * 
+                                         rad_loc_7 );
+                   // point (8)
+                   Real rad_loc_8    =   std::pow(x_loc_l_c1 - m_suhmoParm->m_moulin_position[m*2 + 0], 2) 
+                                       + std::pow(y_loc_l_p1 - m_suhmoParm->m_moulin_position[m*2 + 1], 2);
+                   Real MS_8         =   prefac * std::exp(- 1.0 / (2.0 * m_suhmoParm->m_sigma[m] * m_suhmoParm->m_sigma[m]) * 
+                                         rad_loc_8 );
+                   // point (9)
+                   Real rad_loc_9    =   std::pow(x_loc_l_p1 - m_suhmoParm->m_moulin_position[m*2 + 0], 2) 
+                                       + std::pow(y_loc_l_p1 - m_suhmoParm->m_moulin_position[m*2 + 1], 2);
+                   Real MS_9         =   prefac * std::exp(- 1.0 / (2.0 * m_suhmoParm->m_sigma[m] * m_suhmoParm->m_sigma[m]) * 
+                                         rad_loc_9 );
+                   // Putting it together
+                   moulinSrcTmp(iv, m) =   v_m1*v_m1*MS_1 + v_c1*v_m1*MS_2 + v_p1*v_m1*MS_3 
+                                         + v_m1*v_c1*MS_4 + v_c1*v_c1*MS_5 + v_p1*v_c1*MS_6
+                                         + v_m1*v_p1*MS_7 + v_c1*v_p1*MS_8 + v_p1*v_p1*MS_9;
+               }
+           }
+       }
 
-           // Loop over all moulins
-           for (int m = 0; m<m_suhmoParm->m_n_moulins; m++) {
-               Real prefac       =   1.0 /( m_suhmoParm->m_sigma[m] * std::sqrt(2.0 * 3.14) );
-               // 7 8 9
-               // 4 5 6
-               // 1 2 3
-               // point (1)
-               Real rad_loc_1    =   std::pow(x_loc_l_m1 - m_suhmoParm->m_moulin_position[m*2 + 0], 2) 
-                                   + std::pow(y_loc_l_m1 - m_suhmoParm->m_moulin_position[m*2 + 1], 2);
-               Real MS_1         =   prefac * std::exp(- 1.0 / (2.0 * m_suhmoParm->m_sigma[m] * m_suhmoParm->m_sigma[m]) * 
-                                     rad_loc_1 );
-               // point (2)
-               Real rad_loc_2    =   std::pow(x_loc_l_c1 - m_suhmoParm->m_moulin_position[m*2 + 0], 2) 
-                                   + std::pow(y_loc_l_m1 - m_suhmoParm->m_moulin_position[m*2 + 1], 2);
-               Real MS_2         =   prefac * std::exp(- 1.0 / (2.0 * m_suhmoParm->m_sigma[m] * m_suhmoParm->m_sigma[m]) * 
-                                     rad_loc_2 );
-               // point (3)
-               Real rad_loc_3    =   std::pow(x_loc_l_p1 - m_suhmoParm->m_moulin_position[m*2 + 0], 2) 
-                                   + std::pow(y_loc_l_m1 - m_suhmoParm->m_moulin_position[m*2 + 1], 2);
-               Real MS_3         =   prefac * std::exp(- 1.0 / (2.0 * m_suhmoParm->m_sigma[m] * m_suhmoParm->m_sigma[m]) * 
-                                     rad_loc_3 );
-               // point (4)
-               Real rad_loc_4    =   std::pow(x_loc_l_m1 - m_suhmoParm->m_moulin_position[m*2 + 0], 2) 
-                                   + std::pow(y_loc_l_c1 - m_suhmoParm->m_moulin_position[m*2 + 1], 2);
-               Real MS_4         =   prefac * std::exp(- 1.0 / (2.0 * m_suhmoParm->m_sigma[m] * m_suhmoParm->m_sigma[m]) * 
-                                     rad_loc_4 );
-               // point (5)
-               Real rad_loc_5    =   std::pow(x_loc_l_c1 - m_suhmoParm->m_moulin_position[m*2 + 0], 2) 
-                                   + std::pow(y_loc_l_c1 - m_suhmoParm->m_moulin_position[m*2 + 1], 2);
-               Real MS_5         =   prefac * std::exp(- 1.0 / (2.0 * m_suhmoParm->m_sigma[m] * m_suhmoParm->m_sigma[m]) * 
-                                     rad_loc_5 );
-               // point (6)
-               Real rad_loc_6    =   std::pow(x_loc_l_p1 - m_suhmoParm->m_moulin_position[m*2 + 0], 2) 
-                                   + std::pow(y_loc_l_c1 - m_suhmoParm->m_moulin_position[m*2 + 1], 2);
-               Real MS_6         =   prefac * std::exp(- 1.0 / (2.0 * m_suhmoParm->m_sigma[m] * m_suhmoParm->m_sigma[m]) * 
-                                     rad_loc_6 );
-               // point (7)
-               Real rad_loc_7    =   std::pow(x_loc_l_m1 - m_suhmoParm->m_moulin_position[m*2 + 0], 2) 
-                                   + std::pow(y_loc_l_p1 - m_suhmoParm->m_moulin_position[m*2 + 1], 2);
-               Real MS_7         =   prefac * std::exp(- 1.0 / (2.0 * m_suhmoParm->m_sigma[m] * m_suhmoParm->m_sigma[m]) * 
-                                     rad_loc_7 );
-               // point (8)
-               Real rad_loc_8    =   std::pow(x_loc_l_c1 - m_suhmoParm->m_moulin_position[m*2 + 0], 2) 
-                                   + std::pow(y_loc_l_p1 - m_suhmoParm->m_moulin_position[m*2 + 1], 2);
-               Real MS_8         =   prefac * std::exp(- 1.0 / (2.0 * m_suhmoParm->m_sigma[m] * m_suhmoParm->m_sigma[m]) * 
-                                     rad_loc_8 );
-               // point (9)
-               Real rad_loc_9    =   std::pow(x_loc_l_p1 - m_suhmoParm->m_moulin_position[m*2 + 0], 2) 
-                                   + std::pow(y_loc_l_p1 - m_suhmoParm->m_moulin_position[m*2 + 1], 2);
-               Real MS_9         =   prefac * std::exp(- 1.0 / (2.0 * m_suhmoParm->m_sigma[m] * m_suhmoParm->m_sigma[m]) * 
-                                     rad_loc_9 );
-               // Putting it together
-               moulinSrcTmp(iv, m) =   v_m1*v_m1*MS_1 + v_c1*v_m1*MS_2 + v_p1*v_m1*MS_3 
-                                     + v_m1*v_c1*MS_4 + v_c1*v_c1*MS_5 + v_p1*v_c1*MS_6
-                                     + v_m1*v_p1*MS_7 + v_c1*v_p1*MS_8 + v_p1*v_p1*MS_9;
+       // Zero all coarse moulinSrc that are covered by a finer grid 
+       if (lev < m_finest_level) {
+           const DisjointBoxLayout& levelGridsCoar = m_amrGrids[lev];
+           const DisjointBoxLayout& levelGridsFine = m_amrGrids[lev+1];
+           for (dit.begin(); dit.ok(); ++dit) {
+               FArrayBox& moulinSrcTmp   = levelMoulinSrcTmp[dit];
+               int ncomp = levelMoulinSrcTmp.nComp();   
+               LayoutIterator litFine = levelGridsFine.layoutIterator(); 
+               for (litFine.reset(); litFine.ok(); ++litFine) {
+                   Box overlayBox    = moulinSrcTmp.box();
+                   Box coarsenedGrid = coarsen(levelGridsFine[litFine], 2);
 
-               // normalization
-               a_moulinsInteg[m] += moulinSrcTmp(iv,m) * m_amrDx[curr_level][0] * m_amrDx[curr_level][1]; 
+                   overlayBox &= coarsenedGrid;
+                   if (!overlayBox.isEmpty()) {
+                       moulinSrcTmp.setVal(0.0, overlayBox, 0, ncomp);
+                   }
+               }
+           }
+       }    
+
+       // normalization
+       for (dit.begin(); dit.ok(); ++dit) {
+           FArrayBox& moulinSrcTmp   = levelMoulinSrcTmp[dit];
+           BoxIterator bit(moulinSrcTmp.box());
+           for (bit.begin(); bit.ok(); ++bit) {
+               IntVect iv = bit();
+               // Loop over all moulins
+               for (int m = 0; m<m_suhmoParm->m_n_moulins; m++) {
+                   a_moulinsInteg[m] += moulinSrcTmp(iv,m) * m_amrDx[lev][0] * m_amrDx[lev][1]; 
+               }
            }
        }
    }
@@ -1622,23 +1640,31 @@ AmrHydro::Calc_moulin_source_term_distributed (LevelData<FArrayBox>& levelMoulin
 #ifdef CH_MPI
    Real recv;
    for (int m = 0; m<m_suhmoParm->m_n_moulins; m++) {
+       recv = 0;
        int result = MPI_Allreduce(&a_moulinsInteg[m], &recv, 1, MPI_CH_REAL,
                                   MPI_SUM, Chombo_MPI::comm);
        a_moulinsInteg[m] = recv;
+
+       if (m_verbosity > 3) {
+           pout() << "moulin: " << m << ", integral (vol. rate): " << a_moulinsInteg[m]  << endl; 
+       } 
    }
 #endif
- 
-   // Rescale each moulins
-   for (int m = 0; m<m_suhmoParm->m_n_moulins; m++) {
-       if (a_moulinsInteg[m] == 0.0) {
-           a_moulinsInteg[m] = 1.0;
-       }
-   }
+}
+
+void 
+AmrHydro::Calc_moulin_source_term_distributed (LevelData<FArrayBox>& levelMoulinSrc,
+                                               LevelData<FArrayBox>& levelMoulinSrcNoNorm,
+                                               std::vector<Real> a_moulinsInteg,
+                                               int curr_level) 
+{
+   // UNITS FOR m_moulin_flux SHOULD BE M3/S
    std::vector<Real> a_moulinsIntegFinal;    // m.s-1 Sliding velocity
    a_moulinsIntegFinal.resize(m_suhmoParm->m_n_moulins, 0.0);
+   DataIterator dit = levelMoulinSrc.dataIterator();
    for (dit.begin(); dit.ok(); ++dit) {
        FArrayBox& moulinSrc      = levelMoulinSrc[dit];
-       FArrayBox& moulinSrcTmp   = levelMoulinSrcTmp[dit];
+       FArrayBox& moulinSrcTmp   = levelMoulinSrcNoNorm[dit];
 
        moulinSrc.setVal(m_suhmoParm->m_distributed_input);
 
@@ -1655,6 +1681,7 @@ AmrHydro::Calc_moulin_source_term_distributed (LevelData<FArrayBox>& levelMoulin
    }
 
 #ifdef CH_MPI
+   Real recv;
    for (int m = 0; m<m_suhmoParm->m_n_moulins; m++) {
        recv = 0;
        int result = MPI_Allreduce(&a_moulinsIntegFinal[m], &recv, 1, MPI_CH_REAL,
@@ -1821,6 +1848,7 @@ AmrHydro::timeStepFAS(Real a_dt)
     Vector<LevelData<FArrayBox>*> a_gapheight_lagged;
     Vector<LevelData<FArrayBox>*> RHS_h;
     Vector<LevelData<FArrayBox>*> moulin_source_term;
+    Vector<LevelData<FArrayBox>*> moulin_source_term_noNorm;
     Vector<LevelData<FArrayBox>*> RHS_b;
     Vector<LevelData<FArrayBox>*> a_ReQwIter;
     Vector<LevelData<FArrayBox>*> a_diffusiveTerm;
@@ -1837,6 +1865,7 @@ AmrHydro::timeStepFAS(Real a_dt)
     a_gapheight_lagged.resize(m_finest_level + 1, NULL);
     RHS_h.resize(m_finest_level + 1, NULL);
     moulin_source_term.resize(m_finest_level + 1, NULL);
+    moulin_source_term_noNorm.resize(m_finest_level + 1, NULL);
     RHS_b.resize(m_finest_level + 1, NULL);
     a_ReQwIter.resize(m_finest_level + 1, NULL);
     a_diffusiveTerm.resize(m_finest_level + 1, NULL);
@@ -1903,6 +1932,7 @@ AmrHydro::timeStepFAS(Real a_dt)
         // Head and b RHS
         RHS_h[lev]                = new LevelData<FArrayBox>(m_amrGrids[lev], 1, IntVect::Zero);
         moulin_source_term[lev]   = new LevelData<FArrayBox>(m_amrGrids[lev], 1, HeadGhostVect);
+        moulin_source_term_noNorm[lev]   = new LevelData<FArrayBox>(m_amrGrids[lev], m_suhmoParm->m_n_moulins, HeadGhostVect);
         RHS_b[lev]                = new LevelData<FArrayBox>(m_amrGrids[lev], 1, IntVect::Zero);
         a_diffusiveTerm[lev]      = new LevelData<FArrayBox>(m_amrGrids[lev], 1, IntVect::Zero);
         a_chanDegree[lev]         = new LevelData<FArrayBox>(m_amrGrids[lev], 1, HeadGhostVect);
@@ -2231,13 +2261,21 @@ AmrHydro::timeStepFAS(Real a_dt)
         }
         // UNITS FOR m_moulin_flux SHOULD BE M3/S
         // UNITS FOR m_distributed_input SHOULD BE M/S
+        std::vector<Real> a_moulinsInteg(m_suhmoParm->m_n_moulins, 0.0);    // m.s-1 Sliding velocity
+        if (m_suhmoParm->m_n_moulins > 0) {
+            Calc_moulin_integral(a_moulinsInteg, moulin_source_term_noNorm);
+        }
         for (int lev = 0; lev <= m_finest_level; lev++) {
-            LevelData<FArrayBox>& levelmoulin_source_term = *moulin_source_term[lev];
+            LevelData<FArrayBox>& levelmoulin_source_term        = *moulin_source_term[lev];
+            LevelData<FArrayBox>& levelmoulin_source_term_noNorm = *moulin_source_term_noNorm[lev];
             LevelData<FArrayBox>& levelPi                 = *m_overburdenpress[lev];
             DisjointBoxLayout& levelGrids                 = m_amrGrids[lev];
             DataIterator dit                              = levelGrids.dataIterator();
             if (m_suhmoParm->m_n_moulins > 0) {
-                Calc_moulin_source_term_distributed(levelmoulin_source_term, lev);
+                Calc_moulin_source_term_distributed(levelmoulin_source_term, 
+                                                    levelmoulin_source_term_noNorm,
+                                                    a_moulinsInteg,
+                                                    lev);
             } else if (m_suhmoParm->m_n_moulins < 0) {
                 if (m_suhmoParm->m_time_varying_input) {
 
@@ -2274,6 +2312,7 @@ AmrHydro::timeStepFAS(Real a_dt)
                 }
             }
         }
+
         for (int lev = m_finest_level; lev > 0; lev--) {
             if (m_suhmoParm->m_n_moulins > 0) {
                 if (lev > 0 ) {
@@ -2282,6 +2321,8 @@ AmrHydro::timeStepFAS(Real a_dt)
                 }
             }
         }
+
+
         // handle ghost cells on the coarse-fine interface
         for (int lev = 1; lev <= m_finest_level; lev++) {
             QuadCFInterp qcfi(m_amrGrids[lev], &m_amrGrids[lev-1],

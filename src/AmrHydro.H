@@ -127,7 +127,12 @@ public:
                 int lev);
 
     void Calc_moulin_source_term_distributed(LevelData<FArrayBox>& levelMoulinSrc,
+                                             LevelData<FArrayBox>& levelMoulinSrcNoNorm, 
+                                             std::vector<Real> a_moulinsInteg, 
                                              int lev);
+
+    void Calc_moulin_integral(std::vector<Real> &a_moulinsInteg,
+                              Vector<LevelData<FArrayBox>*>& a_MS_noNorm); 
 
     void CalcRHS_gapHeightFAS(LevelData<FArrayBox>& levelRHS_b, 
                               LevelData<FArrayBox>& levelPi, 
