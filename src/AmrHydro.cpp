@@ -2600,6 +2600,10 @@ AmrHydro::timeStepFAS(Real a_dt)
     }
 
     //int gh_method = 0; // 0: backward Euler, 1:...
+    Vector<DisjointBoxLayout> m_amrGrids_curr;
+    Vector<ProblemDomain> m_amrDomains_curr;
+    m_amrGrids_curr.resize(m_finest_level + 1);
+    m_amrDomains_curr.resize(m_finest_level + 1);
     for (int lev = 0; lev <= m_finest_level; lev++) {
         /* Make sure head GC are properly filled*/
         LevelData<FArrayBox>& levelH   = *m_head[lev];
@@ -2625,6 +2629,10 @@ AmrHydro::timeStepFAS(Real a_dt)
             // Fill BC ghost cells of h and b
             mixBCValues(levelH[dit], validBox, m_amrDomains[lev], m_amrDx[lev][0], false);
         }
+     
+        // needed for VC solve
+        m_amrGrids_curr[lev]   = m_amrGrids[lev];
+        m_amrDomains_curr[lev] = m_amrDomains[lev];
 
         /* Re evaluate Re with fresh h */
         // CC quantities
@@ -2805,8 +2813,8 @@ AmrHydro::timeStepFAS(Real a_dt)
 
     if (m_use_ImplDiff) {
         //     Solve for h with FAS scheme
-        SolveForGap_nl(m_amrGrids, aCoef_GH, a_Dcoef,
-                       m_amrDomains, m_refinement_ratios, coarsestDx,
+        SolveForGap_nl(m_amrGrids_curr, aCoef_GH, a_Dcoef,
+                       m_amrDomains_curr, m_refinement_ratios, coarsestDx,
                        a_gh_curr, RHS_b, a_dt);
 
         for (int lev = 0; lev <= m_finest_level; lev++) {
@@ -3557,6 +3565,12 @@ AmrHydro::regrid()
 
             // Special treatment for Pi ?
             RealVect levelDx = m_amrDx[lev] * RealVect::Unit;
+            m_IBCPtr->initializeBed(levelDx,
+                                    *m_suhmoParm,
+                                    *m_bedelevation[lev],
+                                    *m_bumpHeight[lev],
+                                    *m_bumpSpacing[lev]);
+
             m_IBCPtr->initializePi(levelDx, 
                                    *m_suhmoParm,       
                                    *m_head[lev],

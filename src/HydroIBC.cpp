@@ -82,7 +82,29 @@ HydroIBC::initializeBed(RealVect& a_dx,
                         LevelData<FArrayBox>& a_bumpHeight,
                         LevelData<FArrayBox>& a_bumpSpacing)
 {
-    // Do nothing 
+
+    pout() << "HydroIBC::initializeBed" << endl;
+
+    DataIterator dit = a_zbed.dataIterator();
+    for (dit.begin(); dit.ok(); ++dit) {
+        FArrayBox& thiszbed          = a_zbed[dit];
+        FArrayBox& thisbumpHeight    = a_bumpHeight[dit];
+        FArrayBox& thisbumpSpacing   = a_bumpSpacing[dit];
+
+        BoxIterator bit(thiszbed.box()); // Default .box() have ghostcells ?
+        for (bit.begin(); bit.ok(); ++bit) {
+            IntVect iv = bit();
+            Real x_loc = (iv[0]+0.5)*a_dx[0];
+
+            /* bed topography */
+            // typical
+            thiszbed(iv, 0)      = Params.m_slope*x_loc;
+        } // end loop over cells
+    }     // end loop over boxes
+
+    if (Params.m_verbosity > 3) {
+        pout() << "(Done with HydroIBC::initializeBed)" << endl;
+    }
 }
 
 void 
@@ -118,9 +140,6 @@ HydroIBC::initializeData(RealVect& a_dx,
     //const double stddev2 = 0.1;
     //std::default_random_engine generator;
     //std::normal_distribution<double> dist2(mean2, stddev2);
-
-    IntVect regionLo = m_domain.domainBox().bigEnd();
-    IntVect regionHi = m_domain.domainBox().bigEnd();
 
     DataIterator dit = a_head.dataIterator();
     for (dit.begin(); dit.ok(); ++dit) {
