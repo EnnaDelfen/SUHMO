@@ -21,6 +21,7 @@
 #include "AmrHydro.H"
 
 #include "HydroIBC.H"
+#include "SqrtIBC.H"
 #include "memusage.H" 
 
 #ifdef CH_USE_PETSC
@@ -90,6 +91,9 @@ main(int argc, char* argv[])
 
         if (problem_type == "basic") {
             hydroIBCPtr = new HydroIBC();
+        } else if (problem_type == "sqrt") {
+            SqrtIBC* ibcPtr = new SqrtIBC;
+            hydroIBCPtr = static_cast<HydroIBC*>(ibcPtr);
         } else {
             MayDay::Error("bad problem_type !");
         }

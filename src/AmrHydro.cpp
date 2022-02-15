@@ -362,8 +362,8 @@ AmrHydro::SolveForGap_nl(const Vector<DisjointBoxLayout>&               a_grids,
     int numBottom = 4;  // num of bottom smoothings
     int numMG     = 1;  // Vcycle selected
     int maxIter   = 100; // max number of v cycles
-    Real eps        =  1.0e-12;  // solution tolerance
-    Real normThresh =  1.0e-12;  // abs tol
+    Real eps        =  1.0e-10;  // solution tolerance
+    Real normThresh =  1.0e-10;  // abs tol
     Real hang       =  1.0e-6;      // next rnorm should be < (1-m_hang)*norm_last 
     //if (m_cur_step < 50) { 
     //    numBottom  = 10;  // num of bottom smoothings
@@ -401,6 +401,9 @@ AmrHydro::SolveForHead_nl(const Vector<DisjointBoxLayout>&               a_grids
                           Vector<LevelData<FArrayBox>*>& a_head, 
                           Vector<LevelData<FArrayBox>*>& a_RHS)
 {
+
+    CH_TIME("AmrHydro::SolveForHead_nl");
+
     Vector<RefCountedPtr<LevelData<FArrayBox> > > B(m_finest_level + 1);
     Vector<RefCountedPtr<LevelData<FArrayBox> > > Pri(m_finest_level + 1);
     Vector<RefCountedPtr<LevelData<FArrayBox> > > zb(m_finest_level + 1);
@@ -459,8 +462,8 @@ AmrHydro::SolveForHead_nl(const Vector<DisjointBoxLayout>&               a_grids
     int numBottom = 8;  // num of bottom smoothings
     int numMG     = 1;  // Vcycle selected
     int maxIter   = 100; // max number of v cycles
-    Real eps        =  1.0e-12;  // solution tolerance
-    Real normThresh =  1.0e-12;  // abs tol
+    Real eps        =  1.0e-10;  // solution tolerance
+    Real normThresh =  1.0e-10;  // abs tol
     Real hang       =  0.01;      // next rnorm should be < (1-m_hang)*norm_last 
     if (m_cur_step < 50) { 
         numBottom  = 10;  // num of bottom smoothings
@@ -1674,7 +1677,7 @@ AmrHydro::Calc_moulin_source_term_distributed (LevelData<FArrayBox>& levelMoulin
            for (int m = 0; m<m_suhmoParm->m_n_moulins; m++) {
                moulinSrc(iv,0) += moulinSrcTmp(iv,m) * std::max( (1.0 - m_suhmoParm->m_runoff * std::sin(2.0 * Pi * (m_time - m_restart_time) / 86400.)), 0.0)  
                                   / a_moulinsInteg[m] *  m_suhmoParm->m_moulin_flux[m] ; 
-               a_moulinsIntegFinal[m] += moulinSrcTmp(iv,m) * std::max( (1.0 - m_suhmoParm->m_runoff * std::sin(2.0 * Pi * (m_time - m_restart_time) / 86400.)), 0.0)   
+               a_moulinsIntegFinal[m] += m_suhmoParm->m_distributed_input * m_amrDx[curr_level][0] * m_amrDx[curr_level][1] + moulinSrcTmp(iv,m) * std::max( (1.0 - m_suhmoParm->m_runoff * std::sin(2.0 * Pi * (m_time - m_restart_time) / 86400.)), 0.0)   
                                   / a_moulinsInteg[m] * m_suhmoParm->m_moulin_flux[m] * m_amrDx[curr_level][0] * m_amrDx[curr_level][1]; 
            }
        }
@@ -1932,7 +1935,9 @@ AmrHydro::timeStepFAS(Real a_dt)
         // Head and b RHS
         RHS_h[lev]                = new LevelData<FArrayBox>(m_amrGrids[lev], 1, IntVect::Zero);
         moulin_source_term[lev]   = new LevelData<FArrayBox>(m_amrGrids[lev], 1, HeadGhostVect);
-        moulin_source_term_noNorm[lev]   = new LevelData<FArrayBox>(m_amrGrids[lev], m_suhmoParm->m_n_moulins, HeadGhostVect);
+        if (m_suhmoParm->m_n_moulins > 0) {
+            moulin_source_term_noNorm[lev]   = new LevelData<FArrayBox>(m_amrGrids[lev], m_suhmoParm->m_n_moulins, HeadGhostVect);
+        }
         RHS_b[lev]                = new LevelData<FArrayBox>(m_amrGrids[lev], 1, IntVect::Zero);
         a_diffusiveTerm[lev]      = new LevelData<FArrayBox>(m_amrGrids[lev], 1, IntVect::Zero);
         a_chanDegree[lev]         = new LevelData<FArrayBox>(m_amrGrids[lev], 1, HeadGhostVect);
@@ -2261,27 +2266,28 @@ AmrHydro::timeStepFAS(Real a_dt)
         }
         // UNITS FOR m_moulin_flux SHOULD BE M3/S
         // UNITS FOR m_distributed_input SHOULD BE M/S
-        std::vector<Real> a_moulinsInteg(m_suhmoParm->m_n_moulins, 0.0);    // m.s-1 Sliding velocity
         if (m_suhmoParm->m_n_moulins > 0) {
+            std::vector<Real> a_moulinsInteg(m_suhmoParm->m_n_moulins, 0.0);    // m.s-1 Sliding velocity
             Calc_moulin_integral(a_moulinsInteg, moulin_source_term_noNorm);
-        }
-        for (int lev = 0; lev <= m_finest_level; lev++) {
-            LevelData<FArrayBox>& levelmoulin_source_term        = *moulin_source_term[lev];
-            LevelData<FArrayBox>& levelmoulin_source_term_noNorm = *moulin_source_term_noNorm[lev];
-            LevelData<FArrayBox>& levelPi                 = *m_overburdenpress[lev];
-            DisjointBoxLayout& levelGrids                 = m_amrGrids[lev];
-            DataIterator dit                              = levelGrids.dataIterator();
-            if (m_suhmoParm->m_n_moulins > 0) {
+            for (int lev = 0; lev <= m_finest_level; lev++) {
+                LevelData<FArrayBox>& levelmoulin_source_term         = *moulin_source_term[lev];
+                LevelData<FArrayBox>& levelmoulin_source_term_noNorm  = *moulin_source_term_noNorm[lev];
                 Calc_moulin_source_term_distributed(levelmoulin_source_term, 
                                                     levelmoulin_source_term_noNorm,
                                                     a_moulinsInteg,
                                                     lev);
-            } else if (m_suhmoParm->m_n_moulins < 0) {
+            }
+        } else if (m_suhmoParm->m_n_moulins < 0) {
+            for (int lev = 0; lev <= m_finest_level; lev++) {
+                LevelData<FArrayBox>& levelmoulin_source_term = *moulin_source_term[lev];
+                LevelData<FArrayBox>& levelPi                 = *m_overburdenpress[lev];
+                LevelData<FArrayBox>& levelIceHeight          = *m_iceheight[lev];
+
+                DisjointBoxLayout& levelGrids                 = m_amrGrids[lev];
+                DataIterator dit                              = levelGrids.dataIterator();
+
                 if (m_suhmoParm->m_time_varying_input) {
-
                     Real T_K   = -16.0 * std::cos( 2.0 * Pi * m_time / ( 365.*24*60*60.) ) - 5.0 + m_suhmoParm->m_deltaT;
-
-                    LevelData<FArrayBox>& levelIceHeight = *m_iceheight[lev];
                     for (dit.begin(); dit.ok(); ++dit) {
                         const Box& region = levelmoulin_source_term[dit].box();
                         FORT_COMPUTE_TIMEVARYINGRECHARGE( CHF_FRA(levelIceHeight[dit]),
@@ -2305,7 +2311,12 @@ AmrHydro::timeStepFAS(Real a_dt)
                         }
                     }
                 }
-            } else {
+            }
+        } else {
+            for (int lev = 0; lev <= m_finest_level; lev++) {
+                LevelData<FArrayBox>& levelmoulin_source_term = *moulin_source_term[lev];
+                DisjointBoxLayout& levelGrids                 = m_amrGrids[lev];
+                DataIterator dit                              = levelGrids.dataIterator();
                 for (dit.begin(); dit.ok(); ++dit) {
                     FArrayBox& moulinSrc = levelmoulin_source_term[dit];
                     moulinSrc.setVal(0.0);
@@ -2601,9 +2612,9 @@ AmrHydro::timeStepFAS(Real a_dt)
             MayDay::Error("Abort");
         } else {
             if (m_cur_step < 50) {
-                if (max_resH < 0.01){
+                if (max_resH < 0.05){
                     if (m_verbosity > 0) {
-                        pout() <<"        converged( it = "<< ite_idx << ", x(h) = " <<max_resH<< ")."<< endl;
+                        pout() <<"        converged( it = "<< ite_idx+1 << ", x(h) = " <<max_resH<< ")."<< endl;
                     }
                     if (m_verbosity > 3) {
                         pout() <<"        Check h (max = "<< maxHead<<", min = " << minHead << ")"<<endl;
@@ -2613,7 +2624,7 @@ AmrHydro::timeStepFAS(Real a_dt)
             } else {
                 if (max_resH < m_eps_PicardIte){
                     if (m_verbosity > 0) {
-                        pout() <<"        converged( it = "<< ite_idx << ", x(h) = " <<max_resH<< ")."<< endl;
+                        pout() <<"        converged( it = "<< ite_idx+1 << ", x(h) = " <<max_resH<< ")."<< endl;
                     }
                     if (m_verbosity > 3) {
                         pout() <<"        Check h (max = "<< maxHead<<", min = " << minHead << ")"<<endl;
@@ -2986,6 +2997,8 @@ AmrHydro::timeStepFAS(Real a_dt)
         
         int DomSize = m_amrDomains[0].domainBox().size(0); 
         int DomSizeY = m_amrDomains[0].domainBox().size(1); 
+
+        // mass balance
  
         // DISCHARGE -- Q
         Vector<Real> out_water_flux_x_tot(DomSize , 0.0);
@@ -3004,6 +3017,8 @@ AmrHydro::timeStepFAS(Real a_dt)
         // RHS B -- Moulins and mRate
         Vector<Real> out_recharge_tot(DomSize, 0.0);
         Vector<Real> out_recharge(DomSize, 0.0);
+        Vector<Real> water_vol(DomSize, 0.0);
+        Vector<Real> dom_sizeY(DomSize, 0.0);
         // Pressures
         Vector<Real> avPressure(DomSize, 0.0);
         Vector<Real> out_avgN(4, 0.0);
@@ -3023,9 +3038,11 @@ AmrHydro::timeStepFAS(Real a_dt)
         LevelData<FArrayBox>& levelmR         = *m_meltRate[0];
         LevelData<FArrayBox>& levelPressi     = *m_overburdenpress[0];
         LevelData<FArrayBox>& levelPw         = *m_Pw[0];
+        LevelData<FArrayBox>& levelB          = *m_gapheight[0];    
 
 
-        LevelData<FluxBox>&   levelQw_ec = *a_Qw_ec[0]; 
+        LevelData<FArrayBox>& levelQw       = *m_qw[0]; 
+        LevelData<FluxBox>&   levelQw_ec    = *a_Qw_ec[0]; 
 
         DataIterator dit                 = levelGrids.dataIterator();
 
@@ -3035,10 +3052,13 @@ AmrHydro::timeStepFAS(Real a_dt)
             FluxBox&   CD_ec        = levelCD_ec[dit];
             FArrayBox& CD_ecFab     = CD_ec[0];
 
+            FArrayBox& QW           = levelQw[dit];
+
             FArrayBox&  MS          = levelMoulinSrc[dit];
             FArrayBox&  MR          = levelmR[dit];
             FArrayBox& Pressi       = levelPressi[dit];
             FArrayBox& Pw           = levelPw[dit];
+            FArrayBox& GH           = levelB[dit];
 
             const Box& validBox = levelGrids.get(dit);
 
@@ -3046,42 +3066,50 @@ AmrHydro::timeStepFAS(Real a_dt)
             for (bitEC.begin(); bitEC.ok(); ++bitEC) {
                 IntVect iv = bitEC();
                 // DISCHARGE -- Q
-                out_water_flux_x_tot[iv[0]]     += Qwater_ecFab(iv, 0) * m_amrDx[0][0];
-                out_water_flux_x_chan[iv[0]]    += Qwater_ecFab(iv, 0) * m_amrDx[0][0] * CD_ecFab(iv, 0);
-                out_water_flux_x_distrib[iv[0]] += Qwater_ecFab(iv, 0) * m_amrDx[0][0] * (1.0 - CD_ecFab(iv, 0));
+                if (Pressi(iv,0) > 0.0) {
+                    out_water_flux_x_tot[iv[0]]     += Qwater_ecFab(iv, 0) * m_amrDx[0][0];                          //QW(iv,0) * m_amrDx[0][0];                            
+                    out_water_flux_x_chan[iv[0]]    += Qwater_ecFab(iv, 0) * m_amrDx[0][0] * CD_ecFab(iv, 0);        //QW(iv,0) * m_amrDx[0][0] * CD_ecFab(iv, 0);          
+                    out_water_flux_x_distrib[iv[0]] += Qwater_ecFab(iv, 0) * m_amrDx[0][0] * (1.0 - CD_ecFab(iv, 0));//QW(iv,0) * m_amrDx[0][0] * (1.0 - CD_ecFab(iv, 0));  
+                }
 
                 // RHS B -- Moulins and mRate
                 //CC
                 Real xloc = (iv[0]+0.5)*m_amrDx[0][0];    
                 // Because of mass conservation eq -basically recharge = RHS of this eq in my head.
                 // If I only use the MS, then for run B its sum of A1 and A5 which in this case does NOT equal total discharge !!
-                out_recharge[iv[0]]      += MS(iv, 0) * m_amrDx[0][0] * m_amrDx[0][0];  
-                out_recharge_tot[iv[0]]  += (MS(iv, 0) + MR(iv, 0)/m_suhmoParm->m_rho_w) * m_amrDx[0][0] * m_amrDx[0][0];
+                if (Pressi(iv,0) > 0.0) {
+                    out_recharge[iv[0]]      += MS(iv, 0) * m_amrDx[0][0] * m_amrDx[0][0];  
+                    out_recharge_tot[iv[0]]  += (MR(iv, 0)/m_suhmoParm->m_rho_w) * m_amrDx[0][0] * m_amrDx[0][0];
+                    water_vol[iv[0]]         +=  GH(iv, 0)* m_amrDx[0][0] * m_amrDx[0][0];
+                }
 
                 // Pressures
-                avPressure[iv[0]]        += (Pressi(iv, 0) - Pw(iv, 0)); 
-                out_avgN[3]              += (Pressi(iv, 0) - Pw(iv, 0)); 
-                count_avgN += 1; 
-                if ((xloc > 10000) && (xloc < 15000)){
-                    out_avgN[0]   += (Pressi(iv, 0) - Pw(iv, 0));
-                    count_avgNLow += 1; 
-                    xloc_bandMin_lo = std::min(xloc, xloc_bandMin_lo);
-                    xloc_bandMin_hi = std::max(xloc, xloc_bandMin_hi);
-                    out_water_flux_x_chan_Bands[0] += Qwater_ecFab(iv, 0) * m_amrDx[0][0] * CD_ecFab(iv, 0);
-                    out_water_flux_x_distrib_Bands[0] += Qwater_ecFab(iv, 0) * m_amrDx[0][0] * (1.0 - CD_ecFab(iv, 0));
-                } else if ((xloc > 50000) && (xloc < 55000)) {
-                    out_avgN[1]   += (Pressi(iv, 0) - Pw(iv, 0));
-                    count_avgNMed += 1; 
-                    xloc_bandMed_lo = std::min(xloc, xloc_bandMed_lo);
-                    xloc_bandMed_hi = std::max(xloc, xloc_bandMed_hi);
-                    out_water_flux_x_chan_Bands[1] += Qwater_ecFab(iv, 0) * m_amrDx[0][0] * CD_ecFab(iv, 0);
-                    out_water_flux_x_distrib_Bands[1] += Qwater_ecFab(iv, 0) * m_amrDx[0][0] * (1.0 - CD_ecFab(iv, 0));
-                } else if ((xloc > 85000) && (xloc < 90000)) {
-                    out_avgN[2]    += (Pressi(iv, 0) - Pw(iv, 0));
-                    count_avgNHigh += 1; 
-                    out_water_flux_x_chan_Bands[2] += Qwater_ecFab(iv, 0) * m_amrDx[0][0] * CD_ecFab(iv, 0);
-                    out_water_flux_x_distrib_Bands[2] += Qwater_ecFab(iv, 0) * m_amrDx[0][0] * (1.0 - CD_ecFab(iv, 0));
-                }  
+                if (Pressi(iv,0) > 0.0) {
+                    avPressure[iv[0]]        += (Pressi(iv, 0) - Pw(iv, 0)); 
+                    out_avgN[3]              += (Pressi(iv, 0) - Pw(iv, 0)); 
+                    count_avgN += 1; 
+                    dom_sizeY[iv[0]]         += 1;
+                }
+                //if ((xloc > 10000) && (xloc < 15000)){
+                //    out_avgN[0]   += (Pressi(iv, 0) - Pw(iv, 0));
+                //    count_avgNLow += 1; 
+                //    xloc_bandMin_lo = std::min(xloc, xloc_bandMin_lo);
+                //    xloc_bandMin_hi = std::max(xloc, xloc_bandMin_hi);
+                //    out_water_flux_x_chan_Bands[0] += Qwater_ecFab(iv, 0) * m_amrDx[0][0] * CD_ecFab(iv, 0);
+                //    out_water_flux_x_distrib_Bands[0] += Qwater_ecFab(iv, 0) * m_amrDx[0][0] * (1.0 - CD_ecFab(iv, 0));
+                //} else if ((xloc > 50000) && (xloc < 55000)) {
+                //    out_avgN[1]   += (Pressi(iv, 0) - Pw(iv, 0));
+                //    count_avgNMed += 1; 
+                //    xloc_bandMed_lo = std::min(xloc, xloc_bandMed_lo);
+                //    xloc_bandMed_hi = std::max(xloc, xloc_bandMed_hi);
+                //    out_water_flux_x_chan_Bands[1] += Qwater_ecFab(iv, 0) * m_amrDx[0][0] * CD_ecFab(iv, 0);
+                //    out_water_flux_x_distrib_Bands[1] += Qwater_ecFab(iv, 0) * m_amrDx[0][0] * (1.0 - CD_ecFab(iv, 0));
+                //} else if ((xloc > 85000) && (xloc < 90000)) {
+                //    out_avgN[2]    += (Pressi(iv, 0) - Pw(iv, 0));
+                //    count_avgNHigh += 1; 
+                //    out_water_flux_x_chan_Bands[2] += Qwater_ecFab(iv, 0) * m_amrDx[0][0] * CD_ecFab(iv, 0);
+                //    out_water_flux_x_distrib_Bands[2] += Qwater_ecFab(iv, 0) * m_amrDx[0][0] * (1.0 - CD_ecFab(iv, 0));
+                //}  
 
                 // TEMPORARY
                 //int time_tmp = (int) m_time;
@@ -3139,6 +3167,16 @@ AmrHydro::timeStepFAS(Real a_dt)
        }
        out_recharge_tot = recvMoulinTot;
 
+       Vector<Real> recvwater_vol(DomSize);
+       result = MPI_Allreduce(&water_vol[0], &recvwater_vol[0], DomSize, MPI_CH_REAL,
+                                  MPI_SUM, Chombo_MPI::comm);
+       if (result != MPI_SUCCESS)
+       {
+           MayDay::Error("communication error on MPI_SUM");
+       }
+       water_vol = recvwater_vol;
+
+
        // Pressures
        Vector<Real> recvavP(DomSize);
        result = MPI_Allreduce(&avPressure[0], &recvavP[0], DomSize, MPI_CH_REAL,
@@ -3148,6 +3186,15 @@ AmrHydro::timeStepFAS(Real a_dt)
            MayDay::Error("communication error on MPI_SUM");
        }
        avPressure = recvavP;
+
+       Vector<Real> recvDomSize(DomSize);
+       result = MPI_Allreduce(&dom_sizeY[0], &recvDomSize[0], DomSize, MPI_CH_REAL,
+                                  MPI_SUM, Chombo_MPI::comm);
+       if (result != MPI_SUCCESS)
+       {
+           MayDay::Error("communication error on MPI_SUM");
+       }
+       dom_sizeY = recvDomSize;
 
        Vector<Real> recvavN(4);
        result = MPI_Allreduce(&out_avgN[0], &recvavN[0], 4, MPI_CH_REAL,
@@ -3242,10 +3289,19 @@ AmrHydro::timeStepFAS(Real a_dt)
        xloc_bandMed_lo = recvMin;
 #endif
 
+        Real RECH_TOT, RECH; 
+        RECH_TOT = 0;
+        RECH = 0;
+        for (int xi = 0; xi <DomSize ; xi++) {
+            RECH_TOT += out_recharge_tot[xi] ;
+            RECH     += out_recharge[xi] ;
+        }
         for (int xi = (DomSize - 2); xi > -1 ; xi--) {
             out_recharge[xi]  = out_recharge[xi]  + out_recharge[xi+1] ;
             out_recharge_tot[xi]  = out_recharge_tot[xi]  + out_recharge_tot[xi+1] ;
+            water_vol[xi]         = water_vol[xi]  + water_vol[xi+1] ; 
         }
+        pout() << "RECHARGE and RECHARGE TOT = " << RECH << " " << RECH_TOT << endl;
         
         idx_bandMin_lo = (int) xloc_bandMin_lo/m_amrDx[0][0] - 0.5;
         idx_bandMin_hi = (int) xloc_bandMin_hi/m_amrDx[0][0] - 0.5;
@@ -3254,10 +3310,10 @@ AmrHydro::timeStepFAS(Real a_dt)
 
         // TEMPORAL POSTPROC
         //int time_tmp = (int) m_time + a_dt;
-        pout() << "Time(h - d) moulin N_LB  N_MB  N_HB = " <<  (m_time-m_restart_time)/3600.  << " " << (m_time-m_restart_time)/86400 << " " << out_recharge[0] 
-                                                                                    << " " << out_avgN[0]/count_avgNLow 
-                                                                                    << " " << out_avgN[1]/count_avgNMed 
-                                                                                    << " " << out_avgN[2]/count_avgNHigh << endl;
+        //pout() << "Time(h - d) moulin N_LB  N_MB  N_HB = " <<  (m_time-m_restart_time)/3600.  << " " << (m_time-m_restart_time)/86400 << " " << out_recharge[0] 
+        //                                                                            << " " << out_avgN[0]/count_avgNLow 
+        //                                                                            << " " << out_avgN[1]/count_avgNMed 
+        //                                                                            << " " << out_avgN[2]/count_avgNHigh << endl;
         //if (time_tmp % 86400 == 0) {
         //    pout() << idx_bandMin_lo << " " << idx_bandMin_hi << " " << idx_bandMed_lo << " "<< idx_bandMed_hi << endl;
         //    pout() << "1-Time  2-disTOT  3-disEFF  4-disINEF  " 
@@ -3284,16 +3340,23 @@ AmrHydro::timeStepFAS(Real a_dt)
         //}
  
         // SPATIAL POSTPROC
+        pout() << "XaxisSUHMO_B1    dischargeSUHMO_B1   dischargeEFFSUHMO_B1   dischargeINEFFSUHMO_B1  rechargeTOTSUHMO_B1  PSUHMO_B1 " << endl;
+        for (int xi = 0; xi < DomSize; xi++) {
+            Real x_loc = (xi+0.5)*m_amrDx[0][0];    
+                    pout() << " " << x_loc/1e3 
+                   << " " << -out_water_flux_x_tot[xi] << " " << -out_water_flux_x_chan[xi] << " " << -out_water_flux_x_distrib[xi] 
+                   << " " << out_recharge[xi] + out_recharge_tot[xi] << " " << avPressure[xi]/dom_sizeY[xi]/1e6  
+                   << endl;
+
+
+        //pout() << "1-Xpos   2-avgP  3-rechargeMR 4-rechargeMS 5-rechargeTOT  6-discharge  7-TOTwaterVol" << endl;
         //for (int xi = 0; xi < DomSize; xi++) {
         //    Real x_loc = (xi+0.5)*m_amrDx[0][0];    
-        //    pout() << "1-Xpos 2-avN 3-recharge 4-discharge 5-EFFdischarge 6-INEFdischarge "
-        //           << " " << x_loc << " " << avPressure[xi]/DomSizeY << " " << out_recharge[xi] 
-        //           << " " << -out_water_flux_x_tot[xi] << " " << -out_water_flux_x_chan[xi] << " " << -out_water_flux_x_distrib[xi]
+        //            pout() << " " << x_loc/1e3 << " "  << avPressure[xi]/DomSizeY/1e6  << " " << out_recharge_tot[xi]  
+        //           << " " << out_recharge[xi] << " " << out_recharge_tot[xi] + out_recharge[xi] 
+        //           << " " << -out_water_flux_x_tot[xi] << " " << water_vol[xi] 
         //           << endl;
-        //}
-        //pout() <<" -          contrib from CHANNEL (%)   = "<< channel_water_flux_x << " (" << channel_water_flux_x/out_water_flux_x * 100. << ")"<< endl;
-        //pout() <<" -          contrib from DISTRIB (%)   = "<< distrib_water_flux_x << " (" << distrib_water_flux_x/out_water_flux_x * 100. << ")"<< endl;
-        //pout() << "END\n\n\n";
+        }
     }
 
     /* Averaging down and fill in ghost cells */
@@ -3351,6 +3414,9 @@ AmrHydro::timeStepFAS(Real a_dt)
             delete a_gapheight_lagged[lev];
             delete RHS_h[lev];
             delete moulin_source_term[lev];
+            if (m_suhmoParm->m_n_moulins > 0) {
+                delete moulin_source_term_noNorm[lev];
+            }
             delete RHS_b[lev];
             delete a_ReQwIter[lev];
             delete a_diffusiveTerm[lev];
