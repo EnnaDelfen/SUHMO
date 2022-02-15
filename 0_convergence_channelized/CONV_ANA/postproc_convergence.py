@@ -63,10 +63,10 @@ len_of_file = len(listOfFiles) /2.
 
 if (len_of_file != len(L2_head)):
     print("Not enough head data", len_of_file, len(L2_head))
-    stop
+    #stop
 if (len_of_file != len(L2_GH)):
     print("Not enough GH data", len_of_file, len(L2_GH))
-    stop
+    #stop
 if (len_of_file != len(L2_Pw)):
     print("Not enough Pw data", len_of_file, len(L2_Pw))
     stop
@@ -93,5 +93,5 @@ with open(csv_file, 'w') as outfile:
     writer = csv.writer(outfile,delimiter=' ',quotechar=' ', quoting=csv.QUOTE_MINIMAL)
     writer.writerow(["#errorL2"])
     writer.writerow(["#case","head","gapHeight","Pw","Re","RHS_moulin","DT","CD"])
-    for i in range(len(L2_head)):
-        writer.writerow([nb_cells[2*i+1], L2_head[i], L2_GH[i], L2_Pw[i], L2_Re[i], L2_moulin[i], L2_Diff[i], L2_Channel[i]])
+    for i in range(len(L2_Channel)):
+        writer.writerow([nb_cells[2*i+1], L2_head[2*i+1], L2_GH[2*i+1], L2_Pw[i], L2_Re[i], L2_moulin[i], L2_Diff[i], L2_Channel[i]])

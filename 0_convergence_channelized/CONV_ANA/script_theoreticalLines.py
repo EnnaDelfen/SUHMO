@@ -10,11 +10,11 @@ for i in range(1,5):
 q = 2.0
 
 snd_order = np.zeros(5)
-snd_order[0] = 0.01
+snd_order[0] = 1
 for i in range(1,5):
     snd_order[i] = snd_order[i-1]/np.exp(q*np.log(2.0))
 
 #print
-for  i in range(5):
+for  i in range(6):
     print(x[i], snd_order[i])
 
