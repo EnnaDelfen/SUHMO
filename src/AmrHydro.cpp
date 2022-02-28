@@ -124,7 +124,7 @@ void ParseBC()
 
 /* Return Neumann boundary val -- based on parsed value */
 void NeumannValue(Real* pos,
-                  int* dir, 
+                  int*  dir, 
                   Side::LoHiSide* side, 
                   Real* a_values)
 {
@@ -998,7 +998,7 @@ AmrHydro::run(Real a_max_time, int a_max_step)
         next_plot_time = std::min(next_plot_time, a_max_time);
 
         while ((next_plot_time > m_time) && (m_cur_step < a_max_step) && (dt > TIME_EPS)) {
-            if ((m_cur_step % m_plot_interval == 0) && m_plot_interval > 0) {
+            if (((m_cur_step-m_restart_step) % m_plot_interval == 0) && m_plot_interval > 0) {
 #ifdef CH_USE_HDF5
                 writePlotFile();
 #endif
@@ -2287,7 +2287,7 @@ AmrHydro::timeStepFAS(Real a_dt)
                 DataIterator dit                              = levelGrids.dataIterator();
 
                 if (m_suhmoParm->m_time_varying_input) {
-                    Real T_K   = -16.0 * std::cos( 2.0 * Pi * m_time / ( 365.*24*60*60.) ) - 5.0 + m_suhmoParm->m_deltaT;
+                    Real T_K   = -16.0 * std::cos( 2.0 * Pi * (m_time - m_restart_time) / ( 365.*24*60*60.) ) - 5.0 + m_suhmoParm->m_deltaT;
                     for (dit.begin(); dit.ok(); ++dit) {
                         const Box& region = levelmoulin_source_term[dit].box();
                         FORT_COMPUTE_TIMEVARYINGRECHARGE( CHF_FRA(levelIceHeight[dit]),
@@ -2883,7 +2883,7 @@ AmrHydro::timeStepFAS(Real a_dt)
 
 
     /* FINAL custom plt here -- debug print */
-    if ((m_PrintCustom) && (m_cur_step % m_plot_interval == 0) ) {
+    if ((m_PrintCustom) && ((m_cur_step-m_restart_step) % m_plot_interval == 0) ) {
         int nStuffToPlot = 12;
         Vector<std::string> vectName;
         vectName.resize(nStuffToPlot);
@@ -3010,13 +3010,18 @@ AmrHydro::timeStepFAS(Real a_dt)
         int idx_bandMin_hi = 0;
         int idx_bandMed_lo = 0;
         int idx_bandMed_hi = 0;
+        int idx_bandHi_lo  = 0;
+        int idx_bandHi_hi  = 0;
         Real xloc_bandMin_lo = 9999999999;
         Real xloc_bandMin_hi = -1;
         Real xloc_bandMed_lo = 9999999999;
         Real xloc_bandMed_hi = -1;
+        Real xloc_bandHi_lo = 9999999999;
+        Real xloc_bandHi_hi = -1;
         // RHS B -- Moulins and mRate
         Vector<Real> out_recharge_tot(DomSize, 0.0);
         Vector<Real> out_recharge(DomSize, 0.0);
+        Vector<Real> Ylength(DomSize, 0.0);
         Vector<Real> water_vol(DomSize, 0.0);
         Vector<Real> dom_sizeY(DomSize, 0.0);
         // Pressures
@@ -3052,7 +3057,7 @@ AmrHydro::timeStepFAS(Real a_dt)
             FluxBox&   CD_ec        = levelCD_ec[dit];
             FArrayBox& CD_ecFab     = CD_ec[0];
 
-            FArrayBox& QW           = levelQw[dit];
+            //FArrayBox& QW           = levelQw[dit];
 
             FArrayBox&  MS          = levelMoulinSrc[dit];
             FArrayBox&  MR          = levelmR[dit];
@@ -3078,9 +3083,10 @@ AmrHydro::timeStepFAS(Real a_dt)
                 // Because of mass conservation eq -basically recharge = RHS of this eq in my head.
                 // If I only use the MS, then for run B its sum of A1 and A5 which in this case does NOT equal total discharge !!
                 if (Pressi(iv,0) > 0.0) {
-                    out_recharge[iv[0]]      += MS(iv, 0) * m_amrDx[0][0] * m_amrDx[0][0];  
+                    out_recharge[iv[0]]      += 1.158e-6 * m_amrDx[0][0] * m_amrDx[0][0];  //MS(iv, 0) * m_amrDx[0][0] * m_amrDx[0][0];  
                     out_recharge_tot[iv[0]]  += (MR(iv, 0)/m_suhmoParm->m_rho_w) * m_amrDx[0][0] * m_amrDx[0][0];
                     water_vol[iv[0]]         +=  GH(iv, 0)* m_amrDx[0][0] * m_amrDx[0][0];
+                    Ylength[iv[0]]           += m_amrDx[0][0];
                 }
 
                 // Pressures
@@ -3090,32 +3096,34 @@ AmrHydro::timeStepFAS(Real a_dt)
                     count_avgN += 1; 
                     dom_sizeY[iv[0]]         += 1;
                 }
-                //if ((xloc > 10000) && (xloc < 15000)){
-                //    out_avgN[0]   += (Pressi(iv, 0) - Pw(iv, 0));
-                //    count_avgNLow += 1; 
-                //    xloc_bandMin_lo = std::min(xloc, xloc_bandMin_lo);
-                //    xloc_bandMin_hi = std::max(xloc, xloc_bandMin_hi);
-                //    out_water_flux_x_chan_Bands[0] += Qwater_ecFab(iv, 0) * m_amrDx[0][0] * CD_ecFab(iv, 0);
-                //    out_water_flux_x_distrib_Bands[0] += Qwater_ecFab(iv, 0) * m_amrDx[0][0] * (1.0 - CD_ecFab(iv, 0));
-                //} else if ((xloc > 50000) && (xloc < 55000)) {
-                //    out_avgN[1]   += (Pressi(iv, 0) - Pw(iv, 0));
-                //    count_avgNMed += 1; 
-                //    xloc_bandMed_lo = std::min(xloc, xloc_bandMed_lo);
-                //    xloc_bandMed_hi = std::max(xloc, xloc_bandMed_hi);
-                //    out_water_flux_x_chan_Bands[1] += Qwater_ecFab(iv, 0) * m_amrDx[0][0] * CD_ecFab(iv, 0);
-                //    out_water_flux_x_distrib_Bands[1] += Qwater_ecFab(iv, 0) * m_amrDx[0][0] * (1.0 - CD_ecFab(iv, 0));
-                //} else if ((xloc > 85000) && (xloc < 90000)) {
-                //    out_avgN[2]    += (Pressi(iv, 0) - Pw(iv, 0));
-                //    count_avgNHigh += 1; 
-                //    out_water_flux_x_chan_Bands[2] += Qwater_ecFab(iv, 0) * m_amrDx[0][0] * CD_ecFab(iv, 0);
-                //    out_water_flux_x_distrib_Bands[2] += Qwater_ecFab(iv, 0) * m_amrDx[0][0] * (1.0 - CD_ecFab(iv, 0));
-                //}  
-
-                // TEMPORARY
-                //int time_tmp = (int) m_time;
-                //if ((iv[0] == 0) && (iv[1] == 2)) {  // && (time_tmp % 86400 == 0)) {
-                //    pout() << "Time(d) moulin = " <<  (m_time-m_restart_time)  << " " << MS(iv, 0) << endl;
-                //}
+                if ((xloc > 600) && (xloc < 900)){
+                    if (Pressi(iv,0) > 0.0) {
+                        out_avgN[0]   += (Pressi(iv, 0) - Pw(iv, 0));
+                        count_avgNLow += 1; 
+                        xloc_bandMin_lo = std::min(xloc, xloc_bandMin_lo);
+                        xloc_bandMin_hi = std::max(xloc, xloc_bandMin_hi);
+                        out_water_flux_x_chan_Bands[0] += Qwater_ecFab(iv, 0) * m_amrDx[0][0] * CD_ecFab(iv, 0);
+                        out_water_flux_x_distrib_Bands[0] += Qwater_ecFab(iv, 0) * m_amrDx[0][0] * (1.0 - CD_ecFab(iv, 0));
+                    }
+                } else if ((xloc > 3000) && (xloc < 3300)) {
+                    if (Pressi(iv,0) > 0.0) {
+                        out_avgN[1]   += (Pressi(iv, 0) - Pw(iv, 0));
+                        count_avgNMed += 1; 
+                        xloc_bandMed_lo = std::min(xloc, xloc_bandMed_lo);
+                        xloc_bandMed_hi = std::max(xloc, xloc_bandMed_hi);
+                        out_water_flux_x_chan_Bands[1] += Qwater_ecFab(iv, 0) * m_amrDx[0][0] * CD_ecFab(iv, 0);
+                        out_water_flux_x_distrib_Bands[1] += Qwater_ecFab(iv, 0) * m_amrDx[0][0] * (1.0 - CD_ecFab(iv, 0));
+                    }
+                } else if ((xloc > 5100) && (xloc < 5400)) {
+                    if (Pressi(iv,0) > 0.0) {
+                        out_avgN[2]    += (Pressi(iv, 0) - Pw(iv, 0));
+                        count_avgNHigh += 1; 
+                        xloc_bandHi_lo = std::min(xloc, xloc_bandHi_lo);
+                        xloc_bandHi_hi = std::max(xloc, xloc_bandHi_hi);
+                        out_water_flux_x_chan_Bands[2] += Qwater_ecFab(iv, 0) * m_amrDx[0][0] * CD_ecFab(iv, 0);
+                        out_water_flux_x_distrib_Bands[2] += Qwater_ecFab(iv, 0) * m_amrDx[0][0] * (1.0 - CD_ecFab(iv, 0));
+                    }
+                }  
             }
         } 
 
@@ -3147,6 +3155,15 @@ AmrHydro::timeStepFAS(Real a_dt)
            MayDay::Error("communication error on MPI_SUM");
        }
        out_water_flux_x_distrib = recvDist;
+
+       Vector<Real> recvYlength(DomSize);
+       result = MPI_Allreduce(&Ylength[0], &recvYlength[0], DomSize, MPI_CH_REAL,
+                                  MPI_SUM, Chombo_MPI::comm);
+       if (result != MPI_SUCCESS)
+       {
+           MayDay::Error("communication error on MPI_SUM");
+       }
+       Ylength = recvYlength;
 
        // RHS B -- Moulins and mRate
        Vector<Real> recvMoulin(DomSize);
@@ -3256,7 +3273,7 @@ AmrHydro::timeStepFAS(Real a_dt)
        }
        count_avgN = recvInt;
 
-       Real recvMax;
+       Real recvMax = 0;
        result = MPI_Allreduce(&xloc_bandMin_hi, &recvMax, 1, MPI_CH_REAL,
                               MPI_MAX, Chombo_MPI::comm);
        if (result != MPI_SUCCESS)
@@ -3264,6 +3281,7 @@ AmrHydro::timeStepFAS(Real a_dt)
            MayDay::Error("communication error on MPI_MAX");
        }
        xloc_bandMin_hi = recvMax;
+       recvMax = 0;
        result = MPI_Allreduce(&xloc_bandMed_hi, &recvMax, 1, MPI_CH_REAL,
                               MPI_MAX, Chombo_MPI::comm);
        if (result != MPI_SUCCESS)
@@ -3271,8 +3289,16 @@ AmrHydro::timeStepFAS(Real a_dt)
            MayDay::Error("communication error on MPI_MAX");
        }
        xloc_bandMed_hi = recvMax;
+       recvMax = 0;
+       result = MPI_Allreduce(&xloc_bandHi_hi, &recvMax, 1, MPI_CH_REAL,
+                              MPI_MAX, Chombo_MPI::comm);
+       if (result != MPI_SUCCESS)
+       {
+           MayDay::Error("communication error on MPI_MAX");
+       }
+       xloc_bandHi_hi = recvMax;
 
-       Real recvMin;
+       Real recvMin = 0;
        result = MPI_Allreduce(&xloc_bandMin_lo, &recvMin, 1, MPI_CH_REAL,
                               MPI_MIN, Chombo_MPI::comm);
        if (result != MPI_SUCCESS)
@@ -3280,6 +3306,7 @@ AmrHydro::timeStepFAS(Real a_dt)
            MayDay::Error("communication error on MPI_MIN");
        }
        xloc_bandMin_lo = recvMin;
+       recvMin = 0;
        result = MPI_Allreduce(&xloc_bandMed_lo, &recvMin, 1, MPI_CH_REAL,
                               MPI_MIN, Chombo_MPI::comm);
        if (result != MPI_SUCCESS)
@@ -3287,65 +3314,92 @@ AmrHydro::timeStepFAS(Real a_dt)
            MayDay::Error("communication error on MPI_MIN");
        }
        xloc_bandMed_lo = recvMin;
+       recvMin = 0;
+       result = MPI_Allreduce(&xloc_bandHi_lo, &recvMin, 1, MPI_CH_REAL,
+                              MPI_MIN, Chombo_MPI::comm);
+       if (result != MPI_SUCCESS)
+       {
+           MayDay::Error("communication error on MPI_MIN");
+       }
+       xloc_bandHi_lo = recvMin;
 #endif
 
-        Real RECH_TOT, RECH; 
-        RECH_TOT = 0;
-        RECH = 0;
-        for (int xi = 0; xi <DomSize ; xi++) {
-            RECH_TOT += out_recharge_tot[xi] ;
-            RECH     += out_recharge[xi] ;
-        }
+        //Real RECH_TOT, RECH; 
+        //RECH_TOT = 0;
+        //RECH = 0;
+        //for (int xi = 0; xi <DomSize ; xi++) {
+        //    RECH_TOT += out_recharge_tot[xi] ;
+        //    RECH     += out_recharge[xi] ;
+        //}
         for (int xi = (DomSize - 2); xi > -1 ; xi--) {
             out_recharge[xi]  = out_recharge[xi]  + out_recharge[xi+1] ;
             out_recharge_tot[xi]  = out_recharge_tot[xi]  + out_recharge_tot[xi+1] ;
             water_vol[xi]         = water_vol[xi]  + water_vol[xi+1] ; 
         }
-        pout() << "RECHARGE and RECHARGE TOT = " << RECH << " " << RECH_TOT << endl;
+        //pout() << "RECHARGE and RECHARGE TOT = " << RECH << " " << RECH_TOT << endl;
         
         idx_bandMin_lo = (int) xloc_bandMin_lo/m_amrDx[0][0] - 0.5;
         idx_bandMin_hi = (int) xloc_bandMin_hi/m_amrDx[0][0] - 0.5;
         idx_bandMed_lo = (int) xloc_bandMed_lo/m_amrDx[0][0] - 0.5;
         idx_bandMed_hi = (int) xloc_bandMed_hi/m_amrDx[0][0] - 0.5;
+        idx_bandHi_lo  = (int) xloc_bandHi_lo/m_amrDx[0][0] - 0.5;
+        idx_bandHi_hi  = (int) xloc_bandHi_hi/m_amrDx[0][0] - 0.5;
 
         // TEMPORAL POSTPROC
-        //int time_tmp = (int) m_time + a_dt;
-        //pout() << "Time(h - d) moulin N_LB  N_MB  N_HB = " <<  (m_time-m_restart_time)/3600.  << " " << (m_time-m_restart_time)/86400 << " " << out_recharge[0] 
-        //                                                                            << " " << out_avgN[0]/count_avgNLow 
-        //                                                                            << " " << out_avgN[1]/count_avgNMed 
-        //                                                                            << " " << out_avgN[2]/count_avgNHigh << endl;
-        //if (time_tmp % 86400 == 0) {
-        //    pout() << idx_bandMin_lo << " " << idx_bandMin_hi << " " << idx_bandMed_lo << " "<< idx_bandMed_hi << endl;
-        //    pout() << "1-Time  2-disTOT  3-disEFF  4-disINEF  " 
-        //           << "5-disEFF_LB_lo  6-disEFF_LB_hi 7-disEFF_LB  "
-        //           << "8-disINEF_LB_lo  9-disINEF_LB_hi  10-disINEF_LB"
-        //           << " " <<  time_tmp / 86400. << " " << - out_water_flux_x_tot[1]   << " " << -out_water_flux_x_chan[1]   << " " << -out_water_flux_x_distrib[1]
-        //           << " " <<  - out_water_flux_x_chan[idx_bandMin_lo]      << " " << - out_water_flux_x_chan[idx_bandMin_hi] 
-        //           //<< " " <<  - out_water_flux_x_chan[idx_bandMin_lo] + out_water_flux_x_chan[idx_bandMin_hi]  
-        //           << " " << DomSizeY*out_water_flux_x_chan_Bands[0]/count_avgNLow  
-        //           << " " <<  - out_water_flux_x_distrib[idx_bandMin_lo]      << " " << - out_water_flux_x_distrib[idx_bandMin_hi] 
-        //           //<< " " <<  - out_water_flux_x_distrib[idx_bandMin_lo] + out_water_flux_x_distrib[idx_bandMin_hi] 
-        //           << " " << DomSizeY*out_water_flux_x_distrib_Bands[0]/count_avgNLow  
-        //           << endl;
+        int time_tmp = (int) m_time + a_dt;
+        if (time_tmp % 86400 == 0) {
+            pout() << "Time(h - d) avgN N_LB  N_MB  N_HB = " <<  (m_time + a_dt -m_restart_time)/3600.  << " " << (m_time + a_dt -m_restart_time)/86400 
+                                                                    << " " << out_avgN[3]/count_avgN 
+                                                                    << " " << out_avgN[0]/count_avgNLow 
+                                                                    << " " << out_avgN[1]/count_avgNMed 
+                                                                    << " " << out_avgN[2]/count_avgNHigh 
+                                                                    << endl;
+
+            pout() << "Time(h - d) rech dis = " <<  (m_time + a_dt -m_restart_time)/3600.  << " " << (m_time + a_dt -m_restart_time)/86400 
+                                                               << " " << out_recharge[1] + out_recharge_tot[1] 
+                                                               << " " << - out_water_flux_x_tot[1]   
+                                                               //<< " " << - out_water_flux_x_chan[1]   
+                                                               //<< " " << - out_water_flux_x_distrib[1]
+                                                               << endl;
+            pout() << "Time(h - d) dis_LB disEff_LB disInef_LB 2disEff_LB 2disInef_LB  = " 
+                                                               <<  (m_time + a_dt -m_restart_time)/3600.  << " " << (m_time + a_dt -m_restart_time)/86400 
+                                                               << " " << - out_water_flux_x_tot[idx_bandMin_lo] 
+                                                               << " " << - out_water_flux_x_chan[idx_bandMin_lo] 
+                                                               << " " << - out_water_flux_x_distrib[idx_bandMin_lo] 
+                                                               << " " << - DomSizeY*out_water_flux_x_chan_Bands[0]/count_avgNLow 
+                                                               << " " << - DomSizeY*out_water_flux_x_distrib_Bands[0]/count_avgNLow 
+                                                               << endl;
+            pout() << "Time(h - d) dis_MB disEff_MB disInef_MB 2disEff_MB 2disInef_MB  = " 
+                                                               <<  (m_time + a_dt -m_restart_time)/3600.  << " " << (m_time + a_dt -m_restart_time)/86400 
+                                                               << " " << - out_water_flux_x_tot[idx_bandMed_lo] 
+                                                               << " " << - out_water_flux_x_chan[idx_bandMed_lo] 
+                                                               << " " << - out_water_flux_x_distrib[idx_bandMed_lo] 
+                                                               << " " << - DomSizeY*out_water_flux_x_chan_Bands[1]/count_avgNMed 
+                                                               << " " << - DomSizeY*out_water_flux_x_distrib_Bands[1]/count_avgNMed 
+                                                               << endl;
+            pout() << "Time(h - d) dis_HB disEff_HB disInef_HB 2disEff_HB 2disInef_HB  = " 
+                                                               <<  (m_time + a_dt -m_restart_time)/3600.  << " " << (m_time + a_dt -m_restart_time)/86400 
+                                                               << " " << - out_water_flux_x_tot[idx_bandHi_lo] 
+                                                               << " " << - out_water_flux_x_chan[idx_bandHi_lo] 
+                                                               << " " << - out_water_flux_x_distrib[idx_bandHi_lo] 
+                                                               << " " << - DomSizeY*out_water_flux_x_chan_Bands[2]/count_avgNHigh 
+                                                               << " " << - DomSizeY*out_water_flux_x_distrib_Bands[2]/count_avgNHigh 
+                                                               << endl;
+        }
         //    pout() << "Time  rechTOT  rechMS  "
         //           << "rechMS_LB_lo    rechMS_LB_hi "
         //           << " " <<  time_tmp / 86400.  << " " <<  out_recharge_tot[0]  << " "  << out_recharge[0] 
         //           << " " <<  out_recharge[idx_bandMin_lo] << " " << out_recharge[idx_bandMin_hi]
         //           << endl;
-        //    pout() << "Time  N_LB  N_MB  N_HB  avN  "
-        //           << " " << time_tmp / 86400. 
-        //           << " " << out_avgN[0]/count_avgNLow << " " << out_avgN[1]/count_avgNMed << " " << out_avgN[2]/count_avgNHigh 
-        //           << " " << out_avgN[3] /count_avgN 
-        //           << endl;
         //}
  
         // SPATIAL POSTPROC
-        pout() << "XaxisSUHMO_B1    dischargeSUHMO_B1   dischargeEFFSUHMO_B1   dischargeINEFFSUHMO_B1  rechargeTOTSUHMO_B1  PSUHMO_B1 " << endl;
+        pout() << "XaxisSUHMO_B1  Ylength    dischargeSUHMO_B1   dischargeEFFSUHMO_B1   dischargeINEFFSUHMO_B1  rechargeMSSUHMO_B1  rechargeMRSUHMO_B1 PSUHMO_B1 " << endl;
         for (int xi = 0; xi < DomSize; xi++) {
             Real x_loc = (xi+0.5)*m_amrDx[0][0];    
-                    pout() << " " << x_loc/1e3 
+                    pout() << " " << x_loc/1e3 << " " << Ylength[xi] 
                    << " " << -out_water_flux_x_tot[xi] << " " << -out_water_flux_x_chan[xi] << " " << -out_water_flux_x_distrib[xi] 
-                   << " " << out_recharge[xi] + out_recharge_tot[xi] << " " << avPressure[xi]/dom_sizeY[xi]/1e6  
+                   << " " << out_recharge[xi] << " " << out_recharge_tot[xi] << " " << avPressure[xi]/dom_sizeY[xi]/1e6  
                    << endl;
 
 
@@ -4796,8 +4850,6 @@ AmrHydro::readCheckpointFile(HDF5Handle& a_handle)
         MayDay::Error("checkpoint file does not contain time");
     }
     m_time = header.m_real["time"];
-    m_restart_time = m_time;
-    pout() << "restart time ? " << m_restart_time << endl;
     //optionally, over-ride the time in the restart checkpoint file with one specified in the inputs 
     if (ppAmr.contains("restart_time") ) { 
         bool set_time = true;
@@ -4808,6 +4860,8 @@ AmrHydro::readCheckpointFile(HDF5Handle& a_handle)
             m_time = restart_time;
         }
     }
+    m_restart_time = m_time;
+    pout() << "restart time ? " << m_restart_time << endl;
 
     // read timestep
     if (header.m_real.find("dt") == header.m_real.end()) {
