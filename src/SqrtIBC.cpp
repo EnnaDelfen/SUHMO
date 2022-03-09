@@ -85,6 +85,16 @@ SqrtIBC::initializeBed(RealVect& a_dx,
 
     pout() << "SqrtIBC::initializeBed" << endl;
 
+    bool AGU_test_case = false;
+    //if (AGU_test_case) {
+        // randomization
+        const double mean    = 0.0;
+        const double stddev2 = 0.5;
+        std::default_random_engine generator;
+        std::default_random_engine generator2;
+        std::normal_distribution<double> dist2(mean, stddev2);
+    //}
+
     DataIterator dit = a_zbed.dataIterator();
     for (dit.begin(); dit.ok(); ++dit) {
         FArrayBox& thiszbed          = a_zbed[dit];
@@ -98,8 +108,26 @@ SqrtIBC::initializeBed(RealVect& a_dx,
             Real y_loc = (iv[1]+0.5)*a_dx[1];
 
             /* bed topography */
-            // typical
-            thiszbed(iv, 0)      = Params.m_slope*x_loc;
+            if (AGU_test_case) {
+                // add randomness
+                thiszbed(iv, 0)      = std::max(Params.m_slope*x_loc + dist2(generator2) 
+                                       + 3.0*std::sin(x_loc/10.0) 
+                                       + 1000*std::sin(3.0*x_loc) 
+                                       + 50*std::sin(x_loc+2.0)
+                                       + 5000*std::sin(x_loc/100.0), 0.0); 
+                                       //+ 500.0*std::sin(y_loc/50.0+1.0)
+                                       //+ 0.01*(y_loc - 1000) * (y_loc - 1000) , 0.0);
+
+                //if (x_loc < 400.0) {
+                //    thiszbed(iv, 0)      = Params.m_slope*x_loc;
+                //} else if  (x_loc < 1000.0) {
+                //    thiszbed(iv, 0)      = std::max(thiszbed(iv, 0) , Params.m_slope*x_loc);
+                //}
+                thiszbed(iv, 0)      = thiszbed(iv, 0) / 10000.0;
+            } else {
+                // typical
+                thiszbed(iv, 0)      = Params.m_slope*x_loc;
+            }
             /* Ice height (should be ice only, so surface - (bed + gap)) */
             // parabolic profile
             //thisiceHeight(iv, 0) = 6.0 * (std::sqrt(x_loc + Params.m_H) - std::sqrt(Params.m_H)) + 1.0;
@@ -134,14 +162,15 @@ SqrtIBC::initializeData(RealVect& a_dx,
     
     pout() << "SqrtIBC::initializeData" << endl;
 
-    // randomization
-    //const double mean    = 0.0;
-    //const double stddev  = 0.1;
-    //const double stddev2 = 0.5;
-    //std::default_random_engine generator;
-    //std::default_random_engine generator2;
-    //std::normal_distribution<double> dist(mean, stddev);
-    //std::normal_distribution<double> dist2(mean, stddev2);
+    bool AGU_test_case = false;
+    //if (AGU_test_case) {
+        // randomization
+        const double mean    = 0.0;
+        const double stddev2 = 0.5;
+        std::default_random_engine generator;
+        std::default_random_engine generator2;
+        std::normal_distribution<double> dist2(mean, stddev2);
+    //}
 
     DataIterator dit = a_head.dataIterator();
     for (dit.begin(); dit.ok(); ++dit) {
@@ -165,10 +194,27 @@ SqrtIBC::initializeData(RealVect& a_dx,
             Real y_loc = (iv[1]+0.5)*a_dx[1];
 
             /* bed topography */
-            // typical
-            thiszbed(iv, 0)      = Params.m_slope*x_loc;
-            // add randomness
-            //thiszbed(iv, 0)      = std::max(Params.m_slope*x_loc + dist2(generator), 0.0);
+            if (AGU_test_case) {
+                // add randomness
+                thiszbed(iv, 0)      = std::max(Params.m_slope*x_loc + dist2(generator2) 
+                                       + 30.0*std::sin(x_loc/10.0) 
+                                       //+ 1000*std::sin(3.0*x_loc) 
+                                       //+ 50*std::sin(x_loc+2.0)
+                                       //+ 5000*std::sin(x_loc/100.0) 
+                                       //+ 500.0*std::sin(y_loc/50.0+1.0)
+                                       //+ 0.01*(y_loc - 1000) * (y_loc - 1000) 
+                                       , 0.0);
+
+                //if (x_loc < 400.0) {
+                //    thiszbed(iv, 0)      = Params.m_slope*x_loc;
+                //} else if  (x_loc < 1000.0) {
+                //    thiszbed(iv, 0)      = std::max(thiszbed(iv, 0) , Params.m_slope*x_loc);
+                //}
+                thiszbed(iv, 0)      = thiszbed(iv, 0) / 10000.0;
+            } else {
+                // typical
+                thiszbed(iv, 0)      = Params.m_slope*x_loc;
+            }
             /* initial gap height */
             thisGapHeight(iv, 0) = Params.m_gapInit;
             /* Ice height (should be ice only, so surface - (bed + gap)) */
