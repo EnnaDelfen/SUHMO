@@ -16,16 +16,24 @@ void suhmo_params::setDefaults()
     m_ct = 0.0;
     m_cw = 0.0;
     m_omega = 0.0;
+    m_basal_friction = true;
     // BC
     m_br = 0.0 ;
     m_lr = 0.0;
     m_A = 0.0;
+    m_cutOffbr = 0.0;
+    m_maxOffbr = 1000.0;
+    m_DiffFactor = 0.0;
     // Initialization 
     m_slope = 0.0;
     m_gapInit = 0.0;
     m_ReInit = 0.0;
     // Moulin
     m_n_moulins = 0;
+    m_distributed_input  = 0.0;
+    m_time_varying_input = false;
+    m_runoff             = 0.0;
+    m_deltaT             = 0.0;
 }
 
 void suhmo_params::readInputs()
@@ -45,20 +53,37 @@ void suhmo_params::readInputs()
     ppParams.get("ct", m_ct);
     ppParams.get("cw", m_cw);
     ppParams.get("turbulentParam", m_omega);
+    ppParams.get("basalFriction", m_basal_friction);
     m_ub.resize(SpaceDim,0.0);
     ppParams.getarr("SlidingVelocity", m_ub, 0, SpaceDim);
     ppParams.get("br", m_br);
+    ppParams.get("cutOffbr", m_cutOffbr);
+    ppParams.get("maxOffbr", m_maxOffbr);
+    ppParams.get("diffFactor", m_DiffFactor);
     ppParams.get("lr", m_lr);
     ppParams.get("A", m_A);
     ppParams.get("slope", m_slope);
     ppParams.get("GapInit", m_gapInit);
     ppParams.get("ReInit", m_ReInit);
     // MOULINS
+    ppParams.get("time_varying_input", m_time_varying_input);
+    ppParams.get("distributed_input", m_distributed_input);
     ppParams.get("n_moulins", m_n_moulins);
-    m_moulin_position.resize(m_n_moulins*SpaceDim,0.0);
-    ppParams.getarr("moulin_position", m_moulin_position, 0, m_n_moulins*SpaceDim);
-    m_moulin_flux.resize(m_n_moulins,0.0);
-    ppParams.getarr("moulin_flux", m_moulin_flux, 0, m_n_moulins);
+    if (m_n_moulins > 0 ) {
+        m_moulin_position.resize(m_n_moulins*SpaceDim,0.0);
+        ppParams.getarr("moulin_position", m_moulin_position, 0, m_n_moulins*SpaceDim);
+        m_moulin_flux.resize(m_n_moulins,0.0);
+        ppParams.getarr("moulin_flux", m_moulin_flux, 0, m_n_moulins);
+        m_sigma.resize(m_n_moulins,0.0);
+        ppParams.getarr("moulin_sigma", m_sigma, 0, m_n_moulins);
+        if (m_time_varying_input) {
+            ppParams.get("Ra", m_runoff);
+        }
+    } else if (m_n_moulins < 0) {
+        if (m_time_varying_input) {
+            ppParams.get("deltaT", m_deltaT);
+        }
+    }
 
     // need to include verbose
     ParmParse ppAmr("AmrHydro");

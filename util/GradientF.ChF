@@ -28,11 +28,13 @@ c  ULcornerBox => "upper left" corner box
 c  URcornerBox => "upper right" corner box
 c -----------------------------------------------------------------
       subroutine NEWMACGRAD(CHF_FRA1[edgeGrad],
-     &                   CHF_CONST_FRA1[phi],
-     &                   CHF_BOX[edgeGrid],
-     &                   CHF_CONST_REAL[dx],
-     &                   CHF_INT[dir],
-     &                   CHF_INT[edgeDir])
+     &                      CHF_FRA1[mask],
+     &                      CHF_FRA1[phi],
+     &                      CHF_BOX[edgeGrid],
+     &                      CHF_CONST_REAL[dx],
+     &                      CHF_INT[dir],
+     &                      CHF_INT[hasMask],
+     &                      CHF_INT[edgeDir])
 
 c ::: local variables
       integer CHF_DDECL[i;j;k]
@@ -54,9 +56,12 @@ c ::: local variables
 c ::: this is a normal derivative (simpler stencil)
          factor = one/dx
          CHF_MULTIDO[edgeGrid;i;j;k]
-         edgeGrad(CHF_IX[i;j;k]) = factor*(phi(CHF_IX[i;j;k])
+         if ( (mask(CHF_IX[i;j;k])<1E-6) .OR. (mask(CHF_IX[i-ii;j-jj;k-kk])<1E-6) ) then
+             edgeGrad(CHF_IX[i;j;k]) =  0.0
+         else
+             edgeGrad(CHF_IX[i;j;k]) = factor*(phi(CHF_IX[i;j;k])
      &                                    -phi(CHF_IX[i-ii;j-jj;k-kk]))
-
+         endif
          CHF_ENDDO
 
       else
@@ -74,6 +79,7 @@ c ::: this is a transverse derivative
       endif
 
       return
+
       end
 
 c ----------------------------------------------------------------------
@@ -96,7 +102,9 @@ c ------------------------------------------------------------------------
      &                           CHF_BOX[hiEdgeBox],
      &                           CHF_INT[dir],
      &                           CHF_INT[doLo],
-     &                           CHF_INT[doHi])
+     &                           CHF_INT[doHi],
+     &                           CHF_FRA1[usermask],
+     &                           CHF_INT[hasMask])
 
 c ::: local variables
       integer CHF_DDECL[i;j;k]
@@ -115,13 +123,21 @@ c     :: check to see if enough cells exist for full stencil
          if (mask(CHF_IX[i-2*ii; j-2*jj; k-2*kk]).eq.MASKCOPY) then
 
 c     :: do linear extrapolation
-            edgeGrad(CHF_IX[i;j;k]) = two*edgeGrad(CHF_IX[i-ii;j-jj;k-kk])
+           if ( (usermask(CHF_IX[i;j;k])<1E-6) .OR. (usermask(CHF_IX[i-ii;j-jj;k-kk])<1E-6) .OR. (usermask(CHF_IX[i-2*ii;j-2*jj;k-2*kk])<1E-6) ) then
+              edgeGrad(CHF_IX[i;j;k]) = 0.0
+           else
+              edgeGrad(CHF_IX[i;j;k]) = two*edgeGrad(CHF_IX[i-ii;j-jj;k-kk])
      &           -edgeGrad(CHF_IX[i-2*ii;j-2*jj;k-2*kk])
+           endif
 
          else if (mask(CHF_IX[i-ii;j-jj;k-kk]).eq.MASKCOPY) then
 
-c     ::: just do simple extrapolation
-            edgeGrad(CHF_IX[i;j;k]) = edgeGrad(CHF_IX[i-ii;j-jj;k-kk])
+c     ::: just do simple extrapoplation
+           if ( (usermask(CHF_IX[i;j;k])<1E-6) .OR. (usermask(CHF_IX[i-ii;j-jj;k-kk])<1E-6) ) then
+              edgeGrad(CHF_IX[i;j;k]) = 0.0
+           else
+              edgeGrad(CHF_IX[i;j;k]) = edgeGrad(CHF_IX[i-ii;j-jj;k-kk])
+           endif
 
          else
 c     ::: don't know what to do here, so do nothing...
@@ -143,13 +159,21 @@ c     :: of edges
          if (mask(CHF_IX[i+ii; j+jj;k+kk]).eq.MASKCOPY) then
 
 c     :: do linear extrapolation
-            edgeGrad(CHF_IX[i;j;k]) = two*edgeGrad(CHF_IX[i+ii;j+jj;k+kk])
+           if ( (usermask(CHF_IX[i;j;k])<1E-6) .OR. (usermask(CHF_IX[i+ii;j+jj;k+kk])<1E-6) .OR. (usermask(CHF_IX[i+2*ii;j+2*jj;k+2*kk])<1E-6) ) then
+              edgeGrad(CHF_IX[i;j;k]) = 0.0
+           else
+              edgeGrad(CHF_IX[i;j;k]) = two*edgeGrad(CHF_IX[i+ii;j+jj;k+kk])
      &           -edgeGrad(CHF_IX[i+2*ii;j+2*jj;k+2*kk])
+           endif
 
          else if (mask(CHF_IX[i;j;k]).eq.MASKCOPY) then
 
 c     ::: just do simple extrapolation
-            edgeGrad(CHF_IX[i;j;k]) = edgeGrad(CHF_IX[i+ii;j+jj;k+kk])
+           if ( (usermask(CHF_IX[i;j;k])<1E-6) .OR. (usermask(CHF_IX[i+ii;j+jj;k+kk])<1E-6) ) then
+              edgeGrad(CHF_IX[i;j;k]) = 0.0
+           else
+              edgeGrad(CHF_IX[i;j;k]) = edgeGrad(CHF_IX[i+ii;j+jj;k+kk])
+           endif
 
          else
 c     ::: don't know what to do here, so do nothing...
@@ -174,10 +198,12 @@ c gridBox => grid interior over which gradient is computed
 c dir     => direction in which to compute gradient
 c ----------------------------------------------------------------
       subroutine GRADCC(CHF_FRA1[gradPhi],
-     &                  CHF_CONST_FRA1[phi],
+     &                  CHF_FRA1[phi],
      &                  CHF_BOX[gridBox],
      &                  CHF_CONST_REAL[dx],
-     &                  CHF_INT[dir])
+     &                  CHF_INT[dir],
+     &                  CHF_FRA1[usermask],
+     &                  CHF_INT[hasMask])
 
 c ::: local variables
       integer CHF_DDECL[i;j;k]

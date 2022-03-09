@@ -9,38 +9,61 @@
 #endif
 
 //
-//  HydroIBC.H
+//  ValleyIBC.H
 // ============
 //
 // PhysIBC-derived class for basic (simple) IBC
 //
 
-#ifndef _HYDROIBC_H_
-#define _HYDROIBC_H_
+#ifndef _VALLEYIBC_H_
+#define _VALLEYIBC_H_
 
-#include "PhysIBC.H"
-#include "BCFunc.H"
+#include "HydroIBC.H"
 #include "suhmo_params.H"
 
 #include "NamespaceHeader.H"
 
+//class VCPoissonParameters
+//{
+//public:
+//
+//  void getPoissonParameters (VCPoissonParameters&  a_params);
+//
+//  IntVect      nCells;
+//  int          maxGridSize;
+//  int          blockFactor;
+//  int          bufferSize;
+//  Real         fillRatio;
+//  Real         refineThresh;
+//  int          domBcType;
+//  int          maxLevel;
+//  int          numLevels;
+//  Vector<int>  refRatio;
+//  ProblemDomain coarsestDomain;
+//  Real         coarsestDx;
+//  RealVect     domainLength;
+//  RealVect     probLo;
+//  RealVect     probHi;
+//  Real         alpha;
+//  Real         beta;
+//};
 
 /// Physical/domain initial and boundary conditions
 /**
 
  */
-class HydroIBC : public PhysIBC
+class ValleyIBC : public HydroIBC
 {
 public:
     /// Constructor
     /**
      */
-    HydroIBC();
+    ValleyIBC();
 
     /// Destructor
     /**
      */
-    virtual ~HydroIBC();
+    virtual ~ValleyIBC();
 
     /// Define the object
     /**
@@ -51,21 +74,14 @@ public:
 
     /// Factory method - this object is its own factory
     /**
-       Return a pointer to a new PhysIBC object with m_isDefined = false (i.e.,
-       its define() must be called before it is used).
-     */
-    virtual PhysIBC* new_physIBC()
-    {
-        return static_cast<PhysIBC*>(new_hydroIBC());
-    }
-
-    /// Factory method - this object is its own factory
-    /**
-       Returns a pointer to a new HydroIBC object with
+       Returns a pointer to a new ValleyIBC object with
        m_isDefined = false (i.e., its define() must be called before it
        is used).
      */
     virtual HydroIBC* new_hydroIBC();
+
+    /* set parameters */ 
+    void setParameters(const Real& a_gamma);
 
     /// Set up initial conditions
     /**
@@ -111,42 +127,19 @@ public:
                               LevelData<FArrayBox>& a_head,
                               LevelData<FArrayBox>& a_Pi);
 
-    /// Set boundary fluxes
-    /**
-     */
-    virtual void primBC(FArrayBox& a_WGdnv,
-                        const FArrayBox& a_Wextrap,
-                        const FArrayBox& a_W,
-                        const int& a_dir,
-                        const Side::LoHiSide& a_side,
-                        const Real& a_time);
-
-    /// Set boundary slopes
-    /**
-       The boundary slopes in a_dW are already set to one sided difference
-       approximations.  If this function doesn't change them they will be
-       used for the slopes at the boundaries.
-     */
-    virtual void setBdrySlopes(FArrayBox& a_dW, const FArrayBox& a_W, const int& a_dir, const Real& a_time);
-
-    /// Adjust boundary fluxes to account for artificial viscosity
-    /**
-     */
-    virtual void
-    artViscBC(FArrayBox& a_F, const FArrayBox& a_U, const FArrayBox& a_divVel, const int& a_dir, const Real& a_time);
-
 
 protected:
+    Real m_gamma;
 
 private:
     // Disallowed for all the usual reasons
-    void operator=(const HydroIBC& a_input)
+    void operator=(const ValleyIBC& a_input)
     {
         MayDay::Error("invalid operator");
     }
 
     // Disallowed for all the usual reasons
-    HydroIBC(const HydroIBC& a_input)
+    ValleyIBC(const ValleyIBC& a_input)
     {
         MayDay::Error("invalid operator");
     }

@@ -8,20 +8,20 @@
 */
 #endif
 
-#include "HydroIBC.H"
+#include "SqrtIBC.H"
 #include "ParmParse.H"
 #include "FluxBox.H"
-//#include <random>
+#include <random>
 
 #include "NamespaceHeader.H"
 
 // Indicate that define() hasn't been called
 // set default thickness at domain edge to be zero
-HydroIBC::HydroIBC()
+SqrtIBC::SqrtIBC()
 {
 }
 
-HydroIBC::~HydroIBC()
+SqrtIBC::~SqrtIBC()
 {
 }
 
@@ -31,7 +31,7 @@ HydroIBC::~HydroIBC()
    initial and boundary condition object. Just calls base-class define
 */
 void
-HydroIBC::define(const ProblemDomain& a_domain, const Real& a_dx)
+SqrtIBC::define(const ProblemDomain& a_domain, const Real& a_dx)
 {
     PhysIBC::define(a_domain, a_dx);
 }
@@ -42,18 +42,18 @@ HydroIBC::define(const ProblemDomain& a_domain, const Real& a_dx)
    its define() must be called before it is used).
 */
 HydroIBC*
-HydroIBC::new_hydroIBC()
+SqrtIBC::new_hydroIBC()
 {
-    pout() << "Initializing a new HydroIBC"<< endl; 
-    HydroIBC* retval = new HydroIBC();
+    pout() << "Initializing a new SqrtIBC"<< endl; 
+    SqrtIBC* retval = new SqrtIBC();
 
-    return retval;
+    return static_cast<HydroIBC*>(retval);
 }
 
 /** Set up mask 
  */
 void
-HydroIBC::initializePi(RealVect& a_dx,
+SqrtIBC::initializePi(RealVect& a_dx,
                        suhmo_params Params,     
                        LevelData<FArrayBox>& a_Pi)
 {
@@ -61,7 +61,7 @@ HydroIBC::initializePi(RealVect& a_dx,
 }
 
 void 
-HydroIBC::initializePi(RealVect& a_dx,
+SqrtIBC::initializePi(RealVect& a_dx,
                        suhmo_params Params,     
                        LevelData<FArrayBox>& a_head,
                        LevelData<FArrayBox>& a_gapHeight,
@@ -76,14 +76,24 @@ HydroIBC::initializePi(RealVect& a_dx,
 }
 
 void 
-HydroIBC::initializeBed(RealVect& a_dx,
-                        suhmo_params Params,     
-                        LevelData<FArrayBox>& a_zbed,
-                        LevelData<FArrayBox>& a_bumpHeight,
-                        LevelData<FArrayBox>& a_bumpSpacing)
+SqrtIBC::initializeBed(RealVect& a_dx,
+                       suhmo_params Params,     
+                       LevelData<FArrayBox>& a_zbed,
+                       LevelData<FArrayBox>& a_bumpHeight,
+                       LevelData<FArrayBox>& a_bumpSpacing)
 {
 
-    pout() << "HydroIBC::initializeBed" << endl;
+    pout() << "SqrtIBC::initializeBed" << endl;
+
+    bool AGU_test_case = false;
+    //if (AGU_test_case) {
+        // randomization
+        const double mean    = 0.0;
+        const double stddev2 = 0.5;
+        std::default_random_engine generator;
+        std::default_random_engine generator2;
+        std::normal_distribution<double> dist2(mean, stddev2);
+    //}
 
     DataIterator dit = a_zbed.dataIterator();
     for (dit.begin(); dit.ok(); ++dit) {
@@ -95,30 +105,47 @@ HydroIBC::initializeBed(RealVect& a_dx,
         for (bit.begin(); bit.ok(); ++bit) {
             IntVect iv = bit();
             Real x_loc = (iv[0]+0.5)*a_dx[0];
+            Real y_loc = (iv[1]+0.5)*a_dx[1];
 
             /* bed topography */
-            // typical
-            thiszbed(iv, 0)      = Params.m_slope*x_loc;
+            if (AGU_test_case) {
+                // add randomness
+                thiszbed(iv, 0)      = std::max(Params.m_slope*x_loc + dist2(generator2) 
+                                       + 3.0*std::sin(x_loc/10.0) 
+                                       + 1000*std::sin(3.0*x_loc) 
+                                       + 50*std::sin(x_loc+2.0)
+                                       + 5000*std::sin(x_loc/100.0), 0.0); 
+                                       //+ 500.0*std::sin(y_loc/50.0+1.0)
+                                       //+ 0.01*(y_loc - 1000) * (y_loc - 1000) , 0.0);
+
+                //if (x_loc < 400.0) {
+                //    thiszbed(iv, 0)      = Params.m_slope*x_loc;
+                //} else if  (x_loc < 1000.0) {
+                //    thiszbed(iv, 0)      = std::max(thiszbed(iv, 0) , Params.m_slope*x_loc);
+                //}
+                thiszbed(iv, 0)      = thiszbed(iv, 0) / 10000.0;
+            } else {
+                // typical
+                thiszbed(iv, 0)      = Params.m_slope*x_loc;
+            }
+            /* Ice height (should be ice only, so surface - (bed + gap)) */
+            // parabolic profile
+            //thisiceHeight(iv, 0) = 6.0 * (std::sqrt(x_loc + Params.m_H) - std::sqrt(Params.m_H)) + 1.0;
+            /* Ice overburden pressure : rho_i * g * H */
+            //thispi(iv, 0)        = Params.m_rho_i * Params.m_gravity * thisiceHeight(iv, 0);
         } // end loop over cells
     }     // end loop over boxes
 
     if (Params.m_verbosity > 3) {
-        pout() << "(Done with HydroIBC::initializeBed)" << endl;
+        pout() << "(Done with SqrtIBC::initializeBed)" << endl;
     }
-}
 
-void 
-HydroIBC::resetCovered(suhmo_params Params,     
-                       LevelData<FArrayBox>& a_head,
-                       LevelData<FArrayBox>& a_Pi)
-{
-    // Do nothing 
 }
 
 /** Set up initial conditions 
  */
 void
-HydroIBC::initializeData(RealVect& a_dx,
+SqrtIBC::initializeData(RealVect& a_dx,
                          suhmo_params Params,     
                          LevelData<FArrayBox>& a_head,
                          LevelData<FArrayBox>& a_gapHeight,
@@ -133,13 +160,17 @@ HydroIBC::initializeData(RealVect& a_dx,
                          LevelData<FArrayBox>& a_bumpSpacing)
 {
     
-    pout() << "HydroIBC::initializeData" << endl;
+    pout() << "SqrtIBC::initializeData" << endl;
 
-    // randomization
-    //const double mean2 = 0.0;
-    //const double stddev2 = 0.1;
-    //std::default_random_engine generator;
-    //std::normal_distribution<double> dist2(mean2, stddev2);
+    bool AGU_test_case = false;
+    //if (AGU_test_case) {
+        // randomization
+        const double mean    = 0.0;
+        const double stddev2 = 0.5;
+        std::default_random_engine generator;
+        std::default_random_engine generator2;
+        std::normal_distribution<double> dist2(mean, stddev2);
+    //}
 
     DataIterator dit = a_head.dataIterator();
     for (dit.begin(); dit.ok(); ++dit) {
@@ -160,16 +191,35 @@ HydroIBC::initializeData(RealVect& a_dx,
         for (bit.begin(); bit.ok(); ++bit) {
             IntVect iv = bit();
             Real x_loc = (iv[0]+0.5)*a_dx[0];
+            Real y_loc = (iv[1]+0.5)*a_dx[1];
 
             /* bed topography */
-            // typical
-            thiszbed(iv, 0)      = Params.m_slope*x_loc;
-            // add randomness
-            //thiszbed(iv, 0)      = std::max(Params.m_slope*x_loc + dist2(generator), 0.0);
+            if (AGU_test_case) {
+                // add randomness
+                thiszbed(iv, 0)      = std::max(Params.m_slope*x_loc + dist2(generator2) 
+                                       + 30.0*std::sin(x_loc/10.0) 
+                                       //+ 1000*std::sin(3.0*x_loc) 
+                                       //+ 50*std::sin(x_loc+2.0)
+                                       //+ 5000*std::sin(x_loc/100.0) 
+                                       //+ 500.0*std::sin(y_loc/50.0+1.0)
+                                       //+ 0.01*(y_loc - 1000) * (y_loc - 1000) 
+                                       , 0.0);
+
+                //if (x_loc < 400.0) {
+                //    thiszbed(iv, 0)      = Params.m_slope*x_loc;
+                //} else if  (x_loc < 1000.0) {
+                //    thiszbed(iv, 0)      = std::max(thiszbed(iv, 0) , Params.m_slope*x_loc);
+                //}
+                thiszbed(iv, 0)      = thiszbed(iv, 0) / 10000.0;
+            } else {
+                // typical
+                thiszbed(iv, 0)      = Params.m_slope*x_loc;
+            }
             /* initial gap height */
             thisGapHeight(iv, 0) = Params.m_gapInit;
             /* Ice height (should be ice only, so surface - (bed + gap)) */
-            thisiceHeight(iv, 0) = Params.m_H;
+            // parabolic profile
+            thisiceHeight(iv, 0) = 6.0 * (std::sqrt(x_loc + Params.m_H) - std::sqrt(Params.m_H)) + 1.0;
             /* Ice overburden pressure : rho_i * g * H */
             thispi(iv, 0)        = Params.m_rho_i * Params.m_gravity * thisiceHeight(iv, 0);
             
@@ -184,7 +234,7 @@ HydroIBC::initializeData(RealVect& a_dx,
             thisbumpHeight(iv, 0)      = Params.m_br;
             thisbumpSpacing(iv, 0)     = Params.m_lr;
             // if randomness
-            //thisbumpHeight(iv, 0)      = std::max(thiszbed(iv, 0) - Params.m_slope*x_loc, 0.0); 
+            //thisbumpHeight(iv, 0)      = std::max(Params.m_br + dist(generator), 0.0); 
 
             /* dummy stuff -- will be erased right away */
             thisRe(iv, 0)        = std::max(100.0 - 0.1*Params.m_ReInit*x_loc, 10.0);
@@ -198,50 +248,16 @@ HydroIBC::initializeData(RealVect& a_dx,
     }     // end loop over boxes
 
     if (Params.m_verbosity > 3) {
-        pout() << "(Done with HydroIBC::initializeData)" << endl;
+        pout() << "(Done with SqrtIBC::initializeData)" << endl;
     }
 }
 
 
-/// Set boundary fluxes
-/**
- */
-void
-HydroIBC::primBC(FArrayBox& a_WGdnv,
-                 const FArrayBox& a_Wextrap,
-                 const FArrayBox& a_W,
-                 const int& a_dir,
-                 const Side::LoHiSide& a_side,
-                 const Real& a_time)
-{
-}
-
 /** Set up initial conditions 
  */
 void
-HydroIBC::initialize(LevelData<FArrayBox>& a_head)
+SqrtIBC::initialize(LevelData<FArrayBox>& a_head)
 {
-}
-
-void
-HydroIBC::setBdrySlopes(FArrayBox& a_dW, const FArrayBox& a_W, const int& a_dir, const Real& a_time)
-{
-    // one-sided differences sounds fine with me, so do nothing...
-}
-
-/// Adjust boundary fluxes to account for artificial viscosity
-/**
- */
-void
-HydroIBC::artViscBC(FArrayBox& a_F,
-                    const FArrayBox& a_U,
-                    const FArrayBox& a_divVel,
-                    const int& a_dir,
-                    const Real& a_time)
-{
-    // don't anticipate being here -- if we wind up here, need to
-    // give it some thought
-    MayDay::Error("HydroIBC::artViscBC not implemented");
 }
 
 #include "NamespaceFooter.H"

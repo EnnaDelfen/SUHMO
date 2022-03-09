@@ -58,7 +58,7 @@ public:
 
     /* set default values for hydro_params */
     void setParams();
-
+ 
     /* initializes new object based on data in ParmParse database */
     void initialize();
 
@@ -76,44 +76,98 @@ public:
     /* compute one timestep */
     void timeStep(Real a_dt);
 
+    void timeStepFAS(Real a_dt);
+
+    void NonLinear_level(LevelData<FArrayBox>&        a_NL, 
+                         LevelData<FArrayBox>&        a_dNL,
+                         const LevelData<FArrayBox>&  a_u,
+                         LevelData<FArrayBox>&        a_B,
+                         LevelData<FArrayBox>&        a_Pi,
+                         LevelData<FArrayBox>&        a_zb);
+
+    void PD_level(const LevelData<FArrayBox>&  a_u,
+                  int                          a_smooth,
+                  int                          a_depth,
+                  int                          a_AMRFASMGiter);
+
+    void WFlx_level(LevelData<FluxBox>&          a_bcoef, 
+                    const LevelData<FArrayBox>&  a_u,
+                    const LevelData<FArrayBox>*  a_ucoarse,
+                    LevelData<FArrayBox>&        a_B,
+                    LevelData<FArrayBox>&        a_Pi,
+                    Real                         a_dx,
+                    bool                         a_print,
+                    int                          a_smooth,
+                    int                          a_depth);
+
+    void compute_grad_zb_ec(int                 lev,
+                            LevelData<FluxBox>& a_levelgradZb_ec);
+ 
+    void compute_grad_head(int lev);
+
+    void evaluate_Qw_ec(int lev, 
+                        LevelData<FluxBox>& levelQw_ec, 
+                        LevelData<FluxBox>& levelB_ec,
+                        LevelData<FluxBox>& levelRe_ec);
+
+    void evaluate_Re_quadratic(int lev, bool computeGrad);
+
     void aCoeff_bCoeff(LevelData<FArrayBox>&  levelacoef, 
-                       LevelData<FluxBox>&  levelbcoef, 
-                       LevelData<FluxBox>&  levelRe, 
-                       LevelData<FluxBox>&  levelB);
+                       LevelData<FluxBox>&    levelbcoef, 
+                       LevelData<FluxBox>&    levelRe, 
+                       LevelData<FluxBox>&    levelB, 
+                       LevelData<FluxBox>&    levelPi);
 
-    void aCoeff_bCoeff_CC(LevelData<FArrayBox>&  levelacoef, 
-                           LevelData<FArrayBox>&  levelbcoef_cc, 
-                           LevelData<FArrayBox>&  levelRe, 
-                           LevelData<FArrayBox>&  levelB);
+    void aCoeff_GH(LevelData<FArrayBox>&  levelacoef,
+                   LevelData<FluxBox>&    leveldcoef);
 
-    void CalcRHS_head( int currlev, 
-                       LevelData<FArrayBox>& levelRHS_h, 
-                       LevelData<FArrayBox>& levelPi, 
-                       LevelData<FArrayBox>& levelPw, 
-                       LevelData<FArrayBox>& levelmR, 
-                       LevelData<FArrayBox>& levelB,
-                       LevelData<FArrayBox>& levelMoulinSrc);
+    void dCoeff(LevelData<FluxBox>&    leveldcoef, 
+                LevelData<FluxBox>&    a_mRec, 
+                LevelData<FluxBox>&    a_Bec,
+                int lev);
 
-    void Calc_moulin_source_term(LevelData<FArrayBox>& levelMoulinSrc);
+    void Calc_moulin_source_term_distributed(LevelData<FArrayBox>& levelMoulinSrc,
+                                             LevelData<FArrayBox>& levelMoulinSrcNoNorm, 
+                                             std::vector<Real> a_moulinsInteg, 
+                                             int lev);
 
-    void CalcRHS_gapHeight(LevelData<FArrayBox>& levelRHS_b, 
-                       LevelData<FArrayBox>& levelPi, 
-                       LevelData<FArrayBox>& levelPw, 
-                       LevelData<FArrayBox>& levelmR, 
-                       LevelData<FArrayBox>& levelB,
-                       LevelData<FArrayBox>& levelRHS_b_A,
-                       LevelData<FArrayBox>& levelRHS_b_B,
-                       LevelData<FArrayBox>& levelRHS_b_C);
+    void Calc_moulin_integral(std::vector<Real> &a_moulinsInteg,
+                              Vector<LevelData<FArrayBox>*>& a_MS_noNorm); 
 
-    void SolveForHead(
-                      const Vector<DisjointBoxLayout>&               a_grids,
-                      Vector<RefCountedPtr<LevelData<FArrayBox> > >& a_aCoef,
-                      Vector<RefCountedPtr<LevelData<FluxBox> > >&   a_bCoef,
-                      Vector<ProblemDomain>& a_domains,
-                      Vector<int>& refRatio,
-                      Real& coarsestDx,
-                      Vector<LevelData<FArrayBox>*>& a_head, 
-                      Vector<LevelData<FArrayBox>*>& a_RHS);
+    void CalcRHS_gapHeightFAS(LevelData<FArrayBox>& levelRHS_b, 
+                              LevelData<FArrayBox>& levelPi, 
+                              LevelData<FArrayBox>& levelPw, 
+                              LevelData<FArrayBox>& levelmR, 
+                              LevelData<FArrayBox>& levelB,
+                              LevelData<FArrayBox>& levelDT,
+                              LevelData<FArrayBox>& levelBH, 
+                              LevelData<FArrayBox>& levelBL,
+                              LevelData<FArrayBox>& levelRHS_b_A,
+                              LevelData<FArrayBox>& levelRHS_b_B,
+                              LevelData<FArrayBox>& levelRHS_b_C,
+                              LevelData<FArrayBox>& levelchanDegree,
+                              Real a_dt);
+
+
+    void SolveForHead_nl(const Vector<DisjointBoxLayout>&                a_grids,
+                          Vector<RefCountedPtr<LevelData<FArrayBox> > >& a_aCoef,
+                          Vector<RefCountedPtr<LevelData<FluxBox> > >&   a_bCoef,
+                          Vector<ProblemDomain>& a_domains,
+                          Vector<int>& refRatio,
+                          Real& coarsestDx,
+                          Vector<LevelData<FArrayBox>*>& a_head, 
+                          Vector<LevelData<FArrayBox>*>& a_RHS);
+
+
+    void SolveForGap_nl(const Vector<DisjointBoxLayout>&               a_grids,
+                       Vector<RefCountedPtr<LevelData<FArrayBox> > >& a_aCoef,
+                       Vector<RefCountedPtr<LevelData<FluxBox> > >&   a_bCoef,
+                       Vector<ProblemDomain>& a_domains,
+                       Vector<int>& refRatio,
+                       Real& coarsestDx,
+                       Vector<LevelData<FArrayBox>*>& a_gapHeight, 
+                       Vector<LevelData<FArrayBox>*>& a_RHS,
+                       Real a_dt);
 
     /* regridding */
     void regrid();
@@ -131,6 +185,15 @@ public:
                         Vector<std::string>& vectName,
                         Vector<Vector<LevelData<FArrayBox>*>> stp,
                         string namePlot);
+
+    void writePltWFX(int numPlotComps,
+                        Vector<std::string>& vectName,
+                        Vector<Vector<LevelData<FArrayBox>*>> stp,
+                        const ProblemDomain& a_pbDom, 
+                        const DisjointBoxLayout& a_dbl,
+                        int a_smooth, int a_depth, 
+                        int a_AMRFASMGiter);
+
 
     /** writes plotfile to the standard location; filename is
         <plot_root>.<step>.<DIM>d.hdf5
@@ -195,18 +258,18 @@ public:
 
     /* Access functions */
     // m_gapheight
-    const LevelData<FArrayBox>* gapHeight(int a_level) const {
+    const RefCountedPtr<LevelData<FArrayBox>> gapHeight(int a_level) const {
         return m_gapheight[a_level];
     }
-    Vector<LevelData<FArrayBox>*>& amrGapHeight() {
+    Vector<RefCountedPtr<LevelData<FArrayBox>> >& amrGapHeight() {
         return m_gapheight;
     }
 
     // m_head
-    const LevelData<FArrayBox>* head(int a_level) const {
+    const RefCountedPtr<LevelData<FArrayBox>> head(int a_level) const {
         return m_head[a_level];
     }
-    Vector<LevelData<FArrayBox>*>& amrHead() {
+    Vector<RefCountedPtr<LevelData<FArrayBox>> >& amrHead() {
         return m_head;
     }
 
@@ -214,7 +277,7 @@ public:
     const LevelData<FArrayBox>* zBed(int a_level) const {
         return m_bedelevation[a_level];
     }
-    Vector<LevelData<FArrayBox>*>& amrZBed() {
+    Vector<RefCountedPtr<LevelData<FArrayBox>>>& amrZBed() {
         return m_bedelevation;
     }
 
@@ -223,12 +286,14 @@ public:
         return m_amrGrids;
     }
 
+    int m_cur_step;          // current step
+
 protected:
     /// compute tags for regridding
     void tagCells(Vector<IntVectSet>& a_tags);
 
     /// compute tags for the level a_level
-    void tagCellsLevel(IntVectSet& a_tags, int a_level);
+    void tagCellsLevel(IntVectSet& a_tags, int a_level, int a_tag);
 
     /// compute tags at initial time
     void tagCellsInit(Vector<IntVectSet>& a_tags);
@@ -243,30 +308,20 @@ protected:
     void levelSetup(int a_level, const DisjointBoxLayout& a_grids);
 
     /// initialize data on hierarchy
-    void initData(Vector<LevelData<FArrayBox>*>& a_initialVelocity);
+    void initData(Vector<RefCountedPtr<LevelData<FArrayBox>> >& a_initialVelocity);
 
-    /// initialize the BC of fixed data ( ice height, Pi and zBed)
-    void initDataRegrid(int a_level,
-                        LevelData<FArrayBox>& a_levhead,
-                        LevelData<FArrayBox>& a_levgapheight,
-                        LevelData<FArrayBox>& a_levPw,
-                        LevelData<FArrayBox>& a_levqw,
-                        LevelData<FArrayBox>& a_levRe,
-                        LevelData<FArrayBox>& a_levmR,
-                        LevelData<FArrayBox>& a_levzBed,
-                        LevelData<FArrayBox>& a_levPi,
-                        LevelData<FArrayBox>& a_levIceHeight);
-
-    void BCDataRegrid(int a_level,
-                      LevelData<FArrayBox>& a_levzBed,
-                      LevelData<FArrayBox>& a_levPi,
-                      LevelData<FArrayBox>& a_levIceHeight);
 
     /// compute timestep
     Real computeDt();
 
     /// compute timestep at initial time
     Real computeInitialDt();
+
+    /// FAS
+    bool m_use_FAS;
+    bool m_use_NL;
+    bool m_compute_Bcoeff;
+    bool m_use_ImplDiff;
 
     /// IBC
     HydroIBC* m_IBCPtr;
@@ -279,9 +334,6 @@ protected:
 
     /// regridding lbase -- generally (and by default) this will be 0
     int m_regrid_lbase;
-
-    /// maximum level at which refinement tags are computed
-    int m_tag_cap;
 
     /// blocking factor
     int m_block_factor;
@@ -307,8 +359,14 @@ protected:
 
     /* tag variable */
     bool m_tag_defined;                  // did we define a m_tag_var
-    string m_tag_var;
-    Real m_tagging_val;                  // tagging value
+    int m_n_tag_var;                     // number of tag variables
+    Vector<string> m_tag_var;            // tag variables identification
+    Vector<int> m_tag_min;               // min level concerned by tag var - one per tag var
+    Vector<int> m_tag_cap;               // max level concerned by tag var - one per tag var
+
+    Vector<Real> m_tagging_val_min;          // tagging value - one per tag var
+    Vector<Real> m_tagging_val_max;          // tagging value - one per tag var
+
     Vector<IntVectSet> m_vectTags;       // stores tags from previous regrids 
     IntVectSet m_tag_subset;             // only allow tagging within a subset of the coarse domain 
     Vector<IntVectSet> m_vectTagSubset;
@@ -350,7 +408,8 @@ protected:
     Real m_dt;          // most recent timestep
     Real m_stable_dt;   // most recent stable timestep (> m_dt if we took a step just to hit a plot interval)
 
-    int m_cur_step;     // current step
+    int m_cur_PicardIte;     // current Picard It
+    Real m_eps_PicardIte;     // limit residual for picard It
 
     Real m_cfl;         // timestep scaling
 
@@ -360,38 +419,41 @@ protected:
 
     // debug 
     bool m_PrintCustom;
+   
+    // Post proc
+    bool m_post_proc;
 
     /** Model outputs include spatio temporal fields of Hydraulic head,  effective  Pressure,  
         subglacial  gap  height  (the  effective  geometry  representative  of  an  entire  element),  
         depth-integrated  water  flux,  and degree of channelization */
     /* current old-time data */
     /* */
-    Vector<LevelData<FArrayBox>*> m_old_head;               // Hydraulic head
-    Vector<LevelData<FArrayBox>*> m_old_gapheight;          // Subglacial height
-    /* */
-    Vector<LevelData<FArrayBox>*> m_old_Pw;                 // Water pressure
-    Vector<LevelData<FArrayBox>*> m_old_qw;                 // Water flux
-    Vector<LevelData<FArrayBox>*> m_old_Re;                 // Reynolds number
-    Vector<LevelData<FArrayBox>*> m_old_meltRate;           // Melting rate
+    Vector<RefCountedPtr<LevelData<FArrayBox>> > m_old_head;               // Hydraulic head
+    Vector<RefCountedPtr<LevelData<FArrayBox>> > m_old_gapheight;          // Subglacial height
 
     /* new-time data */
     /* */
-    Vector<LevelData<FArrayBox>*> m_head;                   // Hydraulic head
-    Vector<LevelData<FArrayBox>*> m_gapheight;              // Subglacial height
+    Vector<RefCountedPtr<LevelData<FArrayBox>> > m_head;    // Hydraulic head
+    Vector<RefCountedPtr<LevelData<FArrayBox>> > m_gapheight;              // Subglacial height
 
-    Vector<LevelData<FArrayBox>*> m_gradhead;               // Grad of Hydraulic head
-    Vector<LevelData<FluxBox>*> m_gradhead_ec;               // Grad of Hydraulic head
+    Vector<RefCountedPtr<LevelData<FArrayBox>>> m_gradhead;               // Grad of Hydraulic head
+    Vector<RefCountedPtr<LevelData<FluxBox>>> m_gradhead_ec;               // Grad of Hydraulic head
 
     /* */
-    Vector<LevelData<FArrayBox>*> m_Pw;                     // Water pressure
-    Vector<LevelData<FArrayBox>*> m_qw;                     // Water flux
-    Vector<LevelData<FArrayBox>*> m_Re;                     // Reynolds number
-    Vector<LevelData<FArrayBox>*> m_meltRate;               // Melting rate
-    Vector<LevelData<FArrayBox>*> m_iceheight;              // Ice slab height
+    Vector<RefCountedPtr<LevelData<FArrayBox>>> m_Pw;                     // Water pressure
+    Vector<RefCountedPtr<LevelData<FArrayBox>>> m_qw;                     // Water flux
+    Vector<RefCountedPtr<LevelData<FArrayBox>>> m_Re;                     // Reynolds number
+    Vector<RefCountedPtr<LevelData<FArrayBox>>> m_meltRate;               // Melting rate
+    Vector<RefCountedPtr<LevelData<FArrayBox>>> m_iceheight;              // Ice slab height
 
     /* Time-constant parameters */
-    Vector<LevelData<FArrayBox>*> m_bedelevation;           //
-    Vector<LevelData<FArrayBox>*> m_overburdenpress;        // rhoi*g*H
+    Vector<RefCountedPtr<LevelData<FArrayBox>>> m_bedelevation;           //
+    Vector<RefCountedPtr<LevelData<FArrayBox>>> m_overburdenpress;        // rhoi*g*H
+
+    /* Bed randomization */
+    Vector<RefCountedPtr<LevelData<FArrayBox>> > m_bumpHeight;            // typical ground bump height
+    Vector<RefCountedPtr<LevelData<FArrayBox>> > m_bumpSpacing;           // typical ground bump spacing
+   
 
     //Vector<LevelData<FArrayBox>*> m_gradZb;      
 
@@ -404,6 +466,7 @@ protected:
     /* plotting and restarting */
     bool m_do_restart;  // bool : true if we are restarting from checkfile
     int m_restart_step;  //if starting from a restart, timestep of restart
+    Real m_restart_time;        // time of restart -- Care when using this ! It is used in transient moulins inputs
 
     string m_check_prefix;  // name of checkpoint files
     int m_check_interval;   // write checkfile every ... ite

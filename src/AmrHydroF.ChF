@@ -1,0 +1,357 @@
+C      _______              __  
+C     / ___/ /  ___  __ _  / /  ___ 
+C    / /__/ _ \/ _ \/  V \/ _ \/ _ \ 
+C    \___/_//_/\___/_/_/_/_.__/\___/
+C    Please refer to Copyright.txt, in Chombo's root directory.
+
+#include "CONSTANTS.H"
+
+C     --------------------------------------------------------------
+
+C     -----------------------------------------------------------------
+C     subroutine COMPUTENONLINEARTERMS
+C     computes the NL and dNL pieces
+C
+C     INPUTS/OUTPUTS:
+C     phi       =>  phi 
+C     aB        =>  Gap Height 
+C     aPi       =>  Ice Pressure 
+C     aZb       =>  Bed  Height
+C     NL        =>  NL piece
+C     dNL       =>  derivative of NL piece
+C     ------------------------------------------------------------------
+      subroutine COMPUTENONLINEARTERMS(
+     &     CHF_CONST_FRA[phi],
+     &     CHF_CONST_FRA[aB],
+     &     CHF_CONST_FRA[aPi],
+     &     CHF_CONST_FRA[aZb],
+     &     CHF_BOX[region],
+     &     CHF_CONST_FRA[nlfunc], 
+     &     CHF_CONST_FRA[dnlfunc],
+     &     CHF_CONST_REAL[Aparam],
+     &     CHF_CONST_REAL[brparam],
+     &     CHF_CONST_REAL[brparamMax]) 
+    
+      integer CHF_DDECL[i;j;k]
+
+      CHF_MULTIDO[region; i; j; k]
+
+         if ( aPi(CHF_IX[i;j;k],0) < 1e-16 )  then 
+             nlfunc(CHF_IX[i;j;k],0) = 0.0
+             dnlfunc(CHF_IX[i;j;k],0) = 0.0
+         else
+             nlfunc(CHF_IX[i;j;k],0) = - Aparam * aB(CHF_IX[i;j  ;k  ],0) * 
+     &                                   (aPi(CHF_IX[i;j  ;k  ],0) - 1000.0 * 9.8 * (phi(CHF_IX[i;j  ;k  ],0) - aZb(CHF_IX[i;j  ;k  ],0)))  *
+     &                                   (aPi(CHF_IX[i;j  ;k  ],0) - 1000.0 * 9.8 * (phi(CHF_IX[i;j  ;k  ],0) - aZb(CHF_IX[i;j  ;k  ],0)))  *
+     &                                   (aPi(CHF_IX[i;j  ;k  ],0) - 1000.0 * 9.8 * (phi(CHF_IX[i;j  ;k  ],0) - aZb(CHF_IX[i;j  ;k  ],0)))  
+
+             dnlfunc(CHF_IX[i;j;k],0) = 3.0 * Aparam * aB(CHF_IX[i;j  ;k  ],0) * 
+     &                                  1000.0 * 9.8 * 
+     &                                  (aPi(CHF_IX[i;j  ;k  ],0) - 1000.0 * 9.8 * (phi(CHF_IX[i;j  ;k  ],0) - aZb(CHF_IX[i;j  ;k  ],0)))  *
+     &                                  (aPi(CHF_IX[i;j  ;k  ],0) - 1000.0 * 9.8 * (phi(CHF_IX[i;j  ;k  ],0) - aZb(CHF_IX[i;j  ;k  ],0)))  
+
+             if ( brparam > aB(CHF_IX[i;j  ;k  ],0) ) then
+                 nlfunc(CHF_IX[i;j;k],0)  = nlfunc(CHF_IX[i;j;k],0) * (1.0 - (brparam - aB(CHF_IX[i;j  ;k  ],0)) / brparam )
+                 dnlfunc(CHF_IX[i;j;k],0) = dnlfunc(CHF_IX[i;j;k],0) * aB(CHF_IX[i;j  ;k  ],0) /  brparam 
+             endif
+
+             if ( brparamMax < aB(CHF_IX[i;j  ;k  ],0) ) then
+                 nlfunc(CHF_IX[i;j;k],0)  = nlfunc(CHF_IX[i;j;k],0) * (1.0 - (brparamMax - aB(CHF_IX[i;j  ;k  ],0)) / brparamMax )
+                 dnlfunc(CHF_IX[i;j;k],0) = dnlfunc(CHF_IX[i;j;k],0) * aB(CHF_IX[i;j  ;k  ],0) / brparamMax 
+             endif
+         endif
+
+      CHF_ENDDO
+
+      return
+      end
+
+
+
+C     -----------------------------------------------------------------
+C     subroutine COMPUTERE
+C     computes the Reynolds number
+C
+C     INPUTS/OUTPUTS:
+C     gradH     =>  Gradient of Head
+C     aB        =>  Gap Height 
+C     Re        =>  Reynolds
+C     ------------------------------------------------------------------
+      subroutine COMPUTERE(
+     &     CHF_CONST_FRA[aB],
+     &     CHF_CONST_FRA[agradH],
+     &     CHF_BOX[region],
+     &     CHF_CONST_FRA[Re],
+     &     CHF_CONST_REAL[omegaparam],
+     &     CHF_CONST_REAL[nuparam]) 
+    
+      REAL_T sqrt_gradH_cc, discr 
+      integer CHF_DDECL[i;j;k]
+
+      CHF_MULTIDO[region; i; j; k]
+
+         sqrt_gradH_cc = sqrt( agradH(CHF_IX[i;j  ;k  ],0) 
+     &                   * agradH(CHF_IX[i;j  ;k  ],0)  
+     &                   + agradH(CHF_IX[i;j  ;k  ],1) 
+     &                   * agradH(CHF_IX[i;j  ;k  ],1) )  
+     &                  
+         discr         =  1.0 + 4.0 * omegaparam * ( 
+     &                     aB(CHF_IX[i;j  ;k  ],0)  
+     &                   * aB(CHF_IX[i;j  ;k  ],0)  
+     &                   * aB(CHF_IX[i;j  ;k  ],0) 
+     &                   * 9.8 * sqrt_gradH_cc ) / ( 
+     &                     12.0 * nuparam * nuparam )
+
+         Re(CHF_IX[i;j;k],0) = (- 1.0 + sqrt(discr)) / (
+     &                          2.0 * omegaparam) 
+
+      CHF_ENDDO
+
+      return
+      end
+
+
+C     -----------------------------------------------------------------
+C     subroutine COMPUTEQW
+C     computes the comps of qw 
+C
+C     INPUTS/OUTPUTS:
+C     aB        =>  EC Gap Height 
+C     aRe       =>  EC Reynolds
+C     gradH     =>  EC Gradient of Head
+C     Qw        =>  EC Qw
+C     ------------------------------------------------------------------
+      subroutine COMPUTEQW(
+     &     CHF_CONST_FRA[aB],
+     &     CHF_CONST_FRA[aRe],
+     &     CHF_CONST_FRA[agradH],
+     &     CHF_BOX[region],
+     &     CHF_CONST_FRA[Qw],
+     &     CHF_CONST_REAL[omegaparam],
+     &     CHF_CONST_REAL[nuparam]) 
+    
+      REAL_T num_q, denom_q
+      integer CHF_DDECL[i;j;k]
+
+      CHF_MULTIDO[region; i; j; k]
+
+         num_q = - ( aB(CHF_IX[i;j  ;k  ],0) 
+     &             * aB(CHF_IX[i;j  ;k  ],0)  
+     &             * aB(CHF_IX[i;j  ;k  ],0)  
+     &             * 9.8  
+     &             * agradH(CHF_IX[i;j  ;k  ],0) )  
+                 
+         denom_q  =  12.0 * nuparam * ( 1.0 +
+     &               omegaparam * aRe(CHF_IX[i;j  ;k  ],0) ) 
+
+         Qw(CHF_IX[i;j;k],0) = num_q / denom_q
+
+      CHF_ENDDO
+
+      return
+      end
+
+
+C     -----------------------------------------------------------------
+C     subroutine COMPUTESCAPROD
+C     simple multiplication
+C
+C     INPUTS/OUTPUTS:
+C     vara      =>  first product
+C     varb1/2   =>  second product
+C     prod1/2   =>  Result
+C     ------------------------------------------------------------------
+      subroutine COMPUTESCAPROD(
+     &     CHF_CONST_FRA[vara],
+     &     CHF_CONST_FRA[var1b],
+     &     CHF_CONST_FRA[var2b],
+     &     CHF_BOX[region],
+     &     CHF_CONST_FRA[prod1],
+     &     CHF_CONST_FRA[prod2]) 
+    
+      integer CHF_DDECL[i;j;k]
+
+      CHF_MULTIDO[region; i; j; k]
+
+         prod1(CHF_IX[i;j;k],0) = vara(CHF_IX[i;j  ;k  ],0) 
+     &             * var1b(CHF_IX[i;j  ;k  ],0)  
+
+         prod2(CHF_IX[i;j;k],0) = vara(CHF_IX[i;j  ;k  ],0)
+     &             * var2b(CHF_IX[i;j  ;k  ],0)  
+
+      CHF_ENDDO
+
+      return
+      end
+
+
+
+C     -----------------------------------------------------------------
+C     subroutine COMPUTEBCOEFF
+C     computes the betaCoeff for poissonOp 
+C
+C     INPUTS/OUTPUTS:
+C     aB        =>  EC Gap Height 
+C     aRe       =>  EC Reynolds
+C     Bcoeff    =>  EC B
+C     ------------------------------------------------------------------
+      subroutine COMPUTEBCOEFF(
+     &     CHF_CONST_FRA[aB],
+     &     CHF_CONST_FRA[aRe],
+     &     CHF_CONST_FRA[aPi],
+     &     CHF_BOX[region],
+     &     CHF_CONST_FRA[Bcoeff],
+     &     CHF_CONST_REAL[omegaparam],
+     &     CHF_CONST_REAL[nuparam]) 
+    
+      REAL_T num_q, denom_q
+      integer CHF_DDECL[i;j;k]
+
+      CHF_MULTIDO[region; i; j; k]
+
+         num_q = - ( aB(CHF_IX[i;j  ;k  ],0) 
+     &             * aB(CHF_IX[i;j  ;k  ],0)  
+     &             * aB(CHF_IX[i;j  ;k  ],0)  
+     &             * 9.8 )  
+     &                  
+         denom_q  =  12.0 * nuparam * ( 1.0 +
+     &               omegaparam * aRe(CHF_IX[i;j  ;k  ],0) ) 
+
+         Bcoeff(CHF_IX[i;j;k],0) = num_q / denom_q
+
+      CHF_ENDDO
+
+      return
+      end
+
+
+C     -----------------------------------------------------------------
+C     subroutine COMPUTEDCOEFF
+C     computes the diffCoeff for RHS
+C
+C     INPUTS/OUTPUTS:
+C     Dcoeff    =>  EC Diffusion coefficients
+C     ------------------------------------------------------------------
+      subroutine COMPUTEDCOEFF(
+     &     CHF_BOX[region],
+     &     CHF_FRA[Dcoeff],
+     &     CHF_CONST_REAL[dx], 
+     &     CHF_CONST_REAL[rho], 
+     &     CHF_FRA[MRec],
+     &     CHF_FRA[Bec]) 
+    
+      integer CHF_DDECL[i;j;k]
+
+      CHF_MULTIDO[region; i; j; k]
+C        m2/s
+C         Dcoeff(CHF_IX[i;j;k],0) = 1.0
+         Dcoeff(CHF_IX[i;j;k],0) = max(Bec(CHF_IX[i;j;k],0) * MRec(CHF_IX[i;j;k],0) / rho , 5.0e-6)
+
+      CHF_ENDDO
+
+      return
+      end
+
+
+
+C     -----------------------------------------------------------------
+C     subroutine COMPUTEDIFTERM{1D,2D,3D}
+C     computes Div (Dcoef(i) * Grad)
+C     applied to phi
+C
+C     INPUTS/OUTPUTS:
+C     phi        => phi
+C     Dterm      => output quantity
+C     region     => box to compute over
+C     Dcoef[012] => face-centered coefs of diffusion
+C
+C     ------------------------------------------------------------------
+#if CH_SPACEDIM == 1
+      subroutine COMPUTEDIFTERM1D(
+     &     CHF_FRA[phi],
+     &     CHF_BOX[region],
+     &     CHF_CONST_REAL[dx], 
+     &     CHF_CONST_FRA[Dterm],
+     &     CHF_CONST_FRA[Dcoef0])
+#elif CH_SPACEDIM == 2
+      subroutine COMPUTEDIFTERM2D(
+     &     CHF_FRA[phi],
+     &     CHF_BOX[region],
+     &     CHF_CONST_REAL[dx], 
+     &     CHF_CONST_FRA[Dterm],
+     &     CHF_CONST_FRA[Dcoef0],
+     &     CHF_CONST_FRA[Dcoef1])
+#elif CH_SPACEDIM == 3
+      subroutine COMPUTEDIFTERM3D(
+     &     CHF_FRA[phi],
+     &     CHF_BOX[region],
+     &     CHF_CONST_REAL[dx], 
+     &     CHF_CONST_FRA[Dterm],
+     &     CHF_CONST_FRA[Dcoef0],
+     &     CHF_CONST_FRA[Dcoef1],
+     &     CHF_CONST_FRA[Dcoef2])
+#else
+      Somthing_that_will_not_compile
+#endif
+
+      REAL_T dxinv
+      integer CHF_DDECL[i;j;k]
+      dxinv = one/(dx*dx)
+
+      CHF_MULTIDO[region; i; j; k]
+
+              Dterm(CHF_IX[i;j;k],0) =
+     &             (CHF_DTERM[
+     &               Dcoef0(CHF_IX[i+1;j  ;k  ],0)
+     &               * (phi(CHF_IX[i+1;j  ;k  ],0)-phi(CHF_IX[i  ;j  ;k  ],0))
+     &
+     &             - Dcoef0(CHF_IX[i  ;j  ;k  ],0)
+     &               * (phi(CHF_IX[i  ;j  ;k  ],0)-phi(CHF_IX[i-1;j  ;k  ],0)) ;
+     &
+     &             + Dcoef1(CHF_IX[i  ;j+1;k  ],0)
+     &               * (phi(CHF_IX[i  ;j+1;k  ],0)-phi(CHF_IX[i  ;j  ;k  ],0))
+     &
+     &             - Dcoef1(CHF_IX[i  ;j  ;k  ],0)
+     &               * (phi(CHF_IX[i  ;j  ;k  ],0)-phi(CHF_IX[i  ;j-1;k  ],0)) ;
+     &
+     &             + Dcoef2(CHF_IX[i  ;j  ;k+1],0)
+     &               * (phi(CHF_IX[i  ;j  ;k+1],0)-phi(CHF_IX[i  ;j  ;k  ],0))
+     &
+     &             - Dcoef2(CHF_IX[i  ;j  ;k  ],0)
+     &               * (phi(CHF_IX[i  ;j  ;k  ],0)-phi(CHF_IX[i  ;j  ;k-1],0)) ]
+     &             ) * dxinv
+
+      CHF_ENDDO
+
+      return
+      end
+
+C     -----------------------------------------------------------------
+C     subroutine COMPUTE_TIMEVARYINGRECHARGE
+C     computes the time varying distributed recharge
+C
+C     INPUTS/OUTPUTS:
+C     zs        =>  ice height 
+C     Recharge  =>  distributed input m/s
+C     ------------------------------------------------------------------
+      subroutine COMPUTE_TIMEVARYINGRECHARGE(
+     &     CHF_CONST_FRA[aZs],
+     &     CHF_BOX[region],
+     &     CHF_CONST_FRA[Recharge],
+     &     CHF_CONST_REAL[TK],
+     &     CHF_CONST_REAL[BackgroundInput]) 
+    
+      REAL_T ddf, dT_dZ 
+      integer CHF_DDECL[i;j;k]
+
+      ddf   = 0.01/86400.
+      dT_dZ = -0.0075
+
+      CHF_MULTIDO[region; i; j; k]
+
+         Recharge(CHF_IX[i;j;k],0) = max(ddf * (TK + aZs(CHF_IX[i;j;k],0) * dT_dZ), 0.0) + BackgroundInput
+
+      CHF_ENDDO
+
+      return
+      end

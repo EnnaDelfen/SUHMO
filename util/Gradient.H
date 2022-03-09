@@ -43,7 +43,9 @@ public:
                               ///
                               const int a_nRefCrse,
                               ///
-                              const ProblemDomain& a_dProblem);
+                              const ProblemDomain& a_dProblem,
+                             ///
+                             LevelData<FArrayBox>* a_mask = nullptr);
 
   ///computes cell-centered level-operator gradient of cell-centered phi
   /** if phiCrse != NULL, does coarse-fine boundary
@@ -61,7 +63,9 @@ public:
                               ///
                               const int a_nRefCrse,
                               ///
-                              const Box& a_dProblem);
+                              const Box& a_dProblem,
+                              ///
+                              LevelData<FArrayBox>* a_mask = nullptr);
 
   /// computes cell-centered level-operator gradient of cell-centered phi
   /** if phiCrse != NULL, does coarse-fine boundary
@@ -79,7 +83,9 @@ public:
                               ///
                               const LayoutData<IntVectSet>& a_gridIVS,
                               ///
-                              QuadCFInterp& a_cfInterp);
+                              QuadCFInterp& a_cfInterp,
+                              ///
+                              LevelData<FArrayBox>* a_mask = nullptr);
 
   /// computes cell-centered, level-operator gradient of cell-centered phi
   /** in this case, assume that all relevant
@@ -89,9 +95,11 @@ public:
                               ///
                               LevelData<FArrayBox>& a_grad,
                               ///
-                              const LevelData<FArrayBox>& a_phi,
+                              LevelData<FArrayBox>& a_phi,
                               ///
-                              const Real a_dx);
+                              const Real a_dx,
+                              ///
+                              LevelData<FArrayBox>* a_mask = nullptr);
 
   /// computes cell-centered composite gradient of cell centered phi
   /**
@@ -114,7 +122,9 @@ public:
                              ///
                              const int a_nRefFine,
                              ///
-                             const ProblemDomain& a_dProblem);
+                             const ProblemDomain& a_dProblem,
+                             ///
+                             LevelData<FArrayBox>* a_mask = nullptr);
 
   /// computes cell-centered composite gradient of cell centered phi
   /**
@@ -138,7 +148,9 @@ public:
                              ///
                              const int a_nRefFine,
                              ///
-                             const Box& a_dProblem);
+                             const Box& a_dProblem,
+                             ///
+                             LevelData<FArrayBox>* a_mask = nullptr);
 
   /// computes cell-centered composite gradient of cell-centered phi
   /**
@@ -167,7 +179,9 @@ public:
                              ///
                              const LayoutData<IntVectSet>& a_gridIVS,
                              ///
-                             QuadCFInterp& a_cfInterpCrse);
+                             QuadCFInterp& a_cfInterpCrse,
+                             ///
+                             LevelData<FArrayBox>* a_mask = nullptr);
 
   /// computes cell-centered composite gradient of cell-centered phi
   /**
@@ -197,7 +211,9 @@ public:
                              ///
                              const LayoutData<IntVectSet>& a_gridIVS,
                              ///
-                             QuadCFInterp& a_cfInterpCrse);
+                             QuadCFInterp& a_cfInterpCrse,
+                             ///
+                             LevelData<FArrayBox>* a_mask = nullptr);
 
   /// computes cell-centered composite gradient of cell-centered phi
   /**
@@ -209,7 +225,7 @@ public:
                              ///
                              LevelData<FArrayBox>& a_Grad,
                              ///
-                             const LevelData<FArrayBox>& a_phi,
+                             LevelData<FArrayBox>& a_phi,
                              ///
                              const LevelData<FArrayBox>* a_phiFinePtr,
                              ///
@@ -217,7 +233,9 @@ public:
                              ///
                              const int a_nRefFine,
                              ///
-                             const ProblemDomain& a_dProblem);
+                             const ProblemDomain& a_dProblem,
+                             ///
+                             LevelData<FArrayBox>* a_mask = nullptr);
 
   /// computes cell-centered composite gradient of cell-centered phi
   /**  this one assumes that all ghost-cell values have already been set;
@@ -230,7 +248,7 @@ public:
                              ///
                              LevelData<FArrayBox>& a_Grad,
                              ///
-                             const LevelData<FArrayBox>& a_phi,
+                             LevelData<FArrayBox>& a_phi,
                              ///
                              const LevelData<FArrayBox>* a_phiFinePtr,
                              ///
@@ -238,7 +256,9 @@ public:
                              ///
                              const int a_nRefFine,
                              ///
-                             const Box& a_dProblem);
+                             const Box& a_dProblem,
+                             ///
+                             LevelData<FArrayBox>* a_mask = nullptr);
 
   /// computes edge-centered level-operator gradient of cell-centered phi
   /** if phiCrsePtr != NULL, does quadratic interpolation
@@ -255,7 +275,9 @@ public:
                                ///
                                const int a_nRefCrse,
                                ///
-                               const ProblemDomain& a_dProblem);
+                               const ProblemDomain& a_dProblem,
+                               ///
+                               LevelData<FArrayBox>* a_mask = nullptr);
 
   /// computes edge-centered level-operator gradient of cell-centered phi
   /** if phiCrsePtr != NULL, does quadratic interpolation
@@ -273,7 +295,9 @@ public:
                                ///
                                const int a_nRefCrse,
                                ///
-                               const Box& a_dProblem);
+                               const Box& a_dProblem,
+                               ///
+                               LevelData<FArrayBox>* a_mask = nullptr);
 
   /// computes edge-centered level-operator gradient of cell-centered phi
   /**
@@ -292,7 +316,9 @@ public:
                                ///
                                const LayoutData<IntVectSet>& a_gridIVS,
                                ///
-                               QuadCFInterp& a_cfInterpCrse);
+                               QuadCFInterp& a_cfInterpCrse,
+                               ///
+                               LevelData<FArrayBox>* a_mask = nullptr);
 
   /// computes edge-centered level-operator gradient of cell-centered phi
   /**
@@ -302,9 +328,11 @@ public:
                                ///
                                LevelData<FluxBox>& a_edgeGrad,
                                ///
-                               const LevelData<FArrayBox>& a_phi,
+                               LevelData<FArrayBox>& a_phi,
                                ///
-                               const Real a_dx);
+                               const Real a_dx,
+                               ///
+                               LevelData<FArrayBox>* a_mask = nullptr);
 
   /// computes edge-centered composite gradient of cell-centered phi
   /** if phiCrsePtr != NULL, does quadratic interpolation to compute
@@ -329,7 +357,9 @@ public:
                               ///
                               const int a_nRefFine,
                               ///
-                              const Box& a_dProblem);
+                              const Box& a_dProblem,
+                              ///
+                              LevelData<FArrayBox>* a_mask = nullptr);
 
   /// computes edge-centered composite gradient of cell-centered phi
   /**  if phiCrsePtr != NULL, does quadratic interpolation to compute
@@ -354,7 +384,9 @@ public:
                               ///
                               const int a_nRefFine,
                               ///
-                              const ProblemDomain& a_dProblem);
+                              const ProblemDomain& a_dProblem, 
+                              ///
+                              LevelData<FArrayBox>* a_mask = nullptr);
 
   /// computes edge-centered composite gradient of cell-centered phi
   /** if phiCrsePtr != NULL, does quadratic interpolation to compute
@@ -381,11 +413,13 @@ public:
                               ///
                               const LayoutData<IntVectSet>& a_gridIVS,
                               ///
-                              QuadCFInterp& a_cfInterpCrse);
+                              QuadCFInterp& a_cfInterpCrse,
+                              ///
+                              LevelData<FArrayBox>* a_mask = nullptr);
 
   /// utility function for internal use
   static void singleBoxMacGrad(FArrayBox& a_gradFab,
-                               const FArrayBox& a_phiFab,
+                               FArrayBox& a_phiFab,
                                int a_gradComp,
                                int a_phiComp,
                                int a_numComp,
@@ -393,7 +427,9 @@ public:
                                Real a_dx,
                                int a_dir,
                                int a_edgeDir,
-                               const IntVectSet& a_gridIVS);
+                               int a_hasMask,
+                               const IntVectSet& a_gridIVS,
+                               FArrayBox& a_maskFab);
 
   /// create grid IVS for all grids
   /** creates an IVS representation of the DisjointBoxLayout
