@@ -3905,11 +3905,11 @@ AmrHydro::regrid()
 
             // Special treatment for Pi ?
             RealVect levelDx = m_amrDx[lev] * RealVect::Unit;
-            m_IBCPtr->initializeBed(levelDx,
-                                    *m_suhmoParm,
-                                    *m_bedelevation[lev],
-                                    *m_bumpHeight[lev],
-                                    *m_bumpSpacing[lev]);
+            //m_IBCPtr->initializeBed(levelDx,
+            //                        *m_suhmoParm,
+            //                        *m_bedelevation[lev],
+            //                        *m_bumpHeight[lev],
+            //                        *m_bumpSpacing[lev]);
 
             m_IBCPtr->initializePi(levelDx, 
                                    *m_suhmoParm,       
