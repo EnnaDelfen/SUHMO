@@ -241,6 +241,141 @@ void mixBCValues(FArrayBox& a_state,
   }
 }
 
+// weird RobinBC
+void RobinBC(FArrayBox& a_state,
+             const Box& a_valid,
+             const ProblemDomain& a_domain,
+             Real a_dx,
+             bool a_homogeneous)
+{
+
+  if (!GlobalBCRS::s_areBCsParsed) {
+      ParseBC();
+  }
+
+  if (!a_domain.domainBox().contains(a_state.box())) {
+    Box valid = a_valid;
+    for (int dir=0; dir<CH_SPACEDIM; ++dir) {
+      // don't do anything if periodic
+      if (!a_domain.isPeriodic(dir)) {
+        Box ghostBoxLo = adjCellBox(valid, dir, Side::Lo, 1);
+        Box ghostBoxHi = adjCellBox(valid, dir, Side::Hi, 1);
+        // lo sides
+        if (!a_domain.domainBox().contains(ghostBoxLo)) {
+            // DIRI
+            if (GlobalBCRS::s_bcLo[dir] == 0) {
+                Interval a_interval   = a_state.interval(); 
+                Side::LoHiSide a_side = Side::Lo;
+                int isign = sign(a_side);
+                RealVect facePos;
+                Box toRegion = adjCellBox(valid, dir, a_side, 1);
+                toRegion &= a_state.box();
+                Real* value = new Real[a_state.nComp()];
+                for (BoxIterator bit(toRegion); bit.ok(); ++bit) {
+                    const IntVect& ivTo = bit();
+                    IntVect ivClose     = ivTo -   isign*BASISV(dir);
+                    //if (!a_homogeneous) {
+                    //      Real* dataPtr = facePos.dataPtr();
+
+                    //      D_TERM( dataPtr[0] = a_dx*(ivClose[0] + 0.5);,\
+                    //              dataPtr[1] = a_dx*(ivClose[1] + 0.5);,\
+                    //              dataPtr[2] = a_dx*(ivClose[2] + 0.5);)
+
+                    //      dataPtr[dir] += 0.5*Real(isign)*a_dx;
+
+                    //      DirichletValue(facePos.dataPtr(), &dir, &a_side, value);
+                    //}
+
+                    for (int icomp = a_interval.begin(); icomp <= a_interval.end(); icomp++) {
+                        Real nearVal = a_state(ivClose, icomp);
+                        Real inhomogVal = 0.0;
+                        if (!a_homogeneous) {
+                            //inhomogVal = value[icomp];
+                            Real x_loc = (ivClose[0]+0.5)*a_dx;
+                            Real y_loc = (ivClose[1]+0.5)*a_dx;
+                            Real ax       = 0.0; //1.5e-3;
+                            Real by       = -1.5e-3;
+                            Real cst      = 100.0;
+                            inhomogVal = std::max(ax*x_loc + by*y_loc + cst, 0.0);
+                            pout() << "GhoC CloC " << ivTo << " " << ivClose <<  endl;
+                        }
+                        // Lin interp
+                        a_state(ivTo, icomp) = 2*inhomogVal-nearVal;
+                        pout() << "Robin BC. GC, Edge, CloC "  << a_state(ivTo, icomp)  << " "<< inhomogVal<< " " << nearVal <<  endl;
+                    }
+                }
+                delete[] value;
+            // NEUM
+            } else if (GlobalBCRS::s_bcLo[dir] == 1) {
+		        NeumBC(a_state,
+		               valid,
+		               a_dx,
+		               a_homogeneous,
+		               NeumannValue,
+		               dir,
+		               Side::Lo);
+            }
+        }
+
+        // hi sides
+        if (!a_domain.domainBox().contains(ghostBoxHi)) {
+            // DIRI
+            if (GlobalBCRS::s_bcHi[dir] == 0) {
+                Interval a_interval   = a_state.interval(); 
+                Side::LoHiSide a_side = Side::Hi;
+                int isign = sign(a_side);
+                RealVect facePos;
+                Box toRegion = adjCellBox(valid, dir, a_side, 1);
+                toRegion &= a_state.box();
+                Real* value = new Real[a_state.nComp()];
+                for (BoxIterator bit(toRegion); bit.ok(); ++bit) {
+                    const IntVect& ivTo = bit();
+                    IntVect ivClose     = ivTo -   isign*BASISV(dir);
+                    //if (!a_homogeneous) {
+                    //      Real* dataPtr = facePos.dataPtr();
+
+                    //      D_TERM( dataPtr[0] = a_dx*(ivClose[0] + 0.5);,\
+                    //              dataPtr[1] = a_dx*(ivClose[1] + 0.5);,\
+                    //              dataPtr[2] = a_dx*(ivClose[2] + 0.5);)
+
+                    //      dataPtr[dir] += 0.5*Real(isign)*a_dx;
+
+                    //      DirichletValue(facePos.dataPtr(), &dir, &a_side, value);
+                    //}
+ 
+                    for (int icomp = a_interval.begin(); icomp <= a_interval.end(); icomp++) {
+                        Real nearVal = a_state(ivClose, icomp);
+                        Real inhomogVal = 0.0;
+                        if (!a_homogeneous) {
+                            //inhomogVal = value[icomp];
+                            Real x_loc = (ivClose[0]+0.5)*a_dx;
+                            Real y_loc = (ivClose[1]+0.5)*a_dx;
+                            Real ax       = 0.0; //1.5e-3;
+                            Real by       = -1.5e-3;
+                            Real cst      = 100.0;
+                            inhomogVal = std::max(ax*x_loc + by*y_loc + cst, 0.0);
+                        }
+                        // Lin interp
+                        a_state(ivTo, icomp) = 2*inhomogVal-nearVal;
+                    }
+                }
+                delete[] value;
+            // NEUM
+            } else if (GlobalBCRS::s_bcHi[dir] == 1) {
+		        NeumBC(a_state,
+		               valid,
+		               a_dx,
+		               a_homogeneous,
+		               NeumannValue,
+		               dir,
+                       Side::Hi);
+            }
+        }
+      } // end if is not periodic in ith direction
+    }
+  }
+}
+
 
 /* BC FOR ANY VAR */
 
@@ -333,7 +468,6 @@ AmrHydro::SolveForGap_nl(const Vector<DisjointBoxLayout>&               a_grids,
 {
 
     VCAMRPoissonOp2Factory opFactory;
-    //AMRPoissonOpFactory opFactory;
     Real alpha = 1.0;
     Real beta  = a_dt * m_suhmoParm->m_DiffFactor;  
     opFactory.define(a_domains[0],
@@ -341,7 +475,6 @@ AmrHydro::SolveForGap_nl(const Vector<DisjointBoxLayout>&               a_grids,
                      refRatio,
                      coarsestDx,
                      &FixedNeumBCFill,
-                     //&mixBCValues,
                      alpha, a_aCoef,
                      beta,  a_bCoef);
 
@@ -435,6 +568,7 @@ AmrHydro::SolveForHead_nl(const Vector<DisjointBoxLayout>&               a_grids
                            refRatio,
                            coarsestDx,
                            &mixBCValues,
+                           //&RobinBC,
                            0.0, a_aCoef,
                            - 1.0, a_bCoef,
                           this, NLfunctTmp, wFfunctTmp,
@@ -1861,6 +1995,9 @@ AmrHydro::timeStepFAS(Real a_dt)
     Vector<LevelData<FArrayBox>*> RHS_b_B;
     Vector<LevelData<FArrayBox>*> RHS_b_C;
     Vector<LevelData<FArrayBox>*> a_Dcoef_cc;
+    Vector<LevelData<FArrayBox>*> MR_A;
+    Vector<LevelData<FArrayBox>*> MR_B;
+    Vector<LevelData<FArrayBox>*> MR_C;
 
     a_head_lagged.resize(m_finest_level + 1, NULL);
     a_head_curr.resize(m_finest_level + 1, NULL);
@@ -1877,6 +2014,9 @@ AmrHydro::timeStepFAS(Real a_dt)
     RHS_b_B.resize(m_finest_level + 1, NULL);
     RHS_b_C.resize(m_finest_level + 1, NULL);
     a_Dcoef_cc.resize(m_finest_level + 1, NULL);
+    MR_A.resize(m_finest_level + 1, NULL);
+    MR_B.resize(m_finest_level + 1, NULL);
+    MR_C.resize(m_finest_level + 1, NULL);
     // FACE CENTERED STUFF
     Vector<LevelData<FluxBox>*> a_Qw_ec;
     Vector<LevelData<FluxBox>*> a_Re_ec;
@@ -1953,6 +2093,10 @@ AmrHydro::timeStepFAS(Real a_dt)
         RHS_b_B[lev]            = new LevelData<FArrayBox>(m_amrGrids[lev], 1, IntVect::Zero);
         RHS_b_C[lev]            = new LevelData<FArrayBox>(m_amrGrids[lev], 1, IntVect::Zero);
         a_Dcoef_cc[lev]         = new LevelData<FArrayBox>(m_amrGrids[lev], 1*SpaceDim, HeadGhostVect);
+        MR_A[lev]               = new LevelData<FArrayBox>(m_amrGrids[lev], 1, HeadGhostVect);
+        MR_B[lev]               = new LevelData<FArrayBox>(m_amrGrids[lev], 1, HeadGhostVect);
+        MR_C[lev]               = new LevelData<FArrayBox>(m_amrGrids[lev], 1, HeadGhostVect);
+
         // Stuff for OpLin
         aCoef[lev] = RefCountedPtr<LevelData<FArrayBox> >(new LevelData<FArrayBox>(m_amrGrids[lev], 1, IntVect::Zero));
         bCoef[lev] = RefCountedPtr<LevelData<FluxBox> >(new LevelData<FluxBox>(m_amrGrids[lev], 1, IntVect::Zero));
@@ -1975,6 +2119,7 @@ AmrHydro::timeStepFAS(Real a_dt)
 
             // Fill BC ghost cells of h and b
             mixBCValues(currentH[dit], validBox, m_amrDomains[lev], m_amrDx[lev][0], false);
+            //RobinBC(currentH[dit], validBox, m_amrDomains[lev], m_amrDx[lev][0], false);
             FixedNeumBCFill(currentB[dit], validBox, m_amrDomains[lev], m_amrDx[lev][0], false);
 
             // Copy curr into old -- copy ghost cells too 
@@ -2043,6 +2188,7 @@ AmrHydro::timeStepFAS(Real a_dt)
                 // get the validBox & fill BC ghost cells
                 const Box& validBox = levelGrids.get(dit);
                 mixBCValues(levelcurH[dit], validBox, m_amrDomains[lev], m_amrDx[lev][0], false);
+                //RobinBC(levelcurH[dit], validBox, m_amrDomains[lev], m_amrDx[lev][0], false);
                 FixedNeumBCFill(levelcurB[dit], validBox, m_amrDomains[lev], m_amrDx[lev][0], false);
 
                 levelnewH_lag[dit].copy(levelcurH[dit], 0, 0, 1); // should copy ghost cells too !
@@ -2452,6 +2598,7 @@ AmrHydro::timeStepFAS(Real a_dt)
             Real rho_coef = (1.0 /  m_suhmoParm->m_rho_w - 1.0 / m_suhmoParm->m_rho_i);
             Real ub_norm = std::sqrt(  m_suhmoParm->m_ub[0]*m_suhmoParm->m_ub[0] 
                            + m_suhmoParm->m_ub[1]*m_suhmoParm->m_ub[1]); // / m_suhmoParm->m_lr;
+
             for (dit.begin(); dit.ok(); ++dit) {
                 // CC
                 FArrayBox& B       = levelB[dit];
@@ -2473,15 +2620,24 @@ AmrHydro::timeStepFAS(Real a_dt)
                     IntVect iv = bit();
                     // Actual RHS
                     /* mR */
-                    RHSh(iv,0) = rho_coef / m_suhmoParm->m_L * 
-                                 (  m_suhmoParm->m_G 
-                                  + m_suhmoParm->m_ct * m_suhmoParm->m_cw * m_suhmoParm->m_rho_w * m_suhmoParm->m_rho_w * m_suhmoParm->m_gravity * 
-                                 (tmp2_cc(iv, 0) + tmp2_cc(iv, 1)) ); 
+                    //RHSh(iv,0) = rho_coef / m_suhmoParm->m_L * 
+                    //             (  m_suhmoParm->m_G 
+                    //              + m_suhmoParm->m_ct * m_suhmoParm->m_cw * m_suhmoParm->m_rho_w * m_suhmoParm->m_rho_w * m_suhmoParm->m_gravity * 
+                    //             (tmp2_cc(iv, 0) + tmp2_cc(iv, 1)) ); 
 
                     // Adv term right now in RHS
-                    RHSh(iv,0) -= rho_coef / m_suhmoParm->m_L * m_suhmoParm->m_rho_w * m_suhmoParm->m_gravity * (1.0 
-                                  + m_suhmoParm->m_ct * m_suhmoParm->m_cw * m_suhmoParm->m_rho_w) * 
-                                  (tmp_cc(iv, 0) + tmp_cc(iv, 1));
+                    //RHSh(iv,0) -= rho_coef / m_suhmoParm->m_L * m_suhmoParm->m_rho_w * m_suhmoParm->m_gravity * (1.0 
+                    //              + m_suhmoParm->m_ct * m_suhmoParm->m_cw * m_suhmoParm->m_rho_w) * 
+                    //              (tmp_cc(iv, 0) + tmp_cc(iv, 1));
+
+
+                    //Real abs_QPw = std::abs(tmp_cc(iv, 0) + tmp_cc(iv, 1) - (tmp2_cc(iv, 0) + tmp2_cc(iv, 1)));
+                    Real abs_QPw = tmp_cc(iv, 0) + tmp_cc(iv, 1) - (tmp2_cc(iv, 0) + tmp2_cc(iv, 1));
+                    //Real abs_QPw = (tmp_cc(iv, 0) + tmp_cc(iv, 1));
+
+                    RHSh(iv,0) = rho_coef / m_suhmoParm->m_L *
+                                 (  m_suhmoParm->m_G -  m_suhmoParm->m_rho_w * m_suhmoParm->m_gravity* (tmp_cc(iv, 0) + tmp_cc(iv, 1))
+                                  + m_suhmoParm->m_ct * m_suhmoParm->m_cw * m_suhmoParm->m_rho_w * m_suhmoParm->m_rho_w * m_suhmoParm->m_gravity * abs_QPw);
 
                     // friction 
                     // mR -- turn off fric heat and geot heat
@@ -2493,6 +2649,9 @@ AmrHydro::timeStepFAS(Real a_dt)
                     RHSh(iv,0) += sca_prod * rho_coef / m_suhmoParm->m_L ;
 
                     RHSh(iv,0) = std::max(RHSh(iv,0), 0.0);
+                    //if (RHSh(iv,0) < 0) {
+                    //    pout() << "melt rate in h RHS is negative " << iv << std::endl;
+                    //}
                                  
                     // sliding  
                     if ( B(iv,0) < bumpHeight(iv,0)) {
@@ -2680,6 +2839,7 @@ AmrHydro::timeStepFAS(Real a_dt)
 
             // Fill BC ghost cells of h and b
             mixBCValues(levelH[dit], validBox, m_amrDomains[lev], m_amrDx[lev][0], false);
+            //RobinBC(levelH[dit], validBox, m_amrDomains[lev], m_amrDx[lev][0], false);
         }
      
         // needed for VC solve
@@ -2777,12 +2937,19 @@ AmrHydro::timeStepFAS(Real a_dt)
         LevelData<FArrayBox>& levelPi    = *m_overburdenpress[lev];
         LevelData<FArrayBox>& levelZb    = *m_bedelevation[lev];
         LevelData<FArrayBox>& levelmR    = *m_meltRate[lev];
+        // DEBUG
+        LevelData<FArrayBox>& levelMR_A = *MR_A[lev];
+        LevelData<FArrayBox>& levelMR_B = *MR_B[lev];
+        LevelData<FArrayBox>& levelMR_C = *MR_C[lev];
         for (dit.begin(); dit.ok(); ++dit) {
             FArrayBox& newH    = levelH[dit];
             FArrayBox& Pressw  = levelPw[dit];
             FArrayBox& Pressi  = levelPi[dit];
             FArrayBox& zb      = levelZb[dit];
             FArrayBox& mR      = levelmR[dit];
+            FArrayBox& mMR_A    = levelMR_A[dit];
+            FArrayBox& mMR_B    = levelMR_B[dit];
+            FArrayBox& mMR_C    = levelMR_C[dit];
             FArrayBox& tmp_cc  = leveltmp_cc[dit];
             FArrayBox& tmp2_cc = leveltmp2_cc[dit];
 
@@ -2796,12 +2963,21 @@ AmrHydro::timeStepFAS(Real a_dt)
                 if (m_suhmoParm->m_basal_friction) {
                     sca_prod = 20. * 20. * m_suhmoParm->m_ub[0] * std::abs(Pressi(iv,0) - Pressw(iv,0)) * m_suhmoParm->m_ub[0];
                 }
+                //Real abs_QPw = std::abs(tmp_cc(iv, 0) + tmp_cc(iv, 1) - (tmp2_cc(iv, 0) + tmp2_cc(iv, 1)));
+                Real abs_QPw = (tmp_cc(iv, 0) + tmp_cc(iv, 1) - (tmp2_cc(iv, 0) + tmp2_cc(iv, 1)));
+                //Real abs_QPw = (tmp_cc(iv, 0) + tmp_cc(iv, 1));
                 mR(iv,0)   = m_suhmoParm->m_G + 
                              sca_prod
-                             - m_suhmoParm->m_ct * m_suhmoParm->m_cw * m_suhmoParm->m_rho_w * m_suhmoParm->m_rho_w * m_suhmoParm->m_gravity *
-                             (tmp_cc(iv, 0) + tmp_cc(iv, 1) - tmp2_cc(iv, 0) - tmp2_cc(iv, 1)) -
-                             m_suhmoParm->m_rho_w * m_suhmoParm->m_gravity * (tmp_cc(iv, 0) + tmp_cc(iv, 1));
-                mR(iv,0)   = std::max(mR(iv,0) / m_suhmoParm->m_L, 0.0);
+                             - m_suhmoParm->m_rho_w * m_suhmoParm->m_gravity * (tmp_cc(iv, 0) + tmp_cc(iv, 1))
+                             + m_suhmoParm->m_ct * m_suhmoParm->m_cw * m_suhmoParm->m_rho_w * m_suhmoParm->m_rho_w * m_suhmoParm->m_gravity * abs_QPw;
+                mR(iv,0)   = mR(iv,0) / m_suhmoParm->m_L;
+
+                //DEBUG
+                mMR_A(iv,0) = - m_suhmoParm->m_rho_w * m_suhmoParm->m_gravity * (tmp_cc(iv, 0) + tmp_cc(iv, 1)) / m_suhmoParm->m_L;
+                mMR_B(iv,0) = m_suhmoParm->m_ct * m_suhmoParm->m_cw * m_suhmoParm->m_rho_w * m_suhmoParm->m_rho_w * m_suhmoParm->m_gravity * (tmp_cc(iv, 0) + tmp_cc(iv, 1)) / m_suhmoParm->m_L;
+                mMR_C(iv,0) = -m_suhmoParm->m_ct * m_suhmoParm->m_cw * m_suhmoParm->m_rho_w * m_suhmoParm->m_rho_w * m_suhmoParm->m_gravity * (tmp2_cc(iv, 0) + tmp2_cc(iv, 1)) / m_suhmoParm->m_L; //+ tmp2_cc(iv, 1)) / m_suhmoParm->m_L;
+
+                mR(iv,0)   = std::max(mR(iv,0), 0.0);
                 if (Pressi(iv, 0) == 0.0) {
                     mR(iv,0)   = 0.0;
                 }
@@ -2891,9 +3067,9 @@ AmrHydro::timeStepFAS(Real a_dt)
         vectName[1]="gapHeight";
         vectName[2]="RHS_head";
         vectName[3]="RHS_b";
-        vectName[4]="RHS_bA";
-        vectName[5]="RHS_bB";
-        vectName[6]="RHS_bC";
+        vectName[4]="MRA";
+        vectName[5]="MRB";
+        vectName[6]="MRC";
         vectName[7]="RHS_hmoul";
         vectName[8]="Channelization";
         vectName[9]="DiffusiveTerm";
@@ -2932,13 +3108,13 @@ AmrHydro::timeStepFAS(Real a_dt)
             LevelData<FArrayBox>& levelRHSB      = *RHS_b[lev];
             LevelData<FArrayBox>& levelRHSBSTP   = *stuffToPlot[3][lev];
 
-            LevelData<FArrayBox>& levelRHSB1     = *RHS_b_A[lev];
+            LevelData<FArrayBox>& levelRHSB1     = *MR_A[lev];
             LevelData<FArrayBox>& levelRHSB1STP  = *stuffToPlot[4][lev];
 
-            LevelData<FArrayBox>& levelRHSB2     = *RHS_b_B[lev];
+            LevelData<FArrayBox>& levelRHSB2     = *MR_B[lev];
             LevelData<FArrayBox>& levelRHSB2STP  = *stuffToPlot[5][lev];
 
-            LevelData<FArrayBox>& levelRHSB3     = *RHS_b_C[lev];
+            LevelData<FArrayBox>& levelRHSB3     = *MR_C[lev];
             LevelData<FArrayBox>& levelRHSB3STP  = *stuffToPlot[6][lev];
 
             LevelData<FArrayBox>& levelRHSH1     = *moulin_source_term[lev];
@@ -3478,6 +3654,9 @@ AmrHydro::timeStepFAS(Real a_dt)
             delete RHS_b_A[lev];
             delete RHS_b_B[lev];
             delete RHS_b_C[lev];
+            delete MR_A[lev];
+            delete MR_B[lev];
+            delete MR_C[lev];
             delete a_Dcoef_cc[lev];
             delete a_Qw_ec[lev];
             delete a_Re_ec[lev];
@@ -4237,6 +4416,14 @@ AmrHydro::initData(Vector<RefCountedPtr<LevelData<FArrayBox>> >& a_head)
         // initialize old h and b to be the current value
         levelHead.copyTo(*m_old_head[lev]);
         levelGapHeight.copyTo(*m_old_gapheight[lev]);
+
+        const DisjointBoxLayout& levelGrids = m_amrGrids[lev];
+        DataIterator dit                    = levelzBed.dataIterator();
+        for (dit.begin(); dit.ok(); ++dit) {
+            // get the validBox
+            const Box& validBox = levelGrids.get(dit);
+            FixedNeumBCFill(levelzBed[dit], validBox, m_amrDomains[lev], m_amrDx[lev][0], false);
+        }
     }
 
     //writePlotFile();
@@ -5130,9 +5317,19 @@ AmrHydro::restart(string& a_restart_file)
     handle.close();
 
     // now loop through levels and redefine if necessary
-    //RealVect levelDx = m_amrDx[0] * RealVect::Unit;
     //m_IBCPtr->initializeBed(levelDx, *m_suhmoParm, *m_bedelevation[0], *m_bumpHeight[0], *m_bumpHeight[0]);  
     for (int lev = 0; lev <= m_finest_level; lev++) {
+        RealVect levelDx = m_amrDx[lev] * RealVect::Unit;
+        //m_IBCPtr->initializePi(levelDx,
+        //                       *m_suhmoParm,       
+        //                       *m_head[lev],
+        //                       *m_gapheight[lev],
+        //                       *m_Pw[lev],
+        //                       *m_bedelevation[lev],
+        //                       *m_overburdenpress[lev],
+        //                       *m_iceheight[lev],
+        //                       *m_bumpHeight[lev],
+        //                       *m_bumpSpacing[lev]);
         m_IBCPtr->resetCovered(*m_suhmoParm, *m_head[lev], *m_overburdenpress[lev]);
     }
 }
