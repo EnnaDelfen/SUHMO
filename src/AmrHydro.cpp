@@ -4554,8 +4554,17 @@ AmrHydro::writePltWFX(int numPlotComps,
     //filename.append(namePlot);
     filename.append(".hdf5");
 
-    WriteAMRHierarchyHDF5(
-        filename, m_amrGrids, plotData, vectName, domain, m_amrDx[0][0], dt, time(), m_refinement_ratios, numLevels);
+    Vector<IntVect> a_refinement_ratios_vect;
+    a_refinement_ratios_vect.resize(m_max_level);  
+    for (int lev=0; lev<m_max_level; lev++) {  
+        a_refinement_ratios_vect[lev][0] = m_refinement_ratios[lev];
+        a_refinement_ratios_vect[lev][1] = m_refinement_ratios[lev];
+        if (CH_SPACEDIM == 3) {   
+            a_refinement_ratios_vect[lev][2] = m_refinement_ratios[lev];
+        }
+    }
+    WriteAnisotropicAMRHierarchyHDF5(
+        filename, m_amrGrids, plotData, vectName, domain, m_amrDx[0], dt, time(), a_refinement_ratios_vect, numLevels);
 
     // need to delete plotData
     for (int lev = 0; lev < numLevels; lev++)
@@ -4624,8 +4633,17 @@ AmrHydro::writePltCustom(int numPlotComps,
         filename.append(".hdf5");
     }
 
-    WriteAMRHierarchyHDF5(
-        filename, m_amrGrids, plotData, vectName, domain, m_amrDx[0][0], dt, time(), m_refinement_ratios, numLevels);
+    Vector<IntVect> a_refinement_ratios_vect;
+    a_refinement_ratios_vect.resize(m_max_level);  
+    for (int lev=0; lev<m_max_level; lev++) {  
+        a_refinement_ratios_vect[lev][0] = m_refinement_ratios[lev];
+        a_refinement_ratios_vect[lev][1] = m_refinement_ratios[lev];
+        if (CH_SPACEDIM == 3) {   
+            a_refinement_ratios_vect[lev][2] = m_refinement_ratios[lev];
+        }
+    }
+    WriteAnisotropicAMRHierarchyHDF5(
+        filename, m_amrGrids, plotData, vectName, domain, m_amrDx[0], dt, time(), a_refinement_ratios_vect, numLevels);
 
     // need to delete plotData
     for (int lev = 0; lev < numLevels; lev++)
@@ -4809,8 +4827,17 @@ AmrHydro::writePlotFile()
         filename.append("3d.hdf5");
     }
 
-    WriteAMRHierarchyHDF5(
-        filename, m_amrGrids, plotData, vectName, domain, m_amrDx[0][0], dt, time(), m_refinement_ratios, numLevels);
+    Vector<IntVect> a_refinement_ratios_vect;
+    a_refinement_ratios_vect.resize(m_max_level);  
+    for (int lev=0; lev<m_max_level; lev++) {  
+        a_refinement_ratios_vect[lev][0] = m_refinement_ratios[lev];
+        a_refinement_ratios_vect[lev][1] = m_refinement_ratios[lev];
+        if (CH_SPACEDIM == 3) {   
+            a_refinement_ratios_vect[lev][2] = m_refinement_ratios[lev];
+        }
+    }
+    WriteAnisotropicAMRHierarchyHDF5(
+        filename, m_amrGrids, plotData, vectName, domain, m_amrDx[0], dt, time(), a_refinement_ratios_vect, numLevels);
 
     // need to delete plotData
     for (int lev = 0; lev < numLevels; lev++) {
