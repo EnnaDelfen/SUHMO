@@ -21,7 +21,7 @@ void
 Gradient::levelGradientMAC(LevelData<FluxBox>& a_edgeGrad,
                            LevelData<FArrayBox>& a_phi,
                            const LevelData<FArrayBox>* a_phiCrsePtr,
-                           const Real a_dx, const int a_nRefCrse,
+                           const RealVect a_dx, const int a_nRefCrse,
                            const Box& a_dProblem, LevelData<FArrayBox>* a_mask)
 {
   ProblemDomain physdomain(a_dProblem);
@@ -34,7 +34,7 @@ void
 Gradient::levelGradientMAC(LevelData<FluxBox>& a_edgeGrad,
                            LevelData<FArrayBox>& a_phi,
                            const LevelData<FArrayBox>* a_phiCrsePtr,
-                           const Real a_dx, const int a_nRefCrse,
+                           const RealVect a_dx, const int a_nRefCrse,
                            const ProblemDomain& a_dProblem,
                            LevelData<FArrayBox>* a_mask)
 {
@@ -74,7 +74,7 @@ void
 Gradient::levelGradientMAC(LevelData<FluxBox>& a_edgeGrad,
                            LevelData<FArrayBox>& a_phi,
                            const LevelData<FArrayBox>* a_phiCrsePtr,
-                           const Real a_dx,
+                           const RealVect a_dx,
                            const LayoutData<IntVectSet>& a_gridIVS,
                            QuadCFInterp& a_cfInterpCrse, 
                            LevelData<FArrayBox>* a_mask)
@@ -162,7 +162,7 @@ Gradient::levelGradientMAC(LevelData<FluxBox>& a_edgeGrad,
 void
 Gradient::levelGradientMAC(LevelData<FluxBox>& a_edgeGrad,
                            LevelData<FArrayBox>& a_phi,
-                           const Real a_dx, 
+                           const RealVect a_dx, 
                            LevelData<FArrayBox>* a_mask)
 
 {
@@ -254,7 +254,7 @@ Gradient::compGradientMAC(LevelData<FluxBox>& a_edgeGrad,
                           LevelData<FArrayBox>& a_phi,
                           const LevelData<FArrayBox>* a_phiCrsePtr,
                           const LevelData<FArrayBox>* a_phiFinePtr,
-                          const Real a_dx, const int a_nRefCrse,
+                          const RealVect a_dx, const int a_nRefCrse,
                           const int a_nRefFine, const Box& a_dProblem,
                           LevelData<FArrayBox>* a_mask)
 {
@@ -269,7 +269,7 @@ Gradient::compGradientMAC(LevelData<FluxBox>& a_edgeGrad,
                           LevelData<FArrayBox>& a_phi,
                           const LevelData<FArrayBox>* a_phiCrsePtr,
                           const LevelData<FArrayBox>* a_phiFinePtr,
-                          const Real a_dx, const int a_nRefCrse,
+                          const RealVect a_dx, const int a_nRefCrse,
                           const int a_nRefFine,
                           const ProblemDomain& a_dProblem,
                           LevelData<FArrayBox>* a_mask)
@@ -284,7 +284,7 @@ Gradient::compGradientMAC(LevelData<FluxBox>& a_edgeGrad,
                           LevelData<FArrayBox>& a_phi,
                           const LevelData<FArrayBox>* a_phiCrsePtr,
                           const LevelData<FArrayBox>* a_phiFinePtr,
-                          const Real a_dx, const int a_nRefFine,
+                          const RealVect a_dx, const int a_nRefFine,
                           const LayoutData<IntVectSet>& a_gridIVS,
                           QuadCFInterp& a_cfInterpCrse,
                           LevelData<FArrayBox>* a_mask)
@@ -299,7 +299,7 @@ void
 Gradient::levelGradientCC(LevelData<FArrayBox>& a_grad,
                           LevelData<FArrayBox>& a_phi,
                           const LevelData<FArrayBox>* a_phiCrsePtr,
-                          const Real a_dx,
+                          const RealVect a_dx,
                           const int a_nRefCrse,
                           const Box& a_dProblem, 
                           LevelData<FArrayBox>* a_mask)
@@ -314,7 +314,7 @@ void
 Gradient::levelGradientCC(LevelData<FArrayBox>& a_grad,
                           LevelData<FArrayBox>& a_phi,
                           const LevelData<FArrayBox>* a_phiCrsePtr,
-                          const Real a_dx,
+                          const RealVect a_dx,
                           const int a_nRefCrse,
                           const ProblemDomain& a_dProblem,
                           LevelData<FArrayBox>* a_mask)
@@ -348,7 +348,7 @@ void
 Gradient::levelGradientCC(LevelData<FArrayBox>& a_grad,
                           LevelData<FArrayBox>& a_phi,
                           const LevelData<FArrayBox>* a_phiCrsePtr,
-                          const Real a_dx,
+                          const RealVect a_dx,
                           const LayoutData<IntVectSet>& a_gridIVS,
                           QuadCFInterp& a_cfInterpCrse,
                           LevelData<FArrayBox>* a_mask)
@@ -373,7 +373,7 @@ Gradient::levelGradientCC(LevelData<FArrayBox>& a_grad,
 void
 Gradient::levelGradientCC(LevelData<FArrayBox>& a_grad,
                           LevelData<FArrayBox>& a_phi,
-                          const Real a_dx, 
+                          const RealVect a_dx, 
                           LevelData<FArrayBox>* a_mask)
 {
   // in this case, assume that all BC's have already been set
@@ -393,7 +393,7 @@ Gradient::levelGradientCC(LevelData<FArrayBox>& a_grad,
           FORT_GRADCC(CHF_FRA1(a_grad[dit],dir),
                       CHF_FRA1(a_phi[dit],0),
                       CHF_BOX(grids[dit]),
-                      CHF_CONST_REAL(a_dx),
+                      CHF_CONST_REALVECT(a_dx),
                       CHF_INT(dir),
                       CHF_FRA1(thisMask,0),
                       CHF_INT(has_mask));
@@ -407,7 +407,7 @@ Gradient::compGradientCC(LevelData<FArrayBox>& a_grad,
                          LevelData<FArrayBox>& a_phi,
                          const LevelData<FArrayBox>* a_phiCrsePtr,
                          const LevelData<FArrayBox>* a_phiFinePtr,
-                         const Real a_dx,
+                         const RealVect a_dx,
                          const int a_nRefCrse, const int a_nRefFine,
                          const Box& a_dProblem, LevelData<FArrayBox>* a_mask)
 {
@@ -423,7 +423,7 @@ Gradient::compGradientCC(LevelData<FArrayBox>& a_grad,
                          LevelData<FArrayBox>& a_phi,
                          const LevelData<FArrayBox>* a_phiCrsePtr,
                          const LevelData<FArrayBox>* a_phiFinePtr,
-                         const Real a_dx,
+                         const RealVect a_dx,
                          const int a_nRefCrse, const int a_nRefFine,
                          const ProblemDomain& a_dProblem,
                          LevelData<FArrayBox>* a_mask)
@@ -459,7 +459,7 @@ Gradient::compGradientCC(LevelData<FArrayBox>& a_grad,
                          LevelData<FArrayBox>& a_phi,
                          const LevelData<FArrayBox>* a_phiCrsePtr,
                          const LevelData<FArrayBox>* a_phiFinePtr,
-                         const Real a_dx, const int a_nRefFine,
+                         const RealVect a_dx, const int a_nRefFine,
                          const Box& a_dProblem,
                          const LayoutData<IntVectSet>& a_gridIVS,
                          QuadCFInterp& cfInterpCrse,
@@ -479,7 +479,7 @@ Gradient::compGradientCC(LevelData<FArrayBox>& a_grad,
                          LevelData<FArrayBox>& a_phi,
                          const LevelData<FArrayBox>* a_phiCrsePtr,
                          const LevelData<FArrayBox>* a_phiFinePtr,
-                         const Real a_dx, const int a_nRefFine,
+                         const RealVect a_dx, const int a_nRefFine,
                          const ProblemDomain& a_dProblem,
                          const LayoutData<IntVectSet>& a_gridIVS,
                          QuadCFInterp& cfInterpCrse,
@@ -628,7 +628,7 @@ void
 Gradient::compGradientCC(LevelData<FArrayBox>& a_grad,
                          LevelData<FArrayBox>& a_phi,
                          const LevelData<FArrayBox>* a_phiFinePtr,
-                         const Real a_dx, const int a_nRefFine,
+                         const RealVect a_dx, const int a_nRefFine,
                          const Box& a_dProblem, LevelData<FArrayBox>* a_mask)
 {
   ProblemDomain physdomain(a_dProblem);
@@ -642,7 +642,7 @@ void
 Gradient::compGradientCC(LevelData<FArrayBox>& a_grad,
                          LevelData<FArrayBox>& a_phi,
                          const LevelData<FArrayBox>* a_phiFinePtr,
-                         const Real a_dx, const int a_nRefFine,
+                         const RealVect a_dx, const int a_nRefFine,
                          const ProblemDomain& a_dProblem,
                          LevelData<FArrayBox>* a_mask)
 {
@@ -745,7 +745,7 @@ Gradient::singleBoxMacGrad(FArrayBox& a_gradFab,
                            int a_phiComp,
                            int a_numComp,
                            const Box& a_edgeBox,
-                           Real a_dx,
+                           RealVect a_dx,
                            int a_dir,
                            int a_edgeDir,
                            int a_hasMask,
@@ -792,7 +792,7 @@ Gradient::singleBoxMacGrad(FArrayBox& a_gradFab,
                       CHF_FRA1(a_maskFab,0),
                       CHF_FRA1(a_phiFab,phiComp),
                       CHF_BOX(a_edgeBox),
-                      CHF_CONST_REAL(a_dx),
+                      CHF_CONST_REALVECT(a_dx),
                       CHF_INT(a_dir),
                       CHF_INT(a_hasMask),
                       CHF_INT(a_edgeDir));
@@ -801,7 +801,7 @@ Gradient::singleBoxMacGrad(FArrayBox& a_gradFab,
       // in fortran with one-sided gradients where necessary)
       if (a_dir != a_edgeDir)
         {
-          Real factor = 0.25/a_dx;
+          Real factor = 0.25;
           IntVect dirBasis = BASISV(a_dir);
           IntVect edgeBasis = BASISV(a_edgeDir);
 
@@ -815,9 +815,9 @@ Gradient::singleBoxMacGrad(FArrayBox& a_gradFab,
                 if (!a_gridIVS.contains(cornerVect))
                   {
                     a_gradFab(thisIV, comp) = factor*(3.0*(a_phiFab(thisIV+dirBasis, phiComp)
-                                                          -a_phiFab(thisIV-dirBasis, phiComp))
+                                                          -a_phiFab(thisIV-dirBasis, phiComp)) / a_dx[a_dir]
                                                       -( a_phiFab(thisIV+dirBasis+edgeBasis, phiComp)
-                                                         -a_phiFab(thisIV-dirBasis+edgeBasis, phiComp)));
+                                                         -a_phiFab(thisIV-dirBasis+edgeBasis, phiComp)) / a_dx[a_dir] );
                   }
               } // end loop over cells in BLcorner
           }  // end BLcorner context
@@ -832,9 +832,9 @@ Gradient::singleBoxMacGrad(FArrayBox& a_gradFab,
                 if (!a_gridIVS.contains(cornerVect))
                   {
                     a_gradFab(thisIV, comp) = factor*(3.0*(a_phiFab(thisIV+dirBasis-edgeBasis, phiComp)
-                                                          -a_phiFab(thisIV-dirBasis-edgeBasis, phiComp))
+                                                          -a_phiFab(thisIV-dirBasis-edgeBasis, phiComp)) / a_dx[a_dir] 
                                                       -( a_phiFab(thisIV+dirBasis-2*edgeBasis, phiComp)
-                                                         -a_phiFab(thisIV-dirBasis-2*edgeBasis, phiComp)));
+                                                         -a_phiFab(thisIV-dirBasis-2*edgeBasis, phiComp)) / a_dx[a_dir]  );
                   }
               } // end loop over cells in BRcorner
           }  // end BRcorner context
@@ -849,9 +849,9 @@ Gradient::singleBoxMacGrad(FArrayBox& a_gradFab,
                 if (!a_gridIVS.contains(cornerVect))
                   {
                     a_gradFab(thisIV, comp) = factor*(3.0*(a_phiFab(thisIV+dirBasis, phiComp)
-                                                          -a_phiFab(thisIV-dirBasis, phiComp))
+                                                          -a_phiFab(thisIV-dirBasis, phiComp)) / a_dx[a_dir] 
                                                       -( a_phiFab(thisIV+dirBasis+edgeBasis, phiComp)
-                                                       -a_phiFab(thisIV-dirBasis+edgeBasis, phiComp)));
+                                                       -a_phiFab(thisIV-dirBasis+edgeBasis, phiComp)) / a_dx[a_dir] );
                   }
               } // end loop over cells in ULcorner
           }  // end ULcorner context
@@ -866,9 +866,9 @@ Gradient::singleBoxMacGrad(FArrayBox& a_gradFab,
                 if (!a_gridIVS.contains(cornerVect))
                   {
                     a_gradFab(thisIV, comp) = factor*(3.0*(a_phiFab(thisIV+dirBasis-edgeBasis, phiComp)
-                                                          -a_phiFab(thisIV-dirBasis-edgeBasis, phiComp))
+                                                          -a_phiFab(thisIV-dirBasis-edgeBasis, phiComp)) / a_dx[a_dir] 
                                                       -( a_phiFab(thisIV+dirBasis-2*edgeBasis, phiComp)
-                                                         -a_phiFab(thisIV-dirBasis-2*edgeBasis, phiComp)));
+                                                         -a_phiFab(thisIV-dirBasis-2*edgeBasis, phiComp)) / a_dx[a_dir] );
                   }
               } // end loop over cells in URcorner
           }  // end URcorner context

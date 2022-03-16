@@ -39,7 +39,7 @@ public:
                               ///
                               const LevelData<FArrayBox>* a_phiCrsePtr,
                               ///
-                              const Real a_dx,
+                              const RealVect a_dx,
                               ///
                               const int a_nRefCrse,
                               ///
@@ -59,7 +59,7 @@ public:
                               ///
                               const LevelData<FArrayBox>* a_phiCrsePtr,
                               ///
-                              const Real a_dx,
+                              const RealVect a_dx,
                               ///
                               const int a_nRefCrse,
                               ///
@@ -79,7 +79,7 @@ public:
                               ///
                               const LevelData<FArrayBox>* a_phiCrsePtr,
                               ///
-                              const Real a_dx,
+                              const RealVect a_dx,
                               ///
                               const LayoutData<IntVectSet>& a_gridIVS,
                               ///
@@ -97,7 +97,7 @@ public:
                               ///
                               LevelData<FArrayBox>& a_phi,
                               ///
-                              const Real a_dx,
+                              const RealVect a_dx,
                               ///
                               LevelData<FArrayBox>* a_mask = nullptr);
 
@@ -116,7 +116,7 @@ public:
                              ///
                              const LevelData<FArrayBox>* a_phiFinePtr,
                              ///
-                             const Real a_dx,
+                             const RealVect a_dx,
                              ///
                              const int a_nRefCrse,
                              ///
@@ -142,7 +142,7 @@ public:
                              ///
                              const LevelData<FArrayBox>* a_phiFinePtr,
                              ///
-                             const Real a_dx,
+                             const RealVect a_dx,
                              ///
                              const int a_nRefCrse,
                              ///
@@ -171,7 +171,7 @@ public:
                              ///
                              const LevelData<FArrayBox>* a_phiFinePtr,
                              ///
-                             const Real a_dx,
+                             const RealVect a_dx,
                              ///
                              const int a_nRefFine,
                              ///
@@ -203,7 +203,7 @@ public:
                              ///
                              const LevelData<FArrayBox>* a_phiFinePtr,
                              ///
-                             const Real a_dx,
+                             const RealVect a_dx,
                              ///
                              const int a_nRefFine,
                              ///
@@ -229,7 +229,7 @@ public:
                              ///
                              const LevelData<FArrayBox>* a_phiFinePtr,
                              ///
-                             const Real a_dx,
+                             const RealVect a_dx,
                              ///
                              const int a_nRefFine,
                              ///
@@ -252,7 +252,7 @@ public:
                              ///
                              const LevelData<FArrayBox>* a_phiFinePtr,
                              ///
-                             const Real a_dx,
+                             const RealVect a_dx,
                              ///
                              const int a_nRefFine,
                              ///
@@ -271,7 +271,7 @@ public:
                                ///
                                const LevelData<FArrayBox>* a_phiCrsePtr,
                                ///
-                               const Real a_dx,
+                               const RealVect a_dx,
                                ///
                                const int a_nRefCrse,
                                ///
@@ -291,7 +291,7 @@ public:
                                ///
                                const LevelData<FArrayBox>* a_phiCrsePtr,
                                ///
-                               const Real a_dx,
+                               const RealVect a_dx,
                                ///
                                const int a_nRefCrse,
                                ///
@@ -312,7 +312,7 @@ public:
                                ///
                                const LevelData<FArrayBox>* a_phiCrsePtr,
                                ///
-                               const Real a_dx,
+                               const RealVect a_dx,
                                ///
                                const LayoutData<IntVectSet>& a_gridIVS,
                                ///
@@ -330,7 +330,7 @@ public:
                                ///
                                LevelData<FArrayBox>& a_phi,
                                ///
-                               const Real a_dx,
+                               const RealVect a_dx,
                                ///
                                LevelData<FArrayBox>* a_mask = nullptr);
 
@@ -351,7 +351,7 @@ public:
                               ///
                               const LevelData<FArrayBox>* a_phiFine,
                               ///
-                              const Real a_dx,
+                              const RealVect a_dx,
                               ///
                               const int a_nRefCrse,
                               ///
@@ -378,7 +378,7 @@ public:
                               ///
                               const LevelData<FArrayBox>* a_phiFine,
                               ///
-                              const Real a_dx,
+                              const RealVect a_dx,
                               ///
                               const int a_nRefCrse,
                               ///
@@ -407,7 +407,7 @@ public:
                               ///
                               const LevelData<FArrayBox>* a_phiFine,
                               ///
-                              const Real a_dx,
+                              const RealVect a_dx,
                               ///
                               const int a_nRefFine,
                               ///
@@ -424,7 +424,7 @@ public:
                                int a_phiComp,
                                int a_numComp,
                                const Box& a_edgeBox,
-                               Real a_dx,
+                               RealVect a_dx,
                                int a_dir,
                                int a_edgeDir,
                                int a_hasMask,
