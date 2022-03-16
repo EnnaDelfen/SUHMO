@@ -181,7 +181,7 @@ void DirichletValue(Real* pos,
 void mixBCValues(FArrayBox& a_state,
                  const Box& a_valid,
                  const ProblemDomain& a_domain,
-                 Real a_dx,
+                 RealVect a_dx,
                  bool a_homogeneous)
 {
   if(!a_domain.domainBox().contains(a_state.box())) {
@@ -245,7 +245,7 @@ void mixBCValues(FArrayBox& a_state,
 void RobinBC(FArrayBox& a_state,
              const Box& a_valid,
              const ProblemDomain& a_domain,
-             Real a_dx,
+             RealVect a_dx,
              bool a_homogeneous)
 {
 
@@ -291,8 +291,8 @@ void RobinBC(FArrayBox& a_state,
                         Real inhomogVal = 0.0;
                         if (!a_homogeneous) {
                             //inhomogVal = value[icomp];
-                            Real x_loc = (ivClose[0]+0.5)*a_dx;
-                            Real y_loc = (ivClose[1]+0.5)*a_dx;
+                            Real x_loc = (ivClose[0]+0.5)*a_dx[0];
+                            Real y_loc = (ivClose[1]+0.5)*a_dx[1];
                             Real ax       = 0.0; //1.5e-3;
                             Real by       = -1.5e-3;
                             Real cst      = 100.0;
@@ -348,8 +348,8 @@ void RobinBC(FArrayBox& a_state,
                         Real inhomogVal = 0.0;
                         if (!a_homogeneous) {
                             //inhomogVal = value[icomp];
-                            Real x_loc = (ivClose[0]+0.5)*a_dx;
-                            Real y_loc = (ivClose[1]+0.5)*a_dx;
+                            Real x_loc = (ivClose[0]+0.5)*a_dx[0];
+                            Real y_loc = (ivClose[1]+0.5)*a_dx[1];
                             Real ax       = 0.0; //1.5e-3;
                             Real by       = -1.5e-3;
                             Real cst      = 100.0;
@@ -383,7 +383,7 @@ void RobinBC(FArrayBox& a_state,
 void FixedNeumBCFill(FArrayBox& a_state,
                      const Box& a_valid,
                      const ProblemDomain& a_domain,
-                     Real a_dx,
+                     RealVect a_dx,
                      bool a_homogeneous)
 {
   if(!a_domain.domainBox().contains(a_state.box())) {
@@ -417,9 +417,9 @@ void FixedNeumBCFill(FArrayBox& a_state,
 
 /* This function forces the ghost cells on the domain boundaries of a_state to be 0 -- no linear interpolation */ 
 void NullBCFill(FArrayBox& a_state,
-            const Box& a_valid,
-            const ProblemDomain& a_domain,
-            Real a_dx)
+                const Box& a_valid,
+                const ProblemDomain& a_domain,
+                RealVect a_dx)
 {
   // If box is outside of domain bounds ?
   if(!a_domain.domainBox().contains(a_state.box())) {
@@ -461,7 +461,7 @@ AmrHydro::SolveForGap_nl(const Vector<DisjointBoxLayout>&               a_grids,
                           Vector<RefCountedPtr<LevelData<FluxBox> > >&   a_bCoef,
                           Vector<ProblemDomain>& a_domains,
                           Vector<int>& refRatio,
-                          Real& coarsestDx,
+                          RealVect& coarsestDx,
                           Vector<LevelData<FArrayBox>*>& a_gapHeight, 
                           Vector<LevelData<FArrayBox>*>& a_RHS,
                           Real a_dt)
@@ -530,7 +530,7 @@ AmrHydro::SolveForHead_nl(const Vector<DisjointBoxLayout>&               a_grids
                           Vector<RefCountedPtr<LevelData<FluxBox> > >&   a_bCoef,
                           Vector<ProblemDomain>& a_domains,
                           Vector<int>& refRatio,
-                          Real& coarsestDx,
+                          RealVect& coarsestDx,
                           Vector<LevelData<FArrayBox>*>& a_head, 
                           Vector<LevelData<FArrayBox>*>& a_RHS)
 {
@@ -827,13 +827,21 @@ AmrHydro::initialize()
 
         // Set up vector of domains
         m_amrDomains.resize(m_max_level + 1);
-        m_amrDx.resize(m_max_level + 1);
         m_amrDomains[0] = baseDomain;
-        m_amrDx[0] = m_domainSize[0] / baseDomain.domainBox().size(0) * RealVect::Unit;
+        m_amrDx.resize(m_max_level + 1);
+        m_amrDx[0][0] = m_domainSize[0]/baseDomain.domainBox().size(0);
+        m_amrDx[0][1] = m_domainSize[1]/baseDomain.domainBox().size(1);
+        if (CH_SPACEDIM == 3) { 
+            m_amrDx[0][2] = m_domainSize[2]/baseDomain.domainBox().size(2);
+        }
         for (int lev = 1; lev <= m_max_level; lev++)
         {
             m_amrDomains[lev] = refine(m_amrDomains[lev - 1], m_refinement_ratios[lev - 1]);
-            m_amrDx[lev] = m_amrDx[lev - 1] / m_refinement_ratios[lev - 1];
+            m_amrDx[lev][0] = m_amrDx[lev-1][0]/m_refinement_ratios[lev-1]; 
+            m_amrDx[lev][1] = m_amrDx[lev-1][1]/m_refinement_ratios[lev-1]; 
+            if (CH_SPACEDIM == 3) {
+                m_amrDx[lev][2] = m_amrDx[lev-1][2]/m_refinement_ratios[lev-1];     
+            }
         }
     } // leaving problem domain setup scope
 
@@ -1241,7 +1249,7 @@ void AmrHydro::WFlx_level(LevelData<FluxBox>&          a_bcoef,
                           const LevelData<FArrayBox>*  a_ucoarse,
                           LevelData<FArrayBox>&        a_B,
                           LevelData<FArrayBox>&        a_Pi,
-                          Real                         a_dx,
+                          RealVect                     a_dx,
                           bool                         a_print_WFX,
                           int                          a_smooth,
                           int                          a_depth)
@@ -1283,7 +1291,7 @@ void AmrHydro::WFlx_level(LevelData<FluxBox>&          a_bcoef,
         }
 
         // Compute CC gradient of phi coarse
-        Real a_dxcoarse = a_dx*2;
+        RealVect a_dxcoarse = a_dx * 2; // assumes refRatio = 2
         LevelData<FArrayBox> lvlgradHcoarse(levelGridscoarse, SpaceDim, a_ucoarse->ghostVect() ); 
         Gradient::compGradientCC(lvlgradHcoarse, lcl_ucoarse,
                                  crsePsiPtr, finePsiPtr,
@@ -1399,7 +1407,7 @@ AmrHydro::compute_grad_zb_ec(int                 lev,
         finePsiPtr = m_bedelevation[lev+1];  // What does it do with the fine stuff ???
         nRefFine = m_refinement_ratios[lev];
     }
-    Real dx = m_amrDx[lev][0];  
+    RealVect dx = m_amrDx[lev];  
     // EC version
     Gradient::compGradientMAC(a_levelgradZb_ec, levelZb,
                               crsePsiPtr, finePsiPtr,
@@ -1430,7 +1438,7 @@ AmrHydro::compute_grad_head(int lev)
         finePsiPtr = m_head[lev+1];  // What does it do with the fine stuff ???
         nRefFine = m_refinement_ratios[lev];
     }
-    Real dx = m_amrDx[lev][0];  
+    RealVect dx = m_amrDx[lev];  
     // CC version
     Gradient::compGradientCC(levelgradH, levelcurrentH,
                              crsePsiPtr, finePsiPtr,
@@ -1439,7 +1447,7 @@ AmrHydro::compute_grad_head(int lev)
     // handle ghost cells on the coarse-fine interface
     if (lev > 0) {
         QuadCFInterp qcfi(m_amrGrids[lev], &m_amrGrids[lev-1],
-                          m_amrDx[lev][0], m_refinement_ratios[lev-1],  
+                          m_amrDx[lev], m_refinement_ratios[lev-1],  
                           2,  // num comps
                           m_amrDomains[lev]);
         qcfi.coarseFineInterp(*m_gradhead[lev], *m_gradhead[lev-1]);
@@ -1516,7 +1524,7 @@ AmrHydro::evaluate_Re_quadratic(int lev, bool computeGrad)
             finePsiPtr = m_head[lev+1];  // What does it do with the fine stuff ???
             nRefFine = m_refinement_ratios[lev];
         }
-        Real dx = m_amrDx[lev][0];  
+        RealVect dx = m_amrDx[lev];  
         // CC version
         Gradient::compGradientCC(levelgradH, levelcurrentH,
                                  crsePsiPtr, finePsiPtr,
@@ -1525,7 +1533,7 @@ AmrHydro::evaluate_Re_quadratic(int lev, bool computeGrad)
         // handle ghost cells on the coarse-fine interface
         if (lev > 0) {
             QuadCFInterp qcfi(m_amrGrids[lev], &m_amrGrids[lev-1],
-                              m_amrDx[lev][0], m_refinement_ratios[lev-1],  
+                              m_amrDx[lev], m_refinement_ratios[lev-1],  
                               2,  // num comps
                               m_amrDomains[lev]);
             qcfi.coarseFineInterp(*m_gradhead[lev], *m_gradhead[lev-1]);
@@ -1974,7 +1982,6 @@ AmrHydro::timeStepFAS(Real a_dt)
     /* End comments */
 
     IntVect HeadGhostVect = m_num_head_ghost * IntVect::Unit;
-    Real coarsestDx = m_amrDx[0][0];  
 
     /* I Copy new h and new b into old h and old b */
 
@@ -2118,9 +2125,9 @@ AmrHydro::timeStepFAS(Real a_dt)
             const Box& validBox = levelGrids.get(dit);
 
             // Fill BC ghost cells of h and b
-            mixBCValues(currentH[dit], validBox, m_amrDomains[lev], m_amrDx[lev][0], false);
+            mixBCValues(currentH[dit], validBox, m_amrDomains[lev], m_amrDx[lev], false);
             //RobinBC(currentH[dit], validBox, m_amrDomains[lev], m_amrDx[lev][0], false);
-            FixedNeumBCFill(currentB[dit], validBox, m_amrDomains[lev], m_amrDx[lev][0], false);
+            FixedNeumBCFill(currentB[dit], validBox, m_amrDomains[lev], m_amrDx[lev], false);
 
             // Copy curr into old -- copy ghost cells too 
             oldH[dit].copy(currentH[dit], 0, 0, 1);
@@ -2187,9 +2194,9 @@ AmrHydro::timeStepFAS(Real a_dt)
             for (dit.begin(); dit.ok(); ++dit) {
                 // get the validBox & fill BC ghost cells
                 const Box& validBox = levelGrids.get(dit);
-                mixBCValues(levelcurH[dit], validBox, m_amrDomains[lev], m_amrDx[lev][0], false);
+                mixBCValues(levelcurH[dit], validBox, m_amrDomains[lev], m_amrDx[lev], false);
                 //RobinBC(levelcurH[dit], validBox, m_amrDomains[lev], m_amrDx[lev][0], false);
-                FixedNeumBCFill(levelcurB[dit], validBox, m_amrDomains[lev], m_amrDx[lev][0], false);
+                FixedNeumBCFill(levelcurB[dit], validBox, m_amrDomains[lev], m_amrDx[lev], false);
 
                 levelnewH_lag[dit].copy(levelcurH[dit], 0, 0, 1); // should copy ghost cells too !
                 levelnewB_lag[dit].copy(levelcurB[dit], 0, 0, 1); // should copy ghost cells too !
@@ -2483,7 +2490,7 @@ AmrHydro::timeStepFAS(Real a_dt)
         // handle ghost cells on the coarse-fine interface
         for (int lev = 1; lev <= m_finest_level; lev++) {
             QuadCFInterp qcfi(m_amrGrids[lev], &m_amrGrids[lev-1],
-                              m_amrDx[lev][0], m_refinement_ratios[lev-1],  
+                              m_amrDx[lev], m_refinement_ratios[lev-1],  
                               1,  // num comps
                               m_amrDomains[lev]);
             qcfi.coarseFineInterp(*moulin_source_term[lev], *moulin_source_term[lev-1]);
@@ -2710,7 +2717,7 @@ AmrHydro::timeStepFAS(Real a_dt)
         }
 
         SolveForHead_nl(m_amrGrids_curr, aCoef, bCoef,
-                        m_amrDomains_curr, m_refinement_ratios, coarsestDx,
+                        m_amrDomains_curr, m_refinement_ratios, m_amrDx[0],
                         a_head_curr, RHS_h);
 
         for (int lev = 0; lev <= m_finest_level; lev++) {
@@ -2735,7 +2742,7 @@ AmrHydro::timeStepFAS(Real a_dt)
         // handle ghost cells on the coarse-fine interface
         for (int lev = 1; lev <= m_finest_level; lev++) {
             QuadCFInterp qcfi(m_amrGrids[lev], &m_amrGrids[lev-1],
-                              m_amrDx[lev][0], m_refinement_ratios[lev-1],  
+                              m_amrDx[lev], m_refinement_ratios[lev-1],  
                               1,  // num comps
                               m_amrDomains[lev]);
             qcfi.coarseFineInterp(*m_head[lev], *m_head[lev-1]);
@@ -2838,7 +2845,7 @@ AmrHydro::timeStepFAS(Real a_dt)
             const Box& validBox = levelGrids.get(dit);
 
             // Fill BC ghost cells of h and b
-            mixBCValues(levelH[dit], validBox, m_amrDomains[lev], m_amrDx[lev][0], false);
+            mixBCValues(levelH[dit], validBox, m_amrDomains[lev], m_amrDx[lev], false);
             //RobinBC(levelH[dit], validBox, m_amrDomains[lev], m_amrDx[lev][0], false);
         }
      
@@ -3042,7 +3049,7 @@ AmrHydro::timeStepFAS(Real a_dt)
     if (m_use_ImplDiff) {
         //     Solve for h with FAS scheme
         SolveForGap_nl(m_amrGrids_curr, aCoef_GH, a_Dcoef,
-                       m_amrDomains_curr, m_refinement_ratios, coarsestDx,
+                       m_amrDomains_curr, m_refinement_ratios, m_amrDx[0],
                        a_gh_curr, RHS_b, a_dt);
 
         for (int lev = 0; lev <= m_finest_level; lev++) {
@@ -4300,7 +4307,7 @@ AmrHydro::setupFixedGrids(const std::string& a_gridFile)
     broadcast(gridvect, uniqueProc(SerialTask::compute));
 
     m_amrGrids.resize(m_max_level + 1);
-    RealVect dx = m_amrDx[0] * RealVect::Unit;
+    //RealVect dx = m_amrDx[0] * RealVect::Unit;
     for (int lev = 0; lev < gridvect.size(); lev++) {
         int numGridsLev = gridvect[lev].size();
         Vector<int> procIDs(numGridsLev);
@@ -4309,9 +4316,9 @@ AmrHydro::setupFixedGrids(const std::string& a_gridFile)
         m_amrGrids[lev] = newDBL;
         // build storage for this level
         levelSetup(lev, m_amrGrids[lev]);
-        if (lev < gridvect.size() - 1) {
-            dx /= m_refinement_ratios[lev];
-        }
+        //if (lev < gridvect.size() - 1) {
+        //    dx /= m_refinement_ratios[lev];
+        //}
     }
 
     // finally set finest level and initialize data on hierarchy
@@ -4422,7 +4429,7 @@ AmrHydro::initData(Vector<RefCountedPtr<LevelData<FArrayBox>> >& a_head)
         for (dit.begin(); dit.ok(); ++dit) {
             // get the validBox
             const Box& validBox = levelGrids.get(dit);
-            FixedNeumBCFill(levelzBed[dit], validBox, m_amrDomains[lev], m_amrDx[lev][0], false);
+            FixedNeumBCFill(levelzBed[dit], validBox, m_amrDomains[lev], m_amrDx[lev], false);
         }
     }
 
@@ -4949,6 +4956,10 @@ AmrHydro::writeCheckpointFile() const
             levelHeader.m_int["ref_ratio"] = m_refinement_ratios[lev];
         }
         levelHeader.m_real["dx"] = m_amrDx[lev][0];
+        levelHeader.m_real["dy"] = m_amrDx[lev][1];
+        if (CH_SPACEDIM == 3) {
+            levelHeader.m_real["dz"] = m_amrDx[lev][2];
+        }
         levelHeader.m_box["prob_domain"] = m_amrDomains[lev].domainBox();
 
         levelHeader.writeToFile(handle);
@@ -5162,7 +5173,11 @@ AmrHydro::readCheckpointFile(HDF5Handle& a_handle)
         //        MayDay::Error("restart file dx != input file dx");
         //    }
         //}
-        m_amrDx[lev] = RealVect::Unit * (levheader.m_real["dx"]);
+        m_amrDx[lev][0] = levheader.m_real["dx"];
+        m_amrDx[lev][1] = levheader.m_real["dy"];
+        if (CH_SPACEDIM == 3) {
+            m_amrDx[lev][2] = levheader.m_real["dz"];
+        }
 
         // read problem domain box
         if (levheader.m_box.find("prob_domain") == levheader.m_box.end()) {

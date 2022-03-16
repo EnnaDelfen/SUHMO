@@ -95,7 +95,7 @@ public:
                     const LevelData<FArrayBox>*  a_ucoarse,
                     LevelData<FArrayBox>&        a_B,
                     LevelData<FArrayBox>&        a_Pi,
-                    Real                         a_dx,
+                    RealVect                     a_dx,
                     bool                         a_print,
                     int                          a_smooth,
                     int                          a_depth);
@@ -154,7 +154,7 @@ public:
                           Vector<RefCountedPtr<LevelData<FluxBox> > >&   a_bCoef,
                           Vector<ProblemDomain>& a_domains,
                           Vector<int>& refRatio,
-                          Real& coarsestDx,
+                          RealVect& coarsestDx,
                           Vector<LevelData<FArrayBox>*>& a_head, 
                           Vector<LevelData<FArrayBox>*>& a_RHS);
 
@@ -164,7 +164,7 @@ public:
                        Vector<RefCountedPtr<LevelData<FluxBox> > >&   a_bCoef,
                        Vector<ProblemDomain>& a_domains,
                        Vector<int>& refRatio,
-                       Real& coarsestDx,
+                       RealVect& coarsestDx,
                        Vector<LevelData<FArrayBox>*>& a_gapHeight, 
                        Vector<LevelData<FArrayBox>*>& a_RHS,
                        Real a_dt);
