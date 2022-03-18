@@ -1631,7 +1631,7 @@ AmrHydro::dCoeff(LevelData<FluxBox>&    leveldcoef,
 
             FORT_COMPUTEDCOEFF( CHF_BOX(region),
                                 CHF_FRA(bC[dir]),
-                                CHF_CONST_REAL(m_amrDx[lev][0]), 
+                                CHF_CONST_REALVECT(m_amrDx[lev]), 
                                 CHF_CONST_REAL(m_suhmoParm->m_rho_i),
                                 CHF_FRA(MRec[dir]), 
                                 CHF_FRA(Bec[dir]) );
@@ -2567,7 +2567,7 @@ AmrHydro::timeStepFAS(Real a_dt)
 
                 FORT_COMPUTEDIFTERM2D( CHF_FRA(levelB[dit]),
                                        CHF_BOX(region),
-                                       CHF_CONST_REAL(m_amrDx[lev][0]), 
+                                       CHF_CONST_REALVECT(m_amrDx[lev]), 
                                        CHF_FRA(levelDterm[dit]),
                                        CHF_CONST_FRA(thisDcoef[0]),
                                        CHF_CONST_FRA(thisDcoef[1]));
@@ -3254,9 +3254,9 @@ AmrHydro::timeStepFAS(Real a_dt)
                 IntVect iv = bitEC();
                 // DISCHARGE -- Q
                 if (Pressi(iv,0) > 0.0) {
-                    out_water_flux_x_tot[iv[0]]     += Qwater_ecFab(iv, 0) * m_amrDx[0][0];                          //QW(iv,0) * m_amrDx[0][0];                            
-                    out_water_flux_x_chan[iv[0]]    += Qwater_ecFab(iv, 0) * m_amrDx[0][0] * CD_ecFab(iv, 0);        //QW(iv,0) * m_amrDx[0][0] * CD_ecFab(iv, 0);          
-                    out_water_flux_x_distrib[iv[0]] += Qwater_ecFab(iv, 0) * m_amrDx[0][0] * (1.0 - CD_ecFab(iv, 0));//QW(iv,0) * m_amrDx[0][0] * (1.0 - CD_ecFab(iv, 0));  
+                    out_water_flux_x_tot[iv[0]]     += Qwater_ecFab(iv, 0) * m_amrDx[0][1];                          //QW(iv,0) * m_amrDx[0][0];                            
+                    out_water_flux_x_chan[iv[0]]    += Qwater_ecFab(iv, 0) * m_amrDx[0][1] * CD_ecFab(iv, 0);        //QW(iv,0) * m_amrDx[0][0] * CD_ecFab(iv, 0);          
+                    out_water_flux_x_distrib[iv[0]] += Qwater_ecFab(iv, 0) * m_amrDx[0][1] * (1.0 - CD_ecFab(iv, 0));//QW(iv,0) * m_amrDx[0][0] * (1.0 - CD_ecFab(iv, 0));  
                 }
 
                 // RHS B -- Moulins and mRate
@@ -3265,10 +3265,10 @@ AmrHydro::timeStepFAS(Real a_dt)
                 // Because of mass conservation eq -basically recharge = RHS of this eq in my head.
                 // If I only use the MS, then for run B its sum of A1 and A5 which in this case does NOT equal total discharge !!
                 if (Pressi(iv,0) > 0.0) {
-                    out_recharge[iv[0]]      += 1.158e-6 * m_amrDx[0][0] * m_amrDx[0][0];  //MS(iv, 0) * m_amrDx[0][0] * m_amrDx[0][0];  
-                    out_recharge_tot[iv[0]]  += (MR(iv, 0)/m_suhmoParm->m_rho_w) * m_amrDx[0][0] * m_amrDx[0][0];
-                    water_vol[iv[0]]         +=  GH(iv, 0)* m_amrDx[0][0] * m_amrDx[0][0];
-                    Ylength[iv[0]]           += m_amrDx[0][0];
+                    out_recharge[iv[0]]      += 1.158e-6 * m_amrDx[0][1] * m_amrDx[0][0];  //MS(iv, 0) * m_amrDx[0][0] * m_amrDx[0][0];  
+                    out_recharge_tot[iv[0]]  += (MR(iv, 0)/m_suhmoParm->m_rho_w) * m_amrDx[0][1] * m_amrDx[0][0];
+                    water_vol[iv[0]]         +=  GH(iv, 0)* m_amrDx[0][1] * m_amrDx[0][0];
+                    Ylength[iv[0]]           += m_amrDx[0][1];
                 }
 
                 // Pressures
@@ -3284,8 +3284,8 @@ AmrHydro::timeStepFAS(Real a_dt)
                         count_avgNLow += 1; 
                         xloc_bandMin_lo = std::min(xloc, xloc_bandMin_lo);
                         xloc_bandMin_hi = std::max(xloc, xloc_bandMin_hi);
-                        out_water_flux_x_chan_Bands[0] += Qwater_ecFab(iv, 0) * m_amrDx[0][0] * CD_ecFab(iv, 0);
-                        out_water_flux_x_distrib_Bands[0] += Qwater_ecFab(iv, 0) * m_amrDx[0][0] * (1.0 - CD_ecFab(iv, 0));
+                        out_water_flux_x_chan_Bands[0] += Qwater_ecFab(iv, 0) * m_amrDx[0][1] * CD_ecFab(iv, 0);
+                        out_water_flux_x_distrib_Bands[0] += Qwater_ecFab(iv, 0) * m_amrDx[0][1] * (1.0 - CD_ecFab(iv, 0));
                     }
                 } else if ((xloc > 3000) && (xloc < 3300)) {
                     if (Pressi(iv,0) > 0.0) {
@@ -3293,8 +3293,8 @@ AmrHydro::timeStepFAS(Real a_dt)
                         count_avgNMed += 1; 
                         xloc_bandMed_lo = std::min(xloc, xloc_bandMed_lo);
                         xloc_bandMed_hi = std::max(xloc, xloc_bandMed_hi);
-                        out_water_flux_x_chan_Bands[1] += Qwater_ecFab(iv, 0) * m_amrDx[0][0] * CD_ecFab(iv, 0);
-                        out_water_flux_x_distrib_Bands[1] += Qwater_ecFab(iv, 0) * m_amrDx[0][0] * (1.0 - CD_ecFab(iv, 0));
+                        out_water_flux_x_chan_Bands[1] += Qwater_ecFab(iv, 0) * m_amrDx[0][1] * CD_ecFab(iv, 0);
+                        out_water_flux_x_distrib_Bands[1] += Qwater_ecFab(iv, 0) * m_amrDx[0][1] * (1.0 - CD_ecFab(iv, 0));
                     }
                 } else if ((xloc > 5100) && (xloc < 5400)) {
                     if (Pressi(iv,0) > 0.0) {
@@ -3302,8 +3302,8 @@ AmrHydro::timeStepFAS(Real a_dt)
                         count_avgNHigh += 1; 
                         xloc_bandHi_lo = std::min(xloc, xloc_bandHi_lo);
                         xloc_bandHi_hi = std::max(xloc, xloc_bandHi_hi);
-                        out_water_flux_x_chan_Bands[2] += Qwater_ecFab(iv, 0) * m_amrDx[0][0] * CD_ecFab(iv, 0);
-                        out_water_flux_x_distrib_Bands[2] += Qwater_ecFab(iv, 0) * m_amrDx[0][0] * (1.0 - CD_ecFab(iv, 0));
+                        out_water_flux_x_chan_Bands[2] += Qwater_ecFab(iv, 0) * m_amrDx[0][1] * CD_ecFab(iv, 0);
+                        out_water_flux_x_distrib_Bands[2] += Qwater_ecFab(iv, 0) * m_amrDx[0][1] * (1.0 - CD_ecFab(iv, 0));
                     }
                 }  
             }
@@ -4406,7 +4406,7 @@ AmrHydro::initData(Vector<RefCountedPtr<LevelData<FArrayBox>> >& a_head)
         //    gapHeightFiller.fillInterp(levelGapHeight, coarseGapHeight, coarseGapHeight, 0.0, 0, 0, 1);
         //}
 
-        RealVect levelDx = m_amrDx[lev] * RealVect::Unit;
+        RealVect levelDx = m_amrDx[lev] ;
         m_IBCPtr->define(m_amrDomains[lev], levelDx[0]);
         // int refRatio = (lev > 0)?m_refinement_ratios[lev-1]:0;
 
@@ -5360,7 +5360,7 @@ AmrHydro::restart(string& a_restart_file)
     // now loop through levels and redefine if necessary
     //m_IBCPtr->initializeBed(levelDx, *m_suhmoParm, *m_bedelevation[0], *m_bumpHeight[0], *m_bumpHeight[0]);  
     for (int lev = 0; lev <= m_finest_level; lev++) {
-        RealVect levelDx = m_amrDx[lev] * RealVect::Unit;
+        //RealVect levelDx = m_amrDx[lev] * RealVect::Unit;
         //m_IBCPtr->initializePi(levelDx,
         //                       *m_suhmoParm,       
         //                       *m_head[lev],

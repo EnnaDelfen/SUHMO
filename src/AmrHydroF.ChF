@@ -235,7 +235,7 @@ C     ------------------------------------------------------------------
       subroutine COMPUTEDCOEFF(
      &     CHF_BOX[region],
      &     CHF_FRA[Dcoeff],
-     &     CHF_CONST_REAL[dx], 
+     &     CHF_CONST_REALVECT[dx], 
      &     CHF_CONST_REAL[rho], 
      &     CHF_FRA[MRec],
      &     CHF_FRA[Bec]) 
@@ -270,14 +270,14 @@ C     ------------------------------------------------------------------
       subroutine COMPUTEDIFTERM1D(
      &     CHF_FRA[phi],
      &     CHF_BOX[region],
-     &     CHF_CONST_REAL[dx], 
+     &     CHF_CONST_REALVECT[dx], 
      &     CHF_CONST_FRA[Dterm],
      &     CHF_CONST_FRA[Dcoef0])
 #elif CH_SPACEDIM == 2
       subroutine COMPUTEDIFTERM2D(
      &     CHF_FRA[phi],
      &     CHF_BOX[region],
-     &     CHF_CONST_REAL[dx], 
+     &     CHF_CONST_REALVECT[dx], 
      &     CHF_CONST_FRA[Dterm],
      &     CHF_CONST_FRA[Dcoef0],
      &     CHF_CONST_FRA[Dcoef1])
@@ -285,7 +285,7 @@ C     ------------------------------------------------------------------
       subroutine COMPUTEDIFTERM3D(
      &     CHF_FRA[phi],
      &     CHF_BOX[region],
-     &     CHF_CONST_REAL[dx], 
+     &     CHF_CONST_REALVECT[dx], 
      &     CHF_CONST_FRA[Dterm],
      &     CHF_CONST_FRA[Dcoef0],
      &     CHF_CONST_FRA[Dcoef1],
@@ -294,32 +294,36 @@ C     ------------------------------------------------------------------
       Somthing_that_will_not_compile
 #endif
 
-      REAL_T dxinv
+      REAL_T dxinv(0:CH_SPACEDIM - 1) 
       integer CHF_DDECL[i;j;k]
-      dxinv = one/(dx*dx)
+      integer idir
+
+      do idir = 0, CH_SPACEDIM - 1 
+          dxinv(idir) = one/(dx(idir)*dx(idir))
+      enddo
 
       CHF_MULTIDO[region; i; j; k]
 
               Dterm(CHF_IX[i;j;k],0) =
      &             (CHF_DTERM[
      &               Dcoef0(CHF_IX[i+1;j  ;k  ],0)
-     &               * (phi(CHF_IX[i+1;j  ;k  ],0)-phi(CHF_IX[i  ;j  ;k  ],0))
+     &               * (phi(CHF_IX[i+1;j  ;k  ],0)-phi(CHF_IX[i  ;j  ;k  ],0)) * dxinv(0)
      &
      &             - Dcoef0(CHF_IX[i  ;j  ;k  ],0)
-     &               * (phi(CHF_IX[i  ;j  ;k  ],0)-phi(CHF_IX[i-1;j  ;k  ],0)) ;
+     &               * (phi(CHF_IX[i  ;j  ;k  ],0)-phi(CHF_IX[i-1;j  ;k  ],0)) * dxinv(0) ;
      &
      &             + Dcoef1(CHF_IX[i  ;j+1;k  ],0)
-     &               * (phi(CHF_IX[i  ;j+1;k  ],0)-phi(CHF_IX[i  ;j  ;k  ],0))
+     &               * (phi(CHF_IX[i  ;j+1;k  ],0)-phi(CHF_IX[i  ;j  ;k  ],0)) * dxinv(1)
      &
      &             - Dcoef1(CHF_IX[i  ;j  ;k  ],0)
-     &               * (phi(CHF_IX[i  ;j  ;k  ],0)-phi(CHF_IX[i  ;j-1;k  ],0)) ;
+     &               * (phi(CHF_IX[i  ;j  ;k  ],0)-phi(CHF_IX[i  ;j-1;k  ],0)) * dxinv(1) ;
      &
      &             + Dcoef2(CHF_IX[i  ;j  ;k+1],0)
-     &               * (phi(CHF_IX[i  ;j  ;k+1],0)-phi(CHF_IX[i  ;j  ;k  ],0))
+     &               * (phi(CHF_IX[i  ;j  ;k+1],0)-phi(CHF_IX[i  ;j  ;k  ],0)) * dxinv(2)
      &
      &             - Dcoef2(CHF_IX[i  ;j  ;k  ],0)
-     &               * (phi(CHF_IX[i  ;j  ;k  ],0)-phi(CHF_IX[i  ;j  ;k-1],0)) ]
-     &             ) * dxinv
+     &               * (phi(CHF_IX[i  ;j  ;k  ],0)-phi(CHF_IX[i  ;j  ;k-1],0)) * dxinv(2) ]
+     &             )
 
       CHF_ENDDO
 
