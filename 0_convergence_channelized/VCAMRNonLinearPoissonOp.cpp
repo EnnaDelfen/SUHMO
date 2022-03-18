@@ -49,12 +49,12 @@ void VCAMRNonLinearPoissonOp::UpdateOperator(const LevelData<FArrayBox>&   a_phi
   const DisjointBoxLayout& dbl = a_phi.disjointBoxLayout();
   DataIterator dit = phi.dataIterator(); 
   for (dit.begin(); dit.ok(); ++dit) {
-      m_bc(phi[dit], dbl[dit()],m_domain, m_dx, a_homogeneous);
+      m_bc(phi[dit], dbl[dit()],m_domain, m_dx_vect, a_homogeneous);
   }
 
    //test for updating the Re
    MEMBER_FUNC_PTR(*m_amrHydro, m_waterFluxlevel)(*m_bCoef, a_phi, a_phicoarsePtr,
-                                                  *m_B, *m_Pi, m_dx, 
+                                                  *m_B, *m_Pi, m_dx_vect, 
                                                    false, a_AMRFASMGiter, a_depth);
 
   // Recompute the relaxation coef after updating m_bCoef
@@ -117,7 +117,7 @@ void VCAMRNonLinearPoissonOp::residualI(LevelData<FArrayBox>&            a_lhs,
 
     for (dit.begin(); dit.ok(); ++dit)
     {
-      m_bc(phi[dit], dbl[dit()],m_domain, m_dx, a_homogeneous);
+      m_bc(phi[dit], dbl[dit()],m_domain, m_dx_vect, a_homogeneous);
     }
   }
 
@@ -162,7 +162,7 @@ void VCAMRNonLinearPoissonOp::residualI(LevelData<FArrayBox>&            a_lhs,
 #endif
                           CHF_CONST_FRA(a_nlfunc[dit]),
                           CHF_BOX(region),
-                          CHF_CONST_REAL(m_dx));
+                          CHF_CONST_REALVECT(m_dx_vect));
     } // end loop over boxes
 }
 
@@ -236,7 +236,7 @@ void VCAMRNonLinearPoissonOp::applyOpI(LevelData<FArrayBox>&       a_lhs,
 {
   CH_TIME("VCAMRNonLinearPoissonOp::applyOpI");
   LevelData<FArrayBox>& phi = (LevelData<FArrayBox>&)a_phi;
-  Real dx = m_dx;
+  RealVect dx = m_dx_vect;
   const DisjointBoxLayout& dbl = a_lhs.disjointBoxLayout();
   DataIterator dit = phi.dataIterator();
 
@@ -300,7 +300,7 @@ void VCAMRNonLinearPoissonOp::applyOpNoBoundary(LevelData<FArrayBox>&       a_lh
 #endif
                          CHF_CONST_FRA(a_nlfunc[dit]),
                          CHF_BOX(region),
-                         CHF_CONST_REAL(m_dx));
+                         CHF_CONST_REALVECT(m_dx_vect));
     } // end loop over boxes
 }
 
@@ -359,7 +359,7 @@ void VCAMRNonLinearPoissonOp::restrictResidual(LevelData<FArrayBox>&       a_res
   const DisjointBoxLayout& dblFine = a_phiFine.disjointBoxLayout();
   for (DataIterator dit = a_phiFine.dataIterator(); dit.ok(); ++dit) {
       FArrayBox& phi = a_phiFine[dit];
-      m_bc(phi, dblFine[dit()], m_domain, m_dx, homogeneous);
+      m_bc(phi, dblFine[dit()], m_domain, m_dx_vect, homogeneous);
   }
 
   a_phiFine.exchange(a_phiFine.interval(), m_exchangeCopier);
@@ -415,7 +415,7 @@ void VCAMRNonLinearPoissonOp::restrictResidual(LevelData<FArrayBox>&       a_res
 #endif
                            CHF_CONST_FRA_SHIFT(nlfunc, iv),
                            CHF_BOX_SHIFT(region, iv),
-                           CHF_CONST_REAL(m_dx));
+                           CHF_CONST_REALVECT(m_dx_vect));
     }
 }
 
@@ -463,7 +463,6 @@ void VCAMRNonLinearPoissonOp::setCoefs(const RefCountedPtr<LevelData<FArrayBox> 
 void VCAMRNonLinearPoissonOp::resetLambda()
 {
   if (m_lambdaNeedsResetting) {
-      Real scale = 1.0 / (m_dx*m_dx);
 
       // Compute it box by box, point by point
       for (DataIterator dit = m_lambda.dataIterator(); dit.ok(); ++dit) {
@@ -477,6 +476,7 @@ void VCAMRNonLinearPoissonOp::resetLambda()
           lambdaFab.mult(m_alpha);
 
           for (int dir = 0; dir < SpaceDim; dir++) {
+              Real scale = 1.0 / (m_dx_vect[dir]*m_dx_vect[dir]);
               FORT_SUMFACESNL(CHF_FRA(lambdaFab),
                   CHF_CONST_REAL(m_beta),
                   CHF_CONST_FRA(bCoefFab[dir]),
@@ -590,6 +590,7 @@ void VCAMRNonLinearPoissonOp::reflux(const LevelData<FArrayBox>&        a_phiFin
 
   CH_STOP(t3);
 
+  // not taken care of yet
   Real scale = 1.0/m_dx;
   m_levfluxreg.reflux(a_residual, scale);
 }
@@ -641,7 +642,7 @@ void VCAMRNonLinearPoissonOp::levelGSRB(LevelData<FArrayBox>&       a_phi,
         for (dit.begin(); dit.ok(); ++dit)
           {
             // invoke physical BC's where necessary
-            m_bc(a_phi[dit], dbl[dit()], m_domain, m_dx, false);
+            m_bc(a_phi[dit], dbl[dit()], m_domain, m_dx_vect, false);
           }
       }
 
@@ -665,7 +666,7 @@ void VCAMRNonLinearPoissonOp::levelGSRB(LevelData<FArrayBox>&       a_phi,
                                 (CHF_FRA(a_phi[dit]),
                                  CHF_CONST_FRA(a_rhs[dit]),
                                  CHF_BOX(region),
-                                 CHF_CONST_REAL(m_dx),
+                                 CHF_CONST_REALVECT(m_dx_vect),
                                  CHF_CONST_REAL(m_alpha),
                                  CHF_CONST_FRA((*m_aCoef)[dit]),
                                  CHF_CONST_REAL(m_beta),
@@ -698,7 +699,7 @@ void VCAMRNonLinearPoissonOp::levelGSRB(LevelData<FArrayBox>&       a_phi,
     }
 
     for (dit.begin(); dit.ok(); ++dit) {
-        m_bc(a_phi[dit], dbl[dit()], m_domain, m_dx, true);
+        m_bc(a_phi[dit], dbl[dit()], m_domain, m_dx_vect, true);
     }
 }
 
@@ -760,7 +761,7 @@ void VCAMRNonLinearPoissonOp::getFlux(FArrayBox&            a_flux,
   a_flux.resize(a_facebox, a_data.nComp());
   BoxIterator bit(a_facebox);
 
-  Real scale = m_beta * a_ref / m_dx;
+  Real scale = m_beta * a_ref / m_dx_vect[a_dir];
 
   for ( bit.begin(); bit.ok(); bit.next())
     {
@@ -820,7 +821,7 @@ VCAMRNonLinearPoissonOpFactory::VCAMRNonLinearPoissonOpFactory()
 void VCAMRNonLinearPoissonOpFactory::define(const ProblemDomain&         a_coarseDomain,
                                             const Vector<DisjointBoxLayout>&      a_grids,
                                             const Vector<int>&                    a_refRatios,
-                                            const Real&                           a_coarsedx,
+                                            const RealVect&                       a_coarsedx,
                                             BCHolder                              a_bc,
                                             const Real&                           a_alpha,
                                             Vector<RefCountedPtr<LevelData<FArrayBox> > >& a_aCoef,
@@ -899,7 +900,7 @@ void
 VCAMRNonLinearPoissonOpFactory::define(const ProblemDomain&   a_coarseDomain,
                                        const Vector<DisjointBoxLayout>& a_grids,
                                        const Vector<int>&               a_refRatios,
-                                       const Real&                      a_coarsedx,
+                                       const RealVect&                  a_coarsedx,
                                        BCHolder                         a_bc,
                                        const IntVect&                   a_ghostVect)
 {
@@ -957,7 +958,7 @@ MGLevelOp<LevelData<FArrayBox> >* VCAMRNonLinearPoissonOpFactory::MGnewOp(const 
       pout() << "In VCAMRNonLinearPoissonOpFactory::MGnewOp ! depth "<< a_depth <<"\n"; 
   }
 
-  Real dxCrse = -1.0;
+  RealVect dxCrse = -IntVect::Unit;
 
   int ref;
   for (ref = 0; ref < m_domains.size(); ref++) {
@@ -973,7 +974,7 @@ MGLevelOp<LevelData<FArrayBox> >* VCAMRNonLinearPoissonOpFactory::MGnewOp(const 
   }
 
   ProblemDomain domain(m_domains[ref]);
-  Real dx = m_dx[ref];
+  RealVect dx = m_dx[ref];
   int coarsening = 1;
 
   for (int i = 0; i < a_depth; i++) {
@@ -1099,7 +1100,8 @@ MGLevelOp<LevelData<FArrayBox> >* VCAMRNonLinearPoissonOpFactory::MGnewOp(const 
 
   newOp->computeLambda();
 
-  newOp->m_dxCrse = dxCrse;
+  newOp->m_dxCrse      = dxCrse[0];
+  newOp->m_dxCrse_vect = dxCrse;
 
   return (MGLevelOp<LevelData<FArrayBox> >*)newOp;
 }
@@ -1112,7 +1114,7 @@ AMRLevelOp<LevelData<FArrayBox> >* VCAMRNonLinearPoissonOpFactory::AMRnewOp(cons
   }
 
   VCAMRNonLinearPoissonOp* newOp = new VCAMRNonLinearPoissonOp;
-  Real dxCrse = -1.0;
+  RealVect dxCrse = -IntVect::Unit;
 
   // Need to know how many components we're solving for
   int nComp = 1;
@@ -1200,7 +1202,8 @@ AMRLevelOp<LevelData<FArrayBox> >* VCAMRNonLinearPoissonOpFactory::AMRnewOp(cons
       newOp->computeLambda();
   }
 
-  newOp->m_dxCrse = dxCrse;
+  newOp->m_dxCrse      = dxCrse[0];
+  newOp->m_dxCrse_vect = dxCrse;
 
   return (AMRLevelOp<LevelData<FArrayBox> >*)newOp;
 }
@@ -1229,7 +1232,7 @@ int VCAMRNonLinearPoissonOpFactory::refToFiner(const ProblemDomain& a_domain) co
 void VCAMRNonLinearPoissonOpFactory::NeumBCForB(FArrayBox& a_state,
                                                 const Box& a_valid,
                                                 const ProblemDomain& a_domain,
-                                                Real a_dx)
+                                                RealVect a_dx)
 {
   // If box is outside of domain bounds ?
   if(!a_domain.domainBox().contains(a_state.box())) {

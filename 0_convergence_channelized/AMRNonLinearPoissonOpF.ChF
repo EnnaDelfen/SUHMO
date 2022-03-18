@@ -11,20 +11,23 @@ C     --------------------------------------------------------------
      &     chf_fra1[phi],
      &     chf_const_fra1[rhs],
      &     chf_box[coloredbox],
-     $     chf_real[dx],
+     $     chf_realvect[dx],
      $     chf_real[alpha],
      $     chf_real[beta],
      $     chf_const_fra1[nlfunc])
 
-      real_t lambda, dxinv, sum_b, lphi
+      real_t lambda, sum_b, lphi
       integer chf_ddecl[i;j;k]
       integer idir
+      real_t dxinv(0:CH_SPACEDIM - 1) 
 
-      dxinv = one/(dx*dx)
+      do idir = 0, CH_SPACEDIM - 1 
+          dxinv(idir) = one/(dx(idir)*dx(idir))  
+      enddo
 
       sum_b = 0.0
       do idir = 0, CH_SPACEDIM-1
-         sum_b = sum_b + two*dxinv
+         sum_b = sum_b + two*dxinv(idir)
       enddo
 
       lambda = one/(alpha - beta*sum_b)
@@ -33,17 +36,17 @@ C     --------------------------------------------------------------
         lphi = CHF_DTERM[
      &     (    phi(chf_ix[i+1;j  ;k  ])
      &     +    phi(chf_ix[i-1;j  ;k  ])
-     $     -two*phi(chf_ix[i  ;j  ;k  ])) ;
+     $     -two*phi(chf_ix[i  ;j  ;k  ])) * dxinv(0) ;
      $     +(   phi(chf_ix[i  ;j+1;k  ])
      &     +    phi(chf_ix[i  ;j-1;k  ])
-     $     -two*phi(chf_ix[i  ;j  ;k  ])) ;
+     $     -two*phi(chf_ix[i  ;j  ;k  ])) * dxinv(1);
      $     +(   phi(chf_ix[i  ;j  ;k+1])
      &     +    phi(chf_ix[i  ;j  ;k-1])
-     $     -two*phi(chf_ix[i  ;j  ;k  ])) ]
+     $     -two*phi(chf_ix[i  ;j  ;k  ])) * dxinv(2) ]
 
         
         
-        lphi = lphi*dxinv
+        lphi = lphi
         
         lphi = lphi + nlfunc(chf_ix[i;j;k])
         
@@ -60,23 +63,26 @@ C     --------------------------------------------------------------
      &     CHF_FRA[phi],
      &     CHF_CONST_FRA[rhs],
      &     CHF_BOX[region],
-     &     CHF_CONST_REAL[dx],
+     &     CHF_CONST_REALVECT[dx],
      &     CHF_CONST_REAL[alpha],
      &     CHF_CONST_REAL[beta],
      &     CHF_CONST_FRA[nlfunc],
      &     CHF_CONST_FRA[nlDfunc],
      &     CHF_CONST_INT[redBlack])
 
-      REAL_T dxinv, sum_b, lphi, helmop, denom
+      REAL_T sum_b, lphi, helmop, denom
       integer CHF_DDECL[i;j;k]
       integer n,ncomp,idir,indtot,imin,imax
+      REAL_T dxinv(0:CH_SPACEDIM - 1) 
 
-      dxinv = one/(dx*dx)
+      do idir = 0, CH_SPACEDIM - 1 
+          dxinv(idir) = one/(dx(idir)*dx(idir))  
+      enddo
+
       sum_b = 0.0
       do idir = 0, CH_SPACEDIM-1
-         sum_b = sum_b + two*dxinv
-      enddo
-      
+         sum_b = sum_b + two*dxinv(idir)
+      enddo 
       
       ncomp = CHF_NCOMP[phi]
       if (ncomp .ne. CHF_NCOMP[rhs]) then
@@ -103,15 +109,15 @@ C     petermc, 26 april 2001
               lphi =  ((phi(CHF_IX[i+1;j;k],n)
      &                   - phi(CHF_IX[i;j;k],n))
      &                   -(phi(CHF_IX[i;j;k],n)
-     &                   - phi(CHF_IX[i-1;j;k],n)))*dxinv;
+     &                   - phi(CHF_IX[i-1;j;k],n)))*dxinv(0);
      &                +  ((phi(CHF_IX[i;j+1;k],n)
      &                   - phi(CHF_IX[i;j;k],n))
      &                   -(phi(CHF_IX[i;j;k],n)
-     &                   - phi(CHF_IX[i;j-1;k],n)))*dxinv;
+     &                   - phi(CHF_IX[i;j-1;k],n)))*dxinv(1);
      &                +  ((phi(CHF_IX[i;j;k+1],n)
      &                   - phi(CHF_IX[i;j;k],n))
      &                   -(phi(CHF_IX[i;j;k],n)
-     &                   - phi(CHF_IX[i;j;k-1],n)))*dxinv ]
+     &                   - phi(CHF_IX[i;j;k-1],n)))*dxinv(2) ]
               
               denom = alpha + beta * sum_b + nlDfunc(CHF_IX[i;j;k],n)
 
@@ -136,19 +142,23 @@ C     petermc, 26 april 2001
      &     CHF_FRA[phi],
      &     CHF_CONST_FRA[rhs],
      &     CHF_BOX[region],
-     &     CHF_CONST_REAL[dx],
+     &     CHF_CONST_REALVECT[dx],
      &     CHF_CONST_INT[redBlack],
      &     CHF_CONST_FRA[nlfunc],
      &     CHF_CONST_FRA[nlDfunc])
 
-      REAL_T lambda, dxinv, sum_b, lphi, lap, denom
+      REAL_T lambda, sum_b, lphi, lap, denom
       integer CHF_DDECL[i;j;k]
       integer n,ncomp,idir,indtot,imin,imax,counter
+      REAL_T dxinv(0:CH_SPACEDIM - 1) 
 
-      dxinv = one/(dx*dx)
+      do idir = 0, CH_SPACEDIM - 1 
+          dxinv(idir) = one/(dx(idir)*dx(idir))  
+      enddo
+
       sum_b = 0.0
       do idir = 0, CH_SPACEDIM-1
-         sum_b = sum_b + two*dxinv
+         sum_b = sum_b + two*dxinv(idir)
       enddo
       
       lambda = -one/sum_b
@@ -166,15 +176,15 @@ C         print*, 'GSRBLEVELHELM:phi and rhs incompatible'
               lphi =  ((phi(CHF_IX[i+1;j;k],n)
      &                   - phi(CHF_IX[i;j;k],n))
      &                   -(phi(CHF_IX[i;j;k],n)
-     &                   - phi(CHF_IX[i-1;j;k],n)))*dxinv;
+     &                   - phi(CHF_IX[i-1;j;k],n)))*dxinv(0);
      &                +  ((phi(CHF_IX[i;j+1;k],n)
      &                   - phi(CHF_IX[i;j;k],n))
      &                   -(phi(CHF_IX[i;j;k],n)
-     &                   - phi(CHF_IX[i;j-1;k],n)))*dxinv;
+     &                   - phi(CHF_IX[i;j-1;k],n)))*dxinv(1);
      &                +  ((phi(CHF_IX[i;j;k+1],n)
      &                   - phi(CHF_IX[i;j;k],n))
      &                   -(phi(CHF_IX[i;j;k],n)
-     &                   - phi(CHF_IX[i;j;k-1],n)))*dxinv ]
+     &                   - phi(CHF_IX[i;j;k-1],n)))*dxinv(2) ]
 
               denom = sum_b + nlDfunc(CHF_IX[i;j;k],n) 
                             
@@ -194,21 +204,24 @@ C         print*, 'GSRBLEVELHELM:phi and rhs incompatible'
      &     CHF_FRA[phi],
      &     CHF_CONST_FRA[rhs],
      &     CHF_BOX[region],
-     &     CHF_CONST_REAL[dx],
+     &     CHF_CONST_REALVECT[dx],
      &     CHF_CONST_INT[redBlack],
      &     CHF_CONST_FRA[nlfunc],
      &     CHF_CONST_FRA[nlDfunc])
 
-      REAL_T dxinv, sum_b, lphi, denom
+      REAL_T sum_b, lphi, denom
       integer CHF_DDECL[i;j;k]
       integer n,ncomp,idir,indtot,imin,imax,counter
+      REAL_T dxinv(0:CH_SPACEDIM - 1) 
 
-      dxinv = one/(dx*dx)
+      do idir = 0, CH_SPACEDIM - 1 
+          dxinv(idir) = one/(dx(idir)*dx(idir))  
+      enddo
+
       sum_b = 0.0
       do idir = 0, CH_SPACEDIM-1
-         sum_b = sum_b + two*dxinv
+         sum_b = sum_b + two*dxinv(idir)
       enddo
-      
       
       ncomp = CHF_NCOMP[phi]
       if (ncomp .ne. CHF_NCOMP[rhs]) then
@@ -235,15 +248,15 @@ C     petermc, 26 april 2001
               lphi =  ((phi(CHF_IX[i+1;j;k],n)
      &                   - phi(CHF_IX[i;j;k],n))
      &                   -(phi(CHF_IX[i;j;k],n)
-     &                   - phi(CHF_IX[i-1;j;k],n)))*dxinv;
+     &                   - phi(CHF_IX[i-1;j;k],n)))*dxinv(0);
      &                +  ((phi(CHF_IX[i;j+1;k],n)
      &                   - phi(CHF_IX[i;j;k],n))
      &                   -(phi(CHF_IX[i;j;k],n)
-     &                   - phi(CHF_IX[i;j-1;k],n)))*dxinv;
+     &                   - phi(CHF_IX[i;j-1;k],n)))*dxinv(1);
      &                +  ((phi(CHF_IX[i;j;k+1],n)
      &                   - phi(CHF_IX[i;j;k],n))
      &                   -(phi(CHF_IX[i;j;k],n)
-     &                   - phi(CHF_IX[i;j;k-1],n)))*dxinv ]
+     &                   - phi(CHF_IX[i;j;k-1],n)))*dxinv(2) ]
               
               denom = sum_b + nlDfunc(CHF_IX[i;j;k],n)
               
@@ -272,16 +285,19 @@ C     petermc, 26 april 2001
      $     chf_real[alpha],
      $     chf_real[beta],
      $     chf_real[gamma],
-     $     chf_real[dx])
+     $     chf_realvect[dx])
 
       integer chf_ddecl[i;j;k], idir
-      real_t dxinv, sum_b, lambda
+      real_t sum_b, lambda
+      real_t dxinv(0:CH_SPACEDIM - 1)
 
-      dxinv = one/(dx*dx)
+      do idir = 0, CH_SPACEDIM - 1 
+          dxinv(idir) = one/(dx(idir)*dx(idir))  
+      enddo
 
       sum_b = 0.0
       do idir = 0, CH_SPACEDIM-1
-         sum_b = sum_b + two*dxinv
+         sum_b = sum_b + two*dxinv(idir)
       enddo
 
       lambda = -one/(alpha - beta*sum_b)
@@ -345,26 +361,27 @@ C
 C     INPUTS/OUTPUTS:
 C     phi       =>  phi
 C     lofphi   <=   laplacian
-C     dx        =>  cell spacing
+C     dx        =>  cell spacing (realvect)
 C
 C     Warning: phi, lofphi must have the same number
 C     of components and span region.  Phi needs one more cell on
 C     all sides
 C
-C     dtgraves nov 2, 1999
+C     amf, 2022
 C     ------------------------------------------------------------------
       subroutine OPERATORLAPNL(
      &     CHF_FRA[lofphi],
      &     CHF_CONST_FRA[phi],
      &     CHF_BOX[region],
-     &     CHF_CONST_REAL[dx],
+     &     CHF_CONST_REALVECT[dx],
      &     CHF_CONST_REAL[alpha],
      &     CHF_CONST_REAL[beta],
      &     CHF_CONST_FRA[nlfunc]) 
 
-      REAL_T dxinv, lap
-      integer n,ncomp
+      REAL_T lap
+      integer n,ncomp,idir
       integer CHF_DDECL[i;j;k]
+      REAL_T dxinv(0:CH_SPACEDIM - 1) 
 
       ncomp = CHF_NCOMP[phi]
       if (ncomp .ne. CHF_NCOMP[lofphi]) then
@@ -372,18 +389,23 @@ C         print*, 'OPERATORLAP:phi and lofphi incompatible'
          call MAYDAYERROR()
       endif
 
-      dxinv = one/(dx*dx)
+      do idir = 0, CH_SPACEDIM - 1 
+          dxinv(idir) = one/(dx(idir)*dx(idir))  
+      enddo
+
       do n = 0, ncomp-1
         CHF_MULTIDO[region; i; j; k]
 
-          lap = ( CHF_DTERM[ phi(CHF_IX[i+1;j  ;k  ],n)
-     &                     + phi(CHF_IX[i-1;j  ;k  ],n) ;
-     &                     + phi(CHF_IX[i  ;j+1;k  ],n)
-     &                     + phi(CHF_IX[i  ;j-1;k  ],n) ;
-     &                     + phi(CHF_IX[i  ;j  ;k+1],n)
-     &                     + phi(CHF_IX[i  ;j  ;k-1],n) ]
-     &                     -(2*CH_SPACEDIM)*phi(CHF_IX[i;j;k],n) )
-     &       * dxinv
+          lap = ( CHF_DTERM[ ( phi(CHF_IX[i+1;j  ;k  ],n)
+     &                       + phi(CHF_IX[i-1;j  ;k  ],n)
+     &                       - 2*phi(CHF_IX[i;j;k],n) ) * dxinv(0) ;
+     &                     + ( phi(CHF_IX[i  ;j+1;k  ],n)
+     &                     +   phi(CHF_IX[i  ;j-1;k  ],n) 
+     &                       - 2*phi(CHF_IX[i;j;k],n) ) * dxinv(1) ;
+     &                     + ( phi(CHF_IX[i  ;j  ;k+1],n)
+     &                     +   phi(CHF_IX[i  ;j  ;k-1],n) 
+     &                       - 2*phi(CHF_IX[i;j;k],n) ) * dxinv(2) ]
+     &          )
 
           lofphi(CHF_IX[i;j;k],n) = alpha*phi(CHF_IX[i;j;k],n) - beta*lap + 
      &    nlfunc(CHF_IX[i;j;k],n)
@@ -402,42 +424,48 @@ C     INPUTS/OUTPUTS:
 C     phi       =>  phi
 C     rhs       =>
 C     lofphi   <=   helmholtz residual
-C     dx        =>  cell spacing
+C     dx        =>  cell spacing (realvect)
 C
 C     Warning: phi, lofphi must have the same number
 C     of components and span region.  Phi needs one more cell on
 C     all sides
 C
-C     bvs, 2007
+C     amf, 2022
 C     ------------------------------------------------------------------
       subroutine OPERATORLAPRESNL(
      &     CHF_FRA[r],
      &     CHF_CONST_FRA[phi],
      &     CHF_CONST_FRA[rhs],
      &     CHF_BOX[region],
-     &     CHF_CONST_REAL[dx],
+     &     CHF_CONST_REALVECT[dx],
      &     CHF_CONST_REAL[alpha],
      &     CHF_CONST_REAL[beta],
      &     CHF_CONST_FRA[nlfunc]) 
 
-      REAL_T dxinv, lap
-      integer n,ncomp
+      REAL_T lap
+      integer n,ncomp,idir   
       integer CHF_DDECL[i;j;k]
+      REAL_T dxinv(0:CH_SPACEDIM - 1) 
 
       ncomp = CHF_NCOMP[phi]
       
-      dxinv = one/(dx*dx)
+      do idir = 0, CH_SPACEDIM - 1 
+          dxinv(idir) = one/(dx(idir)*dx(idir))  
+      enddo
+
       do n = 0, ncomp-1
          CHF_MULTIDO[region; i; j; k]
 
-          lap = ( CHF_DTERM[ phi(CHF_IX[i+1;j  ;k  ],n)
-     &                     + phi(CHF_IX[i-1;j  ;k  ],n) ;
-     &                     + phi(CHF_IX[i  ;j+1;k  ],n)
-     &                     + phi(CHF_IX[i  ;j-1;k  ],n) ;
-     &                     + phi(CHF_IX[i  ;j  ;k+1],n)
-     &                     + phi(CHF_IX[i  ;j  ;k-1],n) ]
-     &                     -(2*CH_SPACEDIM)*phi(CHF_IX[i;j;k],n) )
-     &       * dxinv
+          lap = ( CHF_DTERM[ ( phi(CHF_IX[i+1;j  ;k  ],n)
+     &                       + phi(CHF_IX[i-1;j  ;k  ],n) 
+     &                       - 2*phi(CHF_IX[i;j;k],n) ) * dxinv(0) ;
+     &                     + ( phi(CHF_IX[i  ;j+1;k  ],n)
+     &                     +   phi(CHF_IX[i  ;j-1;k  ],n)
+     &                     -   2*phi(CHF_IX[i;j;k],n) ) * dxinv(1) ;
+     &                     + ( phi(CHF_IX[i  ;j  ;k+1],n)
+     &                     +   phi(CHF_IX[i  ;j  ;k-1],n) 
+     &                     -   2*phi(CHF_IX[i;j;k],n) ) * dxinv(2) ]
+     &          )
 
          r(CHF_IX[i;j;k],n) = - alpha*phi(CHF_IX[i;j;k],n) + beta*lap -
      &       nlfunc(CHF_IX[i;j;k],n)   + rhs(CHF_IX[i;j;k],n)
@@ -467,8 +495,9 @@ C     ------------------------------------------------------------------
      &     CHF_CONST_REAL[dx])
 
 
-      REAL_T denom,dxinv,lofphi
+      REAL_T denom,lofphi
       integer n,ncomp
+      REAL_T dxinv(0:CH_SPACEDIM - 1) 
 
       integer CHF_DDECL[i;j;k]
       integer CHF_DDECL[ii;jj;kk]
@@ -504,9 +533,9 @@ C     phi       =>  phi[h]
 C     alpha     =>  Coefficient of the identity operator
 C     beta      =>  Coefficient of the laplacian operator
 C     region    =>  Box over which rhs is defined (in h index space)
-C     dx        =>  grid spacing in h
+C     dx        =>  grid spacing in h (realvect)
 C
-C     bvs  Wed Aug 20, 2003
+C     amf, 2022
 C     ------------------------------------------------------------------
       subroutine RESTRICTRESNL(
      &     CHF_FRA[res],
@@ -516,17 +545,20 @@ C     ------------------------------------------------------------------
      &     CHF_CONST_REAL[beta],
      &     CHF_CONST_FRA[nlfunc],
      &     CHF_BOX[region],
-     &     CHF_CONST_REAL[dx])
+     &     CHF_CONST_REALVECT[dx])
 
-      REAL_T denom,dxinv,lofphi
-      integer n,ncomp
-
+      REAL_T denom,lofphi
+      integer n,ncomp,idir
       integer CHF_DDECL[i;j;k]
       integer CHF_DDECL[ii;jj;kk]
+      REAL_T dxinv(0:CH_SPACEDIM - 1) 
 
       ncomp = CHF_NCOMP[phi]
 
-      dxinv = one / (dx*dx)
+      do idir = 0, CH_SPACEDIM - 1 
+          dxinv(idir) = one/(dx(idir)*dx(idir))  
+      enddo
+
       denom = D_TERM(2, *2, *2)
 
       do n = 0, ncomp-1
@@ -538,14 +570,16 @@ C     ------------------------------------------------------------------
 
           lofphi = alpha * phi(CHF_IX[i;j;k],n)
      &           - beta  *
-     &              (CHF_DTERM[ phi(CHF_IX[i+1;j  ;k  ],n)
-     &                        + phi(CHF_IX[i-1;j  ;k  ],n) ;
-     &                        + phi(CHF_IX[i  ;j+1;k  ],n)
-     &                        + phi(CHF_IX[i  ;j-1;k  ],n) ;
-     &                        + phi(CHF_IX[i  ;j  ;k+1],n)
-     &                        + phi(CHF_IX[i  ;j  ;k-1],n) ]
-     &                        - phi(CHF_IX[i  ;j  ;k  ],n) * 2 * CH_SPACEDIM
-     &              ) * dxinv
+     &              (CHF_DTERM[ ( phi(CHF_IX[i+1;j  ;k  ],n)
+     &                         + phi(CHF_IX[i-1;j  ;k  ],n) 
+     &                         - 2*phi(CHF_IX[i  ;j  ;k  ],n) ) * dxinv(0) ;
+     &                         + ( phi(CHF_IX[i  ;j+1;k  ],n)
+     &                         + phi(CHF_IX[i  ;j-1;k  ],n) 
+     &                         - 2*phi(CHF_IX[i  ;j  ;k  ],n) ) * dxinv(1) ;
+     &                         + ( phi(CHF_IX[i  ;j  ;k+1],n)
+     &                         + phi(CHF_IX[i  ;j  ;k-1],n) 
+     &                         - 2*phi(CHF_IX[i  ;j  ;k  ],n) ) * dxinv(2) ]
+     &              )
      &           + nlfunc(CHF_IX[i;j;k],n)
 
           

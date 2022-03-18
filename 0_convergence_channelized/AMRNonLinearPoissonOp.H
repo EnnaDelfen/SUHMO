@@ -36,7 +36,7 @@ typedef void (AmrHydro::*NL_level) (LevelData<FArrayBox>& a_NL, LevelData<FArray
 typedef void (AmrHydro::*waterFlux_level) (LevelData<FluxBox>& a_Bcoef, const LevelData<FArrayBox>&  a_u, 
                                            const LevelData<FArrayBox>*  a_ucoarse, LevelData<FArrayBox>& a_B,
                                            LevelData<FArrayBox>& a_Pi,
-                                           Real a_dx, bool a_print, int a_smooth, int a_depth);
+                                           RealVect a_dx, bool a_print, int a_smooth, int a_depth);
 typedef void (AmrHydro::*printData)       (const LevelData<FArrayBox>&  a_u, 
                                            int a_smooth, int a_depth, int a_AMRFASMGiter);
 
@@ -68,7 +68,7 @@ public:
   void define(const DisjointBoxLayout&   a_grids,
               const DisjointBoxLayout&   a_gridsFiner,
               const DisjointBoxLayout&   a_gridsCoarser,
-              const Real&                a_dxLevel,
+              const RealVect&            a_dxLevel,
               int                        a_refRatio,
               int                        a_refRatioFiner,
               const ProblemDomain&       a_domain,
@@ -80,7 +80,7 @@ public:
   /** full define function for AMRLevelOp with finer levels, but no coarser */
   void define(const DisjointBoxLayout&   a_grids,
               const DisjointBoxLayout&   a_gridsFiner,
-              const Real&                a_dxLevel,
+              const RealVect&            a_dxLevel,
               int                        a_refRatio, // dummy arg, send in 1
               int                        a_refRatioFiner,
               const ProblemDomain&       a_domain,
@@ -96,7 +96,7 @@ public:
   */
   void define(const DisjointBoxLayout&   a_grids,
               const DisjointBoxLayout&   a_baseBAPtr,
-              const Real&                a_dxLevel,
+              const RealVect&            a_dxLevel,
               int                        a_refRatio,
               const ProblemDomain&       a_domain,
               BCHolder                   a_bc,
@@ -109,7 +109,7 @@ public:
      define function for AMRLevelOp which has no finer or coarser AMR level
    */
   void define(const DisjointBoxLayout&   a_grids,
-              const Real&                a_dx,
+              const RealVect&            a_dx,
               const ProblemDomain&       a_domain,
               BCHolder                   a_bc,
               const Copier&              a_exchange,
@@ -120,7 +120,7 @@ public:
      define function for AMRLevelOp which has no finer or coarser AMR level
    */
   void define(const DisjointBoxLayout&   a_grids,
-              const Real&                a_dx,
+              const RealVect&            a_dx,
               const ProblemDomain&       a_domain,
               BCHolder                   a_bc);
 
@@ -130,7 +130,7 @@ public:
   */
   void define(const DisjointBoxLayout& a_grids,
               const DisjointBoxLayout* a_baseBAPtr,
-              Real                     a_dxLevel,
+              RealVect                 a_dxLevel,
               int                      a_refRatio,
               const ProblemDomain&     a_domain,
               BCHolder                 a_bc);
@@ -497,7 +497,8 @@ public:
 
   // needed for homogeneous interpolation
   // set by the factory
-  Real  m_dxCrse;
+  Real      m_dxCrse;
+  RealVect  m_dxCrse_vect;
 
   bool m_homoCFinterp;
 
@@ -514,6 +515,7 @@ public:
 
 protected:
   Real                    m_dx;
+  RealVect                m_dx_vect;
   ProblemDomain           m_domain;
 
   LevelDataOps<FArrayBox> m_levelOps;
@@ -608,7 +610,7 @@ public:
   void define(const ProblemDomain&             a_coarseDomain,
               const Vector<DisjointBoxLayout>& a_grids,
               const Vector<int>&               a_refRatios,
-              const Real&                      a_coarsedx,
+              const RealVect&                  a_coarsedx,
               BCHolder                         a_bc,
               AmrHydro*                        a_amrHydro,
               NL_level                         a_nllevel,
@@ -621,7 +623,7 @@ public:
   // regular multigrid definition function --deprecated
   void define(const ProblemDomain&     a_domain,
               const DisjointBoxLayout& a_grid,
-              const Real&              a_dx,
+              const RealVect&          a_dx,
               BCHolder                 a_bc,
               int                      a_maxDepth = -1,
               Real                     a_alpha = 0.0,
@@ -642,7 +644,7 @@ private:
   Vector<ProblemDomain>     m_domains;
   Vector<DisjointBoxLayout> m_boxes;
 
-  Vector<Real> m_dx;
+  Vector<RealVect> m_dx;
   Vector<int>  m_refRatios; // refinement to next coarser level
 
   BCHolder m_bc;
