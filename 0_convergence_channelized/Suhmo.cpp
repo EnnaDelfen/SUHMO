@@ -22,6 +22,7 @@
 
 #include "HydroIBC.H"
 #include "SqrtIBC.H"
+#include "ValleyIBC.H"
 #include "memusage.H" 
 
 #ifdef CH_USE_PETSC
@@ -93,6 +94,13 @@ main(int argc, char* argv[])
             hydroIBCPtr = new HydroIBC();
         } else if (problem_type == "sqrt") {
             SqrtIBC* ibcPtr = new SqrtIBC;
+            hydroIBCPtr = static_cast<HydroIBC*>(ibcPtr);
+        } else if (problem_type == "valley") {
+            ValleyIBC* ibcPtr = new ValleyIBC;
+            ParmParse vPP("valleypp");
+            Real gamma;
+            vPP.get("gamma", gamma);
+            ibcPtr->setParameters(gamma); 
             hydroIBCPtr = static_cast<HydroIBC*>(ibcPtr);
         } else {
             MayDay::Error("bad problem_type !");
