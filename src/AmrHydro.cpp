@@ -3917,16 +3917,16 @@ AmrHydro::regrid()
             //                        *m_bumpHeight[lev],
             //                        *m_bumpSpacing[lev]);
 
-            m_IBCPtr->initializePi(levelDx, 
-                                   *m_suhmoParm,       
-                                   *m_head[lev],
-                                   *m_gapheight[lev],
-                                   *m_Pw[lev],
-                                   *m_bedelevation[lev],
-                                   *m_overburdenpress[lev],
-                                   *m_iceheight[lev],
-                                   *m_bumpHeight[lev],
-                                   *m_bumpSpacing[lev]);
+            //m_IBCPtr->initializePi(levelDx, 
+            //                       *m_suhmoParm,       
+            //                       *m_head[lev],
+            //                       *m_gapheight[lev],
+            //                       *m_Pw[lev],
+            //                       *m_bedelevation[lev],
+            //                       *m_overburdenpress[lev],
+            //                       *m_iceheight[lev],
+            //                       *m_bumpHeight[lev],
+            //                       *m_bumpSpacing[lev]);
 
 
             //if (m_verbosity > 20) {
