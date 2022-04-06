@@ -94,4 +94,4 @@ with open(csv_file, 'w') as outfile:
     writer.writerow(["#errorL2"])
     writer.writerow(["#case","head","gapHeight","Pw","Re","RHS_moulin","DT","CD"])
     for i in range(len(L2_Channel)):
-        writer.writerow([nb_cells[2*i+1], L2_head[2*i+1], L2_GH[2*i+1], L2_Pw[i], L2_Re[i], L2_moulin[i], L2_Diff[i], L2_Channel[i]])
+        writer.writerow([nb_cells[2*i+1], L2_head[i], L2_GH[i], L2_Pw[i], L2_Re[i], L2_moulin[i], L2_Diff[i], L2_Channel[i]])

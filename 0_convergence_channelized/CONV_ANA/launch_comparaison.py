@@ -6,7 +6,7 @@ import csv
 import numpy as np
 
 # exec 
-chdiff="Users/ennadelfen/Documents/0_BERKELEY/0_CODES/Chombo_git/lib/util/ChomboCompare/compare2d.Darwin.64.mpic++.gfortran.DEBUG.MPI.ex"
+chdiff="Users/ennadelfen/Documents/0_BERKELEY/0_CODES/Chombo_git/lib/util/ChomboCompare/compare2d.Darwin.64.mpic++.gfortran.OPT.MPI.ex"
 # Files to modify
 file_path ="/Users/ennadelfen/Documents/0_BERKELEY/0_CODES/SUHMO_git/0_convergence_channelized" 
 # patterns to modify
@@ -14,7 +14,7 @@ searchFor1 = "exactRoot"
 searchFor2 = "computedRoot"
 
 patterns = ["1lev", "2lev", "3lev", "4lev", "5lev", "6lev", "7lev"]
-LastIt   = ["3000", "3000", "3000", "3000", "3000", "3000", "3000"]
+LastIt   = ["3200", "3200", "3200", "3200", "3200", "3200", "3200"]
 
 # put yourself in root 
 os.chdir(file_path)
@@ -23,7 +23,7 @@ for i, pat in enumerate(patterns[0:-1]):
     print("Dealing with", pat, "and", patterns[i+1])
     tmpFile, abs_path = mkstemp()
     with open(tmpFile,'w') as new_file:
-        with open(file_path+"/inputs.compare", 'r') as old_file:
+        with open(file_path+"/CONV_ANA/inputs.compare", 'r') as old_file:
             for line in old_file:
                 if (searchFor1 in line):
                     new_file.write("compare.exactRoot =  "+patterns[i+1]+"/plot00"+LastIt[i+1]+".2d.hdf5")
@@ -44,7 +44,7 @@ for i, pat in enumerate(patterns[0:-1]):
     print("Dealing with", pat, "and", patterns[i+1])
     tmpFile, abs_path = mkstemp()
     with open(tmpFile,'w') as new_file:
-        with open(file_path+"/inputs.compare_custom", 'r') as old_file:
+        with open(file_path+"/CONV_ANA/inputs.compare_custom", 'r') as old_file:
             for line in old_file:
                 if (searchFor1 in line):
                     new_file.write("compare.exactRoot =  "+patterns[i+1]+"/plotCustom00"+LastIt[i+1]+".2d.hdf5")
