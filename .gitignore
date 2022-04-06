@@ -22,3 +22,7 @@ postproc.dat
 input*_pp
 convergence*.dat
 1_misc_scripts/
+time.table.*
+inputs.compare*
+list_files.dat
+NOTES
