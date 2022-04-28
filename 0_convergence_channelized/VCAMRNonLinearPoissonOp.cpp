@@ -538,6 +538,11 @@ void VCAMRNonLinearPoissonOp::reflux(const LevelData<FArrayBox>&        a_phiFin
                 getFlux(coarflux, coarfab, coarBCoef, faceBox, idir);
 
                 Real scale = 1.0;
+                for (int i=0; i<SpaceDim; ++i) {
+                    if (idir != i) {
+                        scale *= m_dx_vect[i];
+                    }
+                }
                 m_levfluxreg.incrementCoarse(coarflux, scale,dit(),
                                              interv, interv, idir);
           }
@@ -581,6 +586,11 @@ void VCAMRNonLinearPoissonOp::reflux(const LevelData<FArrayBox>&        a_phiFin
                           m_refToFiner);
 
                   Real scale = 1.0;
+                  for (int i=0; i<SpaceDim; ++i) {
+                      if (idir != i) {
+                          scale *= m_dx_vect[i];
+                      }
+                  }
                   m_levfluxreg.incrementFine(fineflux, scale, ditf(),
                                              interv, interv, idir, hiorlo);
               }
@@ -591,7 +601,11 @@ void VCAMRNonLinearPoissonOp::reflux(const LevelData<FArrayBox>&        a_phiFin
   CH_STOP(t3);
 
   // not taken care of yet
-  Real scale = 1.0/m_dx;
+  Real scale = 1.0;
+  for (int i=0; i<SpaceDim; ++i) {  
+      scale *= m_dx_vect[i];
+  }
+  scale = 1.0/scale;
   m_levfluxreg.reflux(a_residual, scale);
 }
 
