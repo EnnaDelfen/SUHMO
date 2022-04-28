@@ -26,3 +26,7 @@ time.table.*
 inputs.compare*
 list_files.dat
 NOTES
+0_convergence_channelized/*_base
+0_convergence_channelized/*_base2levs
+test/
+tmp/
