@@ -98,7 +98,7 @@ MountainIBC::initializePi(RealVect& a_dx,
             Real step_1   = ax*x_loc + by*y_loc + cst + 100.0 ;
             /* Ice height = ICE from 0 (should be ice only, so surface - (bed + gap)) */
             // parabolic profile
-            thisiceHeight(iv, 0) = step_1;
+            thisiceHeight(iv, 0) = 2.0*step_1;
             /* Ice overburden pressure : rho_i * g * H WITH H = Ice height - (bed + gap)*/
             thispi(iv, 0)        = Params.m_rho_i * Params.m_gravity * std::max(thisiceHeight(iv, 0), 0.0);
             /* initial gap height */
@@ -168,10 +168,10 @@ MountainIBC::initializeData(RealVect& a_dx,
     pout() << "MountainIBC::initializeData" << endl;
 
     // randomization
-    //const double mean2 = 0.0;
-    //const double stddev2 = 10;
-    //std::default_random_engine generator;
-    //std::normal_distribution<double> dist2(mean2, stddev2);
+    const double mean2 = 0.0;
+    const double stddev2 = 10;
+    std::default_random_engine generator;
+    std::normal_distribution<double> dist2(mean2, stddev2);
 
     DataIterator dit = a_head.dataIterator();
     for (dit.begin(); dit.ok(); ++dit) {
@@ -207,29 +207,64 @@ MountainIBC::initializeData(RealVect& a_dx,
             thisiceHeight(iv, 0) = ax*x_loc + by*y_loc + cst + 100.0 ; //Params.m_H;
 
             //STEP 2 -- middle finger of the dino
-            Real A_max = 2.0*(10000 - (100000-x_loc + y_loc)*(100000 - x_loc + y_loc)/2000000.0);
-            Real step_2           = std::max( ( A_max - ( ( x_loc - 50000 + (y_loc - x_loc)/2.0 )*( x_loc - 50000 + (y_loc - x_loc)/2.0 )/30000  
-                                                      + ( y_loc - 50000 - (y_loc - x_loc)/2.0 )*( y_loc - 50000 - (y_loc - x_loc)/2.0 )/30000 )) / 1e2, 0.0);
+            Real step_2 = 0.0;
+            {
+               Real angle_st2 = 35.0;
+               Real x_bd = x_loc - 100000.00;
+               Real y_bd = y_loc;
+               Real x_tilt = x_bd * std::cos(angle_st2 * 3.14159 / 180.0 ) + y_bd * std::sin(angle_st2 * 3.14159 / 180.0 );
+               Real y_tilt = -x_bd * std::sin(angle_st2 * 3.14159 / 180.0 ) + y_bd * std::cos(angle_st2 * 3.14159 / 180.0 );
+               Real A_max = 250.0;
+               Real A_gauss = A_max * std::exp(- 0.5 / (50000.0 * 50000.0) * y_tilt * y_tilt);
+               Real sigma = 12000.0 - 3000.0 * std::min( 1.0 - (50000.0-y_tilt)/50000.0,1.0);
+               step_2 = A_gauss * std::exp(- 0.5 / (sigma * sigma) * x_tilt * x_tilt);
+            }
 
-            //STEP 3 -- side finger
-            A_max = .5*(10000000 - y_loc*y_loc*y_loc*y_loc/1e12 + 40*y_loc*y_loc/8e3 );
-            Real step_3 = std::max( (A_max - ( ( x_loc - 100000 )*( x_loc - 100000 )/40 )) / 4e4, 0.0);
+            //STEP 3 -- side finger of the dino
+            Real step_3 = 0.0;
+            {
+               Real angle = 90.0;
+               Real x_bd = x_loc - 85000.00;
+               Real y_bd = y_loc;
+               Real x_tilt = x_bd * std::cos(angle * 3.14159 / 180.0 ) + y_bd * std::sin(angle * 3.14159 / 180.0 );
+               Real y_tilt = -x_bd * std::sin(angle * 3.14159 / 180.0 ) + y_bd * std::cos(angle * 3.14159 / 180.0 );
+               Real A_max = 250.0;
+               Real A_gauss = A_max * std::exp(- 0.5 / (30000.0 * 30000.0) * y_tilt * y_tilt);
+               Real sigma = 10000.0;
+               step_3 = A_gauss * std::exp(- 0.5 / (sigma * sigma) * x_tilt * x_tilt);
+            }
 
+            //STEP 4 -- subside finger of the dino
+            Real step_4 = 0.0;
+            {
+               Real angle = 60.0;
+               Real x_bd = x_loc - 55000.00;
+               Real y_bd = y_loc;
+               Real x_tilt = x_bd * std::cos(angle * 3.14159 / 180.0 ) + y_bd * std::sin(angle * 3.14159 / 180.0 );
+               Real y_tilt = -x_bd * std::sin(angle * 3.14159 / 180.0 ) + y_bd * std::cos(angle * 3.14159 / 180.0 );
+               Real A_max = 100.0;
+               Real A_gauss = A_max * std::exp(- 0.5 / (20000.0 * 20000.0) * y_tilt * y_tilt);
+               Real sigma = 5000.0;
+               step_4 = A_gauss * std::exp(- 0.5 / (sigma * sigma) * x_tilt * x_tilt);
+            }
 
-            //STEP 4 -- side finger 
-            A_max = .8*(+ x_loc*x_loc*x_loc*x_loc/1e12 - 50*x_loc*x_loc/7e3 );
-            //A_max = .8*(-x_loc*x_loc*x_loc*x_loc/1e12 + 50*x_loc*x_loc/7e3 );
-            Real step_4 = std::max( (A_max - y_loc *y_loc/50 ) / 5e4, 0.0);
-
-            //STEP 5 -- other side finger
-            A_max = .8*(-2.*(x_loc-30000)*(x_loc-30000)*(x_loc-30000)*(x_loc-30000)/1e12 + 70*(x_loc)*(x_loc)/7e3 );
-            Real step_5 = std::max( (A_max - (y_loc+2000) *(y_loc+2000)/20 ) / 17e4, 0.0);
-            //save
-            //A_max = .8*(-x_loc*x_loc*x_loc*x_loc/1e12 + 50*x_loc*x_loc/7e3 );
-            //Real step_5 = std::max( (A_max - y_loc *y_loc/40 ) / 3e4, 0.0);
+            //STEP 5 -- other side of the dino
+            Real step_5 = 0.0;
+            {
+               Real angle = 2.0;
+               Real x_bd = x_loc - 100000.00;
+               Real y_bd = y_loc - 20000.0;
+               Real x_tilt = x_bd * std::cos(angle * 3.14159 / 180.0 ) + y_bd * std::sin(angle * 3.14159 / 180.0 );
+               Real y_tilt = -x_bd * std::sin(angle * 3.14159 / 180.0 ) + y_bd * std::cos(angle * 3.14159 / 180.0 );
+               Real A_max = 300.0;
+               Real A_gauss = A_max * std::exp(- 0.5 / (35000.0 * 35000.0) * y_tilt * y_tilt);
+               Real sigma = 6000.0;
+               step_5 = A_gauss * std::exp(- 0.5 / (sigma * sigma) * x_tilt * x_tilt);
+            }
 
             // Putting all together
-            thiszbed(iv, 0)    = step_1 + std::max(std::max(step_3,step_2), std::max(step_4, step_5));
+            thiszbed(iv, 0)    = step_1 + step_2 + step_3 + step_4 + step_5;
+            thiszbed(iv, 0)    = std::max( thiszbed(iv, 0) + dist2(generator), 0.0);
              
             /* Ice overburden pressure : rho_i * g * H WITH H = Ice height - (bed + gap)*/
             thispi(iv, 0)        = Params.m_rho_i * Params.m_gravity * std::max(thisiceHeight(iv, 0), 0.0);
