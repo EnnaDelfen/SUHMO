@@ -23,3 +23,5 @@ input*_pp
 convergence*.dat
 1_misc_scripts/
 time.table.*
+0_convergence_channelized/*_base*/
+test/
