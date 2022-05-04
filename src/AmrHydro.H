@@ -377,6 +377,8 @@ protected:
     // grow tags in all direction dir by max(0,m_tags_grow_dir[dir] -  m_tags_grow)
     IntVect m_tags_grow_dir;
 
+    bool m_regrid; // add this var to know when we have just performed a regrid
+
     /// refinement ratios
     Vector<int> m_refinement_ratios;
 
@@ -453,6 +455,7 @@ protected:
     /* Bed randomization */
     Vector<RefCountedPtr<LevelData<FArrayBox>> > m_bumpHeight;            // typical ground bump height
     Vector<RefCountedPtr<LevelData<FArrayBox>> > m_bumpSpacing;           // typical ground bump spacing
+    Vector<RefCountedPtr<LevelData<FArrayBox>>> m_moulin_source_term;                     // Reynolds number
    
 
     //Vector<LevelData<FArrayBox>*> m_gradZb;      

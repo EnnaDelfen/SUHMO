@@ -734,6 +734,7 @@ AmrHydro::initialize()
     m_restart_time = 0.0;
     m_cur_step = 0;    // start at dt = 0
     m_cur_PicardIte = 0;
+    m_regrid = true;
 
     ParmParse ppAmr("AmrHydro");
     ppAmr.get("max_level", m_max_level);  // max level
@@ -981,6 +982,7 @@ AmrHydro::initialize()
         m_Re.resize(m_max_level + 1);
         m_meltRate.resize(m_max_level + 1);
         m_iceheight.resize(m_max_level + 1);
+        m_moulin_source_term.resize(m_max_level + 1);
 
         // Time constant variables
         m_bedelevation.resize(m_max_level + 1);
@@ -1008,6 +1010,7 @@ AmrHydro::initialize()
             m_Re[lev]          = RefCountedPtr<LevelData<FArrayBox>>  (new LevelData<FArrayBox>);
             m_meltRate[lev]    = RefCountedPtr<LevelData<FArrayBox>>  (new LevelData<FArrayBox>);
             m_iceheight[lev]   = RefCountedPtr<LevelData<FArrayBox>>  (new LevelData<FArrayBox>);
+            m_moulin_source_term[lev] = RefCountedPtr<LevelData<FArrayBox>>  (new LevelData<FArrayBox>);
 
             m_bedelevation[lev]    = RefCountedPtr<LevelData<FArrayBox>>  (new LevelData<FArrayBox>);
             m_overburdenpress[lev] = RefCountedPtr<LevelData<FArrayBox>>  (new LevelData<FArrayBox>);
@@ -1768,7 +1771,7 @@ AmrHydro::Calc_moulin_integral(std::vector<Real>& a_moulinsInteg,
                IntVect iv = bit();
                // Loop over all moulins
                for (int m = 0; m<m_suhmoParm->m_n_moulins; m++) {
-                   a_moulinsInteg[m] += moulinSrcTmp(iv,m) * m_amrDx[lev][0] * m_amrDx[lev][1]; 
+                   a_moulinsInteg[m] += moulinSrcTmp(iv,m) * m_amrDx[lev][0] * m_amrDx[lev][1]; // m2  
                }
            }
        }
@@ -1782,21 +1785,21 @@ AmrHydro::Calc_moulin_integral(std::vector<Real>& a_moulinsInteg,
                                   MPI_SUM, Chombo_MPI::comm);
        a_moulinsInteg[m] = recv;
 
-       if (m_verbosity > 3) {
-           pout() << "moulin: " << m << ", integral (vol. rate): " << a_moulinsInteg[m]  << endl; 
-       } 
+       //if (m_verbosity > 3) {
+       //    pout() << "moulin: " << m << ", integral (m2): " << a_moulinsInteg[m]  << endl; 
+       //} 
    }
 #endif
 }
 
 void 
-AmrHydro::Calc_moulin_source_term_distributed (LevelData<FArrayBox>& levelMoulinSrc,
-                                               LevelData<FArrayBox>& levelMoulinSrcNoNorm,
-                                               std::vector<Real> a_moulinsInteg,
+AmrHydro::Calc_moulin_source_term_distributed (LevelData<FArrayBox>& levelMoulinSrc,        // m/s
+                                               LevelData<FArrayBox>& levelMoulinSrcNoNorm,  // no units
+                                               std::vector<Real> a_moulinsInteg,            // m2
                                                int curr_level) 
 {
    // UNITS FOR m_moulin_flux SHOULD BE M3/S
-   std::vector<Real> a_moulinsIntegFinal;    // m.s-1 Sliding velocity
+   std::vector<Real> a_moulinsIntegFinal;    // m3.s-1
    a_moulinsIntegFinal.resize(m_suhmoParm->m_n_moulins, 0.0);
    DataIterator dit = levelMoulinSrc.dataIterator();
    for (dit.begin(); dit.ok(); ++dit) {
@@ -1810,7 +1813,7 @@ AmrHydro::Calc_moulin_source_term_distributed (LevelData<FArrayBox>& levelMoulin
            IntVect iv = bit();
            for (int m = 0; m<m_suhmoParm->m_n_moulins; m++) {
                moulinSrc(iv,0) += moulinSrcTmp(iv,m) * std::max( (1.0 - m_suhmoParm->m_runoff * std::sin(2.0 * Pi * (m_time - m_restart_time) / 86400.)), 0.0)  
-                                  / a_moulinsInteg[m] *  m_suhmoParm->m_moulin_flux[m] ; 
+                                  / a_moulinsInteg[m] *  m_suhmoParm->m_moulin_flux[m] ; // m3/s/m2 -> m/s 
                a_moulinsIntegFinal[m] += m_suhmoParm->m_distributed_input * m_amrDx[curr_level][0] * m_amrDx[curr_level][1] + moulinSrcTmp(iv,m) * std::max( (1.0 - m_suhmoParm->m_runoff * std::sin(2.0 * Pi * (m_time - m_restart_time) / 86400.)), 0.0)   
                                   / a_moulinsInteg[m] * m_suhmoParm->m_moulin_flux[m] * m_amrDx[curr_level][0] * m_amrDx[curr_level][1]; 
            }
@@ -1984,7 +1987,6 @@ AmrHydro::timeStepFAS(Real a_dt)
     Vector<LevelData<FArrayBox>*> a_gh_curr;
     Vector<LevelData<FArrayBox>*> a_gapheight_lagged;
     Vector<LevelData<FArrayBox>*> RHS_h;
-    Vector<LevelData<FArrayBox>*> moulin_source_term;
     Vector<LevelData<FArrayBox>*> moulin_source_term_noNorm;
     Vector<LevelData<FArrayBox>*> RHS_b;
     Vector<LevelData<FArrayBox>*> a_ReQwIter;
@@ -2004,7 +2006,6 @@ AmrHydro::timeStepFAS(Real a_dt)
     a_gh_curr.resize(m_finest_level + 1, NULL);
     a_gapheight_lagged.resize(m_finest_level + 1, NULL);
     RHS_h.resize(m_finest_level + 1, NULL);
-    moulin_source_term.resize(m_finest_level + 1, NULL);
     moulin_source_term_noNorm.resize(m_finest_level + 1, NULL);
     RHS_b.resize(m_finest_level + 1, NULL);
     a_ReQwIter.resize(m_finest_level + 1, NULL);
@@ -2074,7 +2075,6 @@ AmrHydro::timeStepFAS(Real a_dt)
 
         // Head and b RHS
         RHS_h[lev]                = new LevelData<FArrayBox>(m_amrGrids[lev], 1, IntVect::Zero);
-        moulin_source_term[lev]   = new LevelData<FArrayBox>(m_amrGrids[lev], 1, HeadGhostVect);
         if (m_suhmoParm->m_n_moulins > 0) {
             moulin_source_term_noNorm[lev]   = new LevelData<FArrayBox>(m_amrGrids[lev], m_suhmoParm->m_n_moulins, HeadGhostVect);
         }
@@ -2407,25 +2407,30 @@ AmrHydro::timeStepFAS(Real a_dt)
         }
 
         // Compute MoulinSrc 
-        if (m_verbosity > 3) {
-            pout() <<"        Compute Moulins "<< endl;
-        }
         // UNITS FOR m_moulin_flux SHOULD BE M3/S
         // UNITS FOR m_distributed_input SHOULD BE M/S
         if (m_suhmoParm->m_n_moulins > 0) {
-            std::vector<Real> a_moulinsInteg(m_suhmoParm->m_n_moulins, 0.0);    // m.s-1 Sliding velocity
-            Calc_moulin_integral(a_moulinsInteg, moulin_source_term_noNorm);
-            for (int lev = 0; lev <= m_finest_level; lev++) {
-                LevelData<FArrayBox>& levelmoulin_source_term         = *moulin_source_term[lev];
-                LevelData<FArrayBox>& levelmoulin_source_term_noNorm  = *moulin_source_term_noNorm[lev];
-                Calc_moulin_source_term_distributed(levelmoulin_source_term, 
-                                                    levelmoulin_source_term_noNorm,
-                                                    a_moulinsInteg,
-                                                    lev);
+            if (m_regrid) { // useful for insane amount of moulins
+                if (m_verbosity > 3) {
+                    pout() <<"        Compute moulins "<< endl;
+                }
+                std::vector<Real> a_moulinsInteg(m_suhmoParm->m_n_moulins, 0.0);    
+                Calc_moulin_integral(a_moulinsInteg, moulin_source_term_noNorm); // m2 and no units
+                for (int lev = 0; lev <= m_finest_level; lev++) {
+                    LevelData<FArrayBox>& levelmoulin_source_term         = *m_moulin_source_term[lev];
+                    LevelData<FArrayBox>& levelmoulin_source_term_noNorm  = *moulin_source_term_noNorm[lev];
+                    Calc_moulin_source_term_distributed(levelmoulin_source_term,        // m/s
+                                                        levelmoulin_source_term_noNorm, // no units
+                                                        a_moulinsInteg,                 // m2
+                                                        lev);
+                }
             }
         } else if (m_suhmoParm->m_n_moulins < 0) {
+            if (m_verbosity > 3) {
+                pout() <<"        Compute distributed water input "<< endl;
+            }
             for (int lev = 0; lev <= m_finest_level; lev++) {
-                LevelData<FArrayBox>& levelmoulin_source_term = *moulin_source_term[lev];
+                LevelData<FArrayBox>& levelmoulin_source_term = *m_moulin_source_term[lev];
                 LevelData<FArrayBox>& levelPi                 = *m_overburdenpress[lev];
                 LevelData<FArrayBox>& levelIceHeight          = *m_iceheight[lev];
 
@@ -2459,8 +2464,11 @@ AmrHydro::timeStepFAS(Real a_dt)
                 }
             }
         } else {
+            if (m_verbosity > 3) {
+                pout() <<"        No external water input "<< endl;
+            }
             for (int lev = 0; lev <= m_finest_level; lev++) {
-                LevelData<FArrayBox>& levelmoulin_source_term = *moulin_source_term[lev];
+                LevelData<FArrayBox>& levelmoulin_source_term = *m_moulin_source_term[lev];
                 DisjointBoxLayout& levelGrids                 = m_amrGrids[lev];
                 DataIterator dit                              = levelGrids.dataIterator();
                 for (dit.begin(); dit.ok(); ++dit) {
@@ -2474,7 +2482,7 @@ AmrHydro::timeStepFAS(Real a_dt)
             if (m_suhmoParm->m_n_moulins > 0) {
                 if (lev > 0 ) {
                     CoarseAverage averager(m_amrGrids[lev], 1, m_refinement_ratios[lev-1]);
-                    averager.averageToCoarse(*moulin_source_term[lev - 1], *moulin_source_term[lev]);
+                    averager.averageToCoarse(*m_moulin_source_term[lev - 1], *m_moulin_source_term[lev]);
                 }
             }
         }
@@ -2486,7 +2494,7 @@ AmrHydro::timeStepFAS(Real a_dt)
                               m_amrDx[lev][0], m_refinement_ratios[lev-1],  
                               1,  // num comps
                               m_amrDomains[lev]);
-            qcfi.coarseFineInterp(*moulin_source_term[lev], *moulin_source_term[lev-1]);
+            qcfi.coarseFineInterp(*m_moulin_source_term[lev], *m_moulin_source_term[lev-1]);
         }
 
 
@@ -2499,7 +2507,7 @@ AmrHydro::timeStepFAS(Real a_dt)
             // CC quantities
             LevelData<FArrayBox>& levelB                  = *m_gapheight[lev];    
             LevelData<FArrayBox>& levelRHSh               = *RHS_h[lev];
-            LevelData<FArrayBox>& levelmoulin_source_term = *moulin_source_term[lev];
+            LevelData<FArrayBox>& levelmoulin_source_term = *m_moulin_source_term[lev];
             LevelData<FArrayBox>& levelPi                 = *m_overburdenpress[lev];
             LevelData<FArrayBox>& levelPw                 = *m_Pw[lev];
             LevelData<FArrayBox>& levelZb                 = *m_bedelevation[lev];
@@ -3087,7 +3095,7 @@ AmrHydro::timeStepFAS(Real a_dt)
             stuffToPlot[1][lev]  = new LevelData<FArrayBox>(m_amrGrids[lev], 1, IntVect::Zero);
             stuffToPlot[2][lev]  = new LevelData<FArrayBox>(m_amrGrids[lev], 1, IntVect::Zero);
             stuffToPlot[3][lev]  = new LevelData<FArrayBox>(m_amrGrids[lev], 1, IntVect::Zero);
-            stuffToPlot[4][lev]  = new LevelData<FArrayBox>(m_amrGrids[lev], 1, IntVect::Zero);
+            stuffToPlot[4][lev]  = new LevelData<FArrayBox>(m_amrGrids[lev], 1, IntVect::Unit);
             stuffToPlot[5][lev]  = new LevelData<FArrayBox>(m_amrGrids[lev], 1, IntVect::Zero);
             stuffToPlot[6][lev]  = new LevelData<FArrayBox>(m_amrGrids[lev], 1, IntVect::Zero);
             stuffToPlot[7][lev]  = new LevelData<FArrayBox>(m_amrGrids[lev], 1, IntVect::Zero);
@@ -3108,16 +3116,18 @@ AmrHydro::timeStepFAS(Real a_dt)
             LevelData<FArrayBox>& levelRHSB      = *RHS_b[lev];
             LevelData<FArrayBox>& levelRHSBSTP   = *stuffToPlot[3][lev];
 
-            LevelData<FArrayBox>& levelRHSB1     = *MR_A[lev];
+            //LevelData<FArrayBox>& levelRHSB1     = *MR_A[lev];
+            LevelData<FArrayBox>& levelRHSB1     = *m_bedelevation[lev];
             LevelData<FArrayBox>& levelRHSB1STP  = *stuffToPlot[4][lev];
 
-            LevelData<FArrayBox>& levelRHSB2     = *MR_B[lev];
+            //LevelData<FArrayBox>& levelRHSB2     = *MR_B[lev];
+            LevelData<FArrayBox>& levelRHSB2     = *m_iceheight[lev];
             LevelData<FArrayBox>& levelRHSB2STP  = *stuffToPlot[5][lev];
 
             LevelData<FArrayBox>& levelRHSB3     = *MR_C[lev];
             LevelData<FArrayBox>& levelRHSB3STP  = *stuffToPlot[6][lev];
 
-            LevelData<FArrayBox>& levelRHSH1     = *moulin_source_term[lev];
+            LevelData<FArrayBox>& levelRHSH1     = *m_moulin_source_term[lev];
             LevelData<FArrayBox>& levelRHSH1STP  = *stuffToPlot[7][lev];
 
             LevelData<FArrayBox>& levelCD        = *a_chanDegree[lev];
@@ -3215,7 +3225,7 @@ AmrHydro::timeStepFAS(Real a_dt)
         levelchanDegree.exchange();
         CellToEdge(levelchanDegree, levelCD_ec);
 
-        LevelData<FArrayBox>& levelMoulinSrc  = *moulin_source_term[0];
+        LevelData<FArrayBox>& levelMoulinSrc  = *m_moulin_source_term[0];
         LevelData<FArrayBox>& levelmR         = *m_meltRate[0];
         LevelData<FArrayBox>& levelPressi     = *m_overburdenpress[0];
         LevelData<FArrayBox>& levelPw         = *m_Pw[0];
@@ -3643,7 +3653,6 @@ AmrHydro::timeStepFAS(Real a_dt)
             delete a_gh_curr[lev];
             delete a_gapheight_lagged[lev];
             delete RHS_h[lev];
-            delete moulin_source_term[lev];
             if (m_suhmoParm->m_n_moulins > 0) {
                 delete moulin_source_term_noNorm[lev];
             }
@@ -3691,6 +3700,10 @@ AmrHydro::timeStepFAS(Real a_dt)
             pout() << "Time = " << m_time << "  level " << lev << " cells advanced = " << m_num_cells[lev] << endl;
         }
         pout() << endl;
+    }
+
+    if (m_regrid) {
+        m_regrid = false;
     }
 }
 
@@ -3846,6 +3859,7 @@ AmrHydro::regrid()
             // Other vars: Re / Pw / Qw / mR
             m_Re[lev]              = RefCountedPtr<LevelData<FArrayBox>> (new LevelData<FArrayBox>(newDBL, m_Re[0]->nComp(), m_Re[0]->ghostVect()));
             m_qw[lev]              = RefCountedPtr<LevelData<FArrayBox>> (new LevelData<FArrayBox>(newDBL, m_qw[0]->nComp(), m_qw[0]->ghostVect()));
+            m_moulin_source_term[lev] = RefCountedPtr<LevelData<FArrayBox>> (new LevelData<FArrayBox>(newDBL, m_moulin_source_term[0]->nComp(), m_moulin_source_term[0]->ghostVect()));
             // Gradients
             m_gradhead[lev]        = RefCountedPtr<LevelData<FArrayBox>> (new LevelData<FArrayBox>(newDBL, m_gradhead[0]->nComp(), m_gradhead[0]->ghostVect()));
             m_gradhead_ec[lev]     = RefCountedPtr<LevelData<FluxBox>> (new LevelData<FluxBox>(newDBL, m_gradhead_ec[0]->nComp(), IntVect::Zero));
@@ -3911,16 +3925,16 @@ AmrHydro::regrid()
             //                        *m_bumpHeight[lev],
             //                        *m_bumpSpacing[lev]);
 
-            m_IBCPtr->initializePi(levelDx, 
-                                   *m_suhmoParm,       
-                                   *m_head[lev],
-                                   *m_gapheight[lev],
-                                   *m_Pw[lev],
-                                   *m_bedelevation[lev],
-                                   *m_overburdenpress[lev],
-                                   *m_iceheight[lev],
-                                   *m_bumpHeight[lev],
-                                   *m_bumpSpacing[lev]);
+            //m_IBCPtr->initializePi(levelDx, 
+            //                       *m_suhmoParm,       
+            //                       *m_head[lev],
+            //                       *m_gapheight[lev],
+            //                       *m_Pw[lev],
+            //                       *m_bedelevation[lev],
+            //                       *m_overburdenpress[lev],
+            //                       *m_iceheight[lev],
+            //                       *m_bumpHeight[lev],
+            //                       *m_bumpSpacing[lev]);
 
 
             //if (m_verbosity > 20) {
@@ -3991,6 +4005,8 @@ AmrHydro::regrid()
         } // end loop over levels to determine covered levels
 
     } // end if max level > 0 in the first place
+
+    m_regrid = true;
 }
 
 void
@@ -4347,6 +4363,7 @@ AmrHydro::levelSetup(int a_level, const DisjointBoxLayout& a_grids)
     m_Re[a_level]              = RefCountedPtr<LevelData<FArrayBox>> (new LevelData<FArrayBox>(a_grids, nPhiComp, HeadGhostVect));
     m_meltRate[a_level]        = RefCountedPtr<LevelData<FArrayBox>> (new LevelData<FArrayBox>(a_grids, nPhiComp, HeadGhostVect));
     m_iceheight[a_level]       = RefCountedPtr<LevelData<FArrayBox>> (new LevelData<FArrayBox>(a_grids, nPhiComp, HeadGhostVect));
+    m_moulin_source_term[a_level]  = RefCountedPtr<LevelData<FArrayBox>> (new LevelData<FArrayBox>(a_grids, nPhiComp, HeadGhostVect));
     m_bedelevation[a_level]    = RefCountedPtr<LevelData<FArrayBox>> (new LevelData<FArrayBox>(a_grids, nPhiComp, HeadGhostVect));
     m_overburdenpress[a_level] = RefCountedPtr<LevelData<FArrayBox>> (new LevelData<FArrayBox>(a_grids, nPhiComp, HeadGhostVect));
     m_bumpHeight[a_level]      = RefCountedPtr<LevelData<FArrayBox>> (new LevelData<FArrayBox>(a_grids, nPhiComp, HeadGhostVect));
@@ -4861,7 +4878,7 @@ AmrHydro::writeCheckpointFile() const
     header.m_int["current_step"] = m_cur_step;
     header.m_real["time"] = m_time;
     header.m_real["dt"] = m_dt;
-    header.m_int["num_comps"] = 9; // H/B/Pice/Zb/Re/Hice/BH/BL/MR
+    header.m_int["num_comps"] = 10; // H/B/Pice/Zb/Re/Hice/BH/BL/MR/MS
     header.m_real["cfl"] = m_cfl;
 
     // periodicity info
@@ -4891,6 +4908,7 @@ AmrHydro::writeCheckpointFile() const
     string bumpHeightName("bumpHeight"); 
     string bumpSpacingName("bumpSpacing"); 
     string meltRateName("meltRate"); 
+    string MSName("moulinSourceTerm"); 
 
     int nComp = 0;
     char compStr[30];
@@ -4929,6 +4947,10 @@ AmrHydro::writeCheckpointFile() const
     // meltRate
     sprintf(compStr, "component_%04d", nComp);
     header.m_string[compStr] = meltRateName;
+    nComp++;
+    // MS
+    sprintf(compStr, "component_%04d", nComp);
+    header.m_string[compStr] = MSName;
 
     header.writeToFile(handle);
 
@@ -4967,6 +4989,7 @@ AmrHydro::writeCheckpointFile() const
             write(handle, *m_bumpHeight[lev], "bumpHeightData", m_bumpHeight[lev]->ghostVect());
             write(handle, *m_bumpSpacing[lev], "bumpSpacingData", m_bumpSpacing[lev]->ghostVect());
             write(handle, *m_meltRate[lev], "meltRateData", m_meltRate[lev]->ghostVect());
+            write(handle, *m_moulin_source_term[lev], "moulinSourceTermData", m_moulin_source_term[lev]->ghostVect());
         } // end loop over levels
     }
 
@@ -5115,6 +5138,7 @@ AmrHydro::readCheckpointFile(HDF5Handle& a_handle)
     m_Re.resize(m_max_level + 1);
     m_meltRate.resize(m_max_level + 1);
     m_iceheight.resize(m_max_level + 1);
+    m_moulin_source_term.resize(m_max_level + 1);
     m_bedelevation.resize(m_max_level + 1);
     m_overburdenpress.resize(m_max_level + 1);
     m_bumpHeight.resize(m_max_level + 1);
@@ -5201,6 +5225,7 @@ AmrHydro::readCheckpointFile(HDF5Handle& a_handle)
             m_Re[lev]            = RefCountedPtr<LevelData<FArrayBox>> (new LevelData<FArrayBox>(levelDBL, nPhiComp, nGhost));
             m_meltRate[lev]      = RefCountedPtr<LevelData<FArrayBox>> (new LevelData<FArrayBox>(levelDBL, nPhiComp, nGhost));
             m_iceheight[lev]     = RefCountedPtr<LevelData<FArrayBox>> (new LevelData<FArrayBox>(levelDBL, nPhiComp, nGhost));
+            m_moulin_source_term[lev] = RefCountedPtr<LevelData<FArrayBox>> (new LevelData<FArrayBox>(levelDBL, nPhiComp, nGhost));
             m_bedelevation[lev]  = RefCountedPtr<LevelData<FArrayBox>> (new LevelData<FArrayBox>(levelDBL, nPhiComp, nGhost));
             m_overburdenpress[lev]   = RefCountedPtr<LevelData<FArrayBox>> (new LevelData<FArrayBox>(levelDBL, nPhiComp, nGhost));
             m_bumpHeight[lev]        = RefCountedPtr<LevelData<FArrayBox>> (new LevelData<FArrayBox>(levelDBL, nPhiComp, nGhost)); 
@@ -5297,6 +5322,16 @@ AmrHydro::readCheckpointFile(HDF5Handle& a_handle)
             for (DataIterator dit(levelDBL); dit.ok(); ++dit) {
                 (*m_meltRate[lev])[dit].copy(tmpmeltRate[dit]);
             }
+            /* MS */
+            //LevelData<FArrayBox> tmpMS;
+            //tmpMS.define(old_head);
+            //dataStatus = read<FArrayBox>(a_handle, tmpMS, "moulinSourceTermData", levelDBL);
+            //if (dataStatus != 0) {
+            //    MayDay::Error("checkpoint file does not contain MS data");
+            //}
+            //for (DataIterator dit(levelDBL); dit.ok(); ++dit) {
+            //    (*m_moulin_source_term[lev])[dit].copy(tmpMS[dit]);
+            //}
 
         } // end if this level is defined
     }     // end loop over levels
