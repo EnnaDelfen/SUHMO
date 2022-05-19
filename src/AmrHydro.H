@@ -20,6 +20,7 @@
 #include "BiCGStabSolver.H"
 #include "CellToEdge.H"
 #include "EdgeToCell.H"
+#include "RelaxSolver.H"
 #include "CH_HDF5.H"
 
 #include "NamespaceHeader.H"

@@ -226,14 +226,14 @@ void DirichletValue(Real* pos,
                     Real* a_valC)
 {
     Real bcVal = 0.0;
-    if ( dir == 0 ) {
-       if (side == Side::Lo) {
+    if ( *dir == 0 ) {
+       if (*side == Side::Lo) {
           bcVal = GlobalBCRS::s_xlo_diri;
        } else { 
           bcVal = GlobalBCRS::s_xhi_diri;
        }    
-    } else if ( dir == 1 ) {
-       if (side == Side::Lo) {
+    } else if ( *dir == 1 ) {
+       if (*side == Side::Lo) {
           bcVal = GlobalBCRS::s_ylo_diri;
        } else { 
           bcVal = GlobalBCRS::s_yhi_diri;
@@ -335,7 +335,7 @@ void RobinBC(FArrayBox& a_state,
                        a_dx,
                        a_homogeneous,
                        DirichletValue,
-                       i,
+                       dir,
                        Side::Lo,
                        1);
             // NEUM
@@ -348,13 +348,13 @@ void RobinBC(FArrayBox& a_state,
 		               dir,
 		               Side::Lo);
             // ROBIN
-            } else if (GlobalBCRS::s_bcLo[i] == 2) {
+            } else if (GlobalBCRS::s_bcLo[dir] == 2) {
                 RobinBC(a_state,
                         valid,
                         a_dx,
                         a_homogeneous,
                         RobinValue,
-                        i,
+                        dir,
                         Side::Lo);
             }
         }
@@ -367,8 +367,8 @@ void RobinBC(FArrayBox& a_state,
                        valid,
                        a_dx,
                        a_homogeneous,
-                       DiriValue,
-                       i,
+                       DirichletValue,
+                       dir,
                        Side::Hi,
                        1);
             // NEUM
@@ -381,13 +381,13 @@ void RobinBC(FArrayBox& a_state,
 		               dir,
                        Side::Hi);
             // ROBIN
-            } else if (GlobalBCRS::s_bcHi[i] == 2) {
+            } else if (GlobalBCRS::s_bcHi[dir] == 2) {
                 RobinBC(a_state,
                         valid,
                         a_dx,
                         a_homogeneous,
                         RobinValue,
-                        i,
+                        dir,
                         Side::Hi);
             }
         }
@@ -504,7 +504,8 @@ AmrHydro::SolveForGap_nl(const Vector<DisjointBoxLayout>&               a_grids,
     amrSolver = new AMRMultiGrid<LevelData<FArrayBox> >();
 
     // bottom solver ?
-    BiCGStabSolver<LevelData<FArrayBox> > bottomSolver;
+    //BiCGStabSolver<LevelData<FArrayBox> > bottomSolver;
+    RelaxSolver<LevelData<FArrayBox> > bottomSolver;
     bottomSolver.m_verbosity = 1;
 
     int numLevels = m_finest_level + 1;
@@ -601,7 +602,8 @@ AmrHydro::SolveForHead_nl(const Vector<DisjointBoxLayout>&               a_grids
     amrSolver = new AMRFASMultiGrid<LevelData<FArrayBox> >();
 
     // bottom solver ?
-    BiCGStabSolver<LevelData<FArrayBox> > bottomSolver;
+    //BiCGStabSolver<LevelData<FArrayBox> > bottomSolver;
+    RelaxSolver<LevelData<FArrayBox> > bottomSolver;
     if (m_verbosity > 3) {
         bottomSolver.m_verbosity = 4;
     } else {
@@ -613,7 +615,7 @@ AmrHydro::SolveForHead_nl(const Vector<DisjointBoxLayout>&               a_grids
                       &bottomSolver, numLevels);
 
     int numSmooth = 4;  // number of relax before averaging
-    int numBottom = 8;  // num of bottom smoothings
+    int numBottom = 16;  // num of bottom smoothings
     int numMG     = 1;  // Vcycle selected
     int maxIter   = 100; // max number of v cycles
     Real eps        =  1.0e-10;  // solution tolerance
