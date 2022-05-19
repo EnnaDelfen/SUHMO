@@ -201,7 +201,7 @@ void VCAMRNonLinearPoissonOp::preCond(LevelData<FArrayBox>&       a_phi,
 
       // approximate inverse
       a_phi[dit].copy(a_rhs[dit]);
-      a_phi[dit].mult(m_lambda[dit], gridBox, 0, 0, ncomp);
+      a_phi[dit].divide(m_lambda[dit], gridBox, 0, 0, ncomp);
     }
   int dummyDepth = 0;
   m_print = false;
@@ -228,6 +228,46 @@ void VCAMRNonLinearPoissonOp::applyOpMg(LevelData<FArrayBox>& a_lhs,
 
    applyOpI(a_lhs, a_phi, a_homogeneous);
 
+}
+
+void VCAMRNonLinearPoissonOp::preCond(LevelData<FArrayBox>&       a_phi,
+                                      const LevelData<FArrayBox>& a_res,
+                                      const LevelData<FArrayBox>& a_rhs)
+{
+  CH_TIME("VCAMRNonLinearPoissonOp::preCond");
+
+  // diagonal term of this operator in:
+  //
+  //       alpha * a(i)
+  //     + beta  * sum_over_dir (b(i-1/2*e_dir) + b(i+1/2*e_dir)) / (dx*dx)
+  //
+  // The inverse of this is our initial multiplier.
+
+  int ncomp = a_phi.nComp();
+
+  CH_assert(m_lambda.isDefined());
+  CH_assert(a_rhs.nComp()    == ncomp);
+  CH_assert(m_bCoef->nComp() == ncomp);
+
+  // Recompute the relaxation coefficient if needed.
+  resetLambda();
+
+  //incr(a_phi, a_res, mult);
+  // don't need to use a Copier -- plain copy will do
+  //DataIterator dit = a_phi.dataIterator();
+  //for (dit.begin(); dit.ok(); ++dit)
+  //  {
+  //    // also need to average and sum face-centered bCoefs to cell-centers
+  //    Box gridBox = a_res[dit].box();
+
+  //    // approximate inverse
+  //    a_phi[dit].copy(a_res[dit]);
+  //    a_phi[dit].divide(m_lambda[dit], gridBox, 0, 0, ncomp);
+  //  }
+
+  int dummyDepth = 0;
+  m_print = false;
+  relax(a_phi, a_rhs, 2, dummyDepth, dummyDepth);
 }
 
 void VCAMRNonLinearPoissonOp::applyOpI(LevelData<FArrayBox>&       a_lhs,
@@ -900,6 +940,8 @@ void VCAMRNonLinearPoissonOpFactory::define(const ProblemDomain&         a_coars
   m_update_operator = a_update_operator;
   m_print = false;
 
+  m_use_FAS = true; // May need to make this a define arg ... but I'm only working with FAS usually
+
   m_B  = a_B;  // Gap Height
   m_Pi = a_Pi; // Overb Press  
   m_zb = a_zb; // Bed Elevation
@@ -1031,6 +1073,8 @@ MGLevelOp<LevelData<FArrayBox> >* VCAMRNonLinearPoissonOpFactory::MGnewOp(const 
   newOp->m_nllevel     = m_nllevel;
   newOp->m_waterFluxlevel = m_waterFluxlevel;
   newOp->m_print_data     = m_print_data;
+
+  newOp->m_use_FAS = m_use_FAS;
 
   if (a_depth == 0) {
       // don't need to coarsen anything for this
@@ -1206,6 +1250,8 @@ AMRLevelOp<LevelData<FArrayBox> >* VCAMRNonLinearPoissonOpFactory::AMRnewOp(cons
   newOp->m_nllevel        = m_nllevel;
   newOp->m_waterFluxlevel = m_waterFluxlevel;
   newOp->m_print_data     = m_print_data;
+
+  newOp->m_use_FAS = m_use_FAS;
 
   // Problem SPECIFIC
   newOp->m_B  = m_B[ref];  // Gap Height

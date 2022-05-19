@@ -37,6 +37,7 @@ public:
     m_verbosity = 3;
     m_update_operator = true;
     m_print = false;
+    m_use_FAS = true;
   }
 
   ///
@@ -65,6 +66,9 @@ public:
   virtual void preCond(LevelData<FArrayBox>&       a_correction,
                        const LevelData<FArrayBox>& a_residual);
 
+  virtual void preCond(LevelData<FArrayBox>&       a_correction,
+                       const LevelData<FArrayBox>& a_residual,
+                       const LevelData<FArrayBox>& a_rhs);
   // FAS Multigrid needs access to a method which will apply an operator
   virtual void applyOpMg(LevelData<FArrayBox>& a_lhs,
                          LevelData<FArrayBox>& a_phi,
@@ -373,6 +377,8 @@ private:
   Real m_verbosity;
   bool m_update_operator;
   bool m_print;
+
+  bool m_use_FAS;
  
   Vector<RefCountedPtr<LevelData<FArrayBox> > > m_aCoef;
   Vector<RefCountedPtr<LevelData<FluxBox> > >   m_bCoef;

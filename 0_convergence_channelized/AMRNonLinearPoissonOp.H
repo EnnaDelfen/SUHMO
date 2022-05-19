@@ -164,6 +164,10 @@ public:
   virtual void preCond(LevelData<FArrayBox>&       a_correction,
                        const LevelData<FArrayBox>& a_residual);
 
+  virtual void preCond(LevelData<FArrayBox>&       a_correction,
+                       const LevelData<FArrayBox>& a_residual,
+                       const LevelData<FArrayBox>& a_rhs);
+
   virtual void applyOp(LevelData<FArrayBox>&       a_lhs,
                        const LevelData<FArrayBox>& a_phi,
                        bool                        a_homogeneous = false);
@@ -500,7 +504,7 @@ public:
   Real      m_dxCrse;
   RealVect  m_dxCrse_vect;
 
-  bool m_homoCFinterp;
+  bool m_use_FAS;
 
   Vector<IntVect> m_colors;
   static int s_exchangeMode;
@@ -654,6 +658,8 @@ private:
 
   Real m_verbosity;
   bool m_print;
+
+  bool m_use_FAS;
 
   // Problem SPECIFIC
   Vector<RefCountedPtr<LevelData<FArrayBox> > > m_B;  // Gap Height
