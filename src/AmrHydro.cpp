@@ -68,14 +68,31 @@ using std::string;
 std::vector<int>  GlobalBCRS::s_bcLo = std::vector<int>();
 std::vector<int>  GlobalBCRS::s_bcHi = std::vector<int>();
 bool              GlobalBCRS::s_areBCsParsed= false;
+// DIRI
 Real              GlobalBCRS::s_xlo_diri= -1000;
 Real              GlobalBCRS::s_xhi_diri= -1000;
 Real              GlobalBCRS::s_ylo_diri= -1000;
 Real              GlobalBCRS::s_yhi_diri= -1000;
+// NEUM
 Real              GlobalBCRS::s_xlo_neum= -1000;
 Real              GlobalBCRS::s_xhi_neum= -1000;
 Real              GlobalBCRS::s_ylo_neum= -1000;
 Real              GlobalBCRS::s_yhi_neum= -1000;
+// ROBIN
+Real              GlobalBCRS::s_xlo_A_robin= -1000;
+Real              GlobalBCRS::s_xlo_B_robin= -1000;
+Real              GlobalBCRS::s_xlo_C_robin= -1000;
+Real              GlobalBCRS::s_xhi_A_robin= -1000;
+Real              GlobalBCRS::s_xhi_B_robin= -1000;
+Real              GlobalBCRS::s_xhi_C_robin= -1000;
+
+Real              GlobalBCRS::s_ylo_A_robin= -1000;
+Real              GlobalBCRS::s_ylo_B_robin= -1000;
+Real              GlobalBCRS::s_ylo_C_robin= -1000;
+Real              GlobalBCRS::s_yhi_A_robin= -1000;
+Real              GlobalBCRS::s_yhi_B_robin= -1000;
+Real              GlobalBCRS::s_yhi_C_robin= -1000;
+
 
 /* Parse boundary conditions and values in input file -- only once */
 void ParseBC() 
@@ -95,12 +112,20 @@ void ParseBC()
             pp.get("x.lo_dirich_val",GlobalBCRS::s_xlo_diri);
         } else if (GlobalBCRS::s_bcLo[0] == 1) {
             pp.get("x.lo_neumann_val",GlobalBCRS::s_xlo_neum);
+        } else if (GlobalBCRS::s_bcLo[0] == 2) {  // ROBIN 
+            ppBC.get("x.lo_robin_valA" ,GlobalBCRS::s_xlo_A_robin);
+            ppBC.get("x.lo_robin_valB" ,GlobalBCRS::s_xlo_B_robin);
+            ppBC.get("x.lo_robin_valC" ,GlobalBCRS::s_xlo_C_robin);
         }
         // x hi
         if (GlobalBCRS::s_bcHi[0] == 0) {
             pp.get("x.hi_dirich_val",GlobalBCRS::s_xhi_diri);
         } else if (GlobalBCRS::s_bcHi[0] == 1) {
             pp.get("x.hi_neumann_val",GlobalBCRS::s_xhi_neum);
+        } else if (GlobalBCRS::s_bcHi[0] == 2) {  // ROBIN
+            ppBC.get("x.hi_robin_valA" ,GlobalBCRS::s_xhi_A_robin);
+            ppBC.get("x.hi_robin_valB" ,GlobalBCRS::s_xhi_B_robin);
+            ppBC.get("x.hi_robin_valC" ,GlobalBCRS::s_xhi_C_robin);
         }
     }
     if (isPerio[1] == 0) {
@@ -109,25 +134,71 @@ void ParseBC()
             pp.get("y.lo_dirich_val",GlobalBCRS::s_ylo_diri);
         } else if (GlobalBCRS::s_bcLo[1] == 1) {
             pp.get("y.lo_neumann_val",GlobalBCRS::s_ylo_neum);
+        } else if (GlobalBCRS::s_bcLo[1] == 2) { //ROBIN
+            ppBC.get("y.lo_robin_valA" ,GlobalBCRS::s_ylo_A_robin);
+            ppBC.get("y.lo_robin_valB" ,GlobalBCRS::s_ylo_B_robin);
+            ppBC.get("y.lo_robin_valC" ,GlobalBCRS::s_ylo_C_robin);
         }
         // y hi
         if (GlobalBCRS::s_bcHi[1] == 0) {
             pp.get("y.hi_dirich_val",GlobalBCRS::s_yhi_diri);
         } else if (GlobalBCRS::s_bcHi[1] == 1) {
             pp.get("y.hi_neumann_val",GlobalBCRS::s_yhi_neum);
+        } else if (GlobalBCRS::s_bcHi[1] == 2) { //ROBIN
+            ppBC.get("y.hi_robin_valA" ,GlobalBCRS::s_yhi_A_robin);
+            ppBC.get("y.hi_robin_valB" ,GlobalBCRS::s_yhi_B_robin);
+            ppBC.get("y.hi_robin_valC" ,GlobalBCRS::s_yhi_C_robin);
         }
     }
     GlobalBCRS::s_areBCsParsed = true;
 }
+
+void RobinValue(Real* pos,
+                int* dir,
+                Side::LoHiSide* side,
+                Real* a_valA,
+                Real* a_valB,
+                Real* a_valC)
+{
+    Real bcValA = 0.0;
+    Real bcValB = 0.0;
+    Real bcValC = 0.0;
+    if ( *dir == 0 ) {
+       if (*side == Side::Lo) {
+          bcValA = GlobalBCRS::s_xlo_A_robin;
+          bcValB = GlobalBCRS::s_xlo_B_robin;
+          bcValC = GlobalBCRS::s_xlo_C_robin;
+       } else { 
+          bcValA = GlobalBCRS::s_xhi_A_robin;
+          bcValB = GlobalBCRS::s_xhi_B_robin;
+          bcValC = GlobalBCRS::s_xhi_C_robin;
+       }    
+    } else if ( *dir == 1 ) {
+       if (*side == Side::Lo) {
+          bcValA = GlobalBCRS::s_ylo_A_robin;
+          bcValB = GlobalBCRS::s_ylo_B_robin;
+          bcValC = GlobalBCRS::s_ylo_C_robin;
+       } else { 
+          bcValA = GlobalBCRS::s_yhi_A_robin;
+          bcValB = GlobalBCRS::s_yhi_B_robin;
+          bcValC = GlobalBCRS::s_yhi_C_robin;
+       }    
+    }
+    a_valA[0]=bcValA;
+    a_valB[0]=bcValB;
+    a_valC[0]=bcValC;
+}
+
 
 
 /* Return Neumann boundary val -- based on parsed value */
 void NeumannValue(Real* pos,
                   int*  dir, 
                   Side::LoHiSide* side, 
-                  Real* a_values)
+                  Real* a_valA,
+                  Real* a_valB,
+                  Real* a_valC)
 {
-    ParmParse pp;
     Real bcVal = 0.0;
     if ( *dir == 0 ) {
        if (*side == Side::Lo) {
@@ -142,12 +213,17 @@ void NeumannValue(Real* pos,
           bcVal = GlobalBCRS::s_yhi_neum;
        }    
     }
-    a_values[0] = bcVal;
+    a_valA[0] = bcVal;
 }
 
 
-Real DirichletValue(int dir, 
-                    Side::LoHiSide side)
+/* Return Dirichlet boundary val -- based on parsed value */
+void DirichletValue(Real* pos,
+                    int* dir, 
+                    Side::LoHiSide* side, 
+                    Real* a_valA,
+                    Real* a_valB,
+                    Real* a_valC)
 {
     Real bcVal = 0.0;
     if ( dir == 0 ) {
@@ -163,16 +239,7 @@ Real DirichletValue(int dir,
           bcVal = GlobalBCRS::s_yhi_diri;
        }    
     }
-    return bcVal;
-}
-
-/* Return Dirichlet boundary val -- based on parsed value */
-void DirichletValue(Real* pos,
-                    int* dir, 
-                    Side::LoHiSide* side, 
-                    Real* a_values)
-{
-    a_values[0] = DirichletValue(*dir, *side);
+    a_valA[0] = bcVal;
 }
 
 
@@ -240,7 +307,7 @@ void mixBCValues(FArrayBox& a_state,
   }
 }
 
-// weird RobinBC
+// RobinBC
 void RobinBC(FArrayBox& a_state,
              const Box& a_valid,
              const ProblemDomain& a_domain,
@@ -263,47 +330,14 @@ void RobinBC(FArrayBox& a_state,
         if (!a_domain.domainBox().contains(ghostBoxLo)) {
             // DIRI
             if (GlobalBCRS::s_bcLo[dir] == 0) {
-                Interval a_interval   = a_state.interval(); 
-                Side::LoHiSide a_side = Side::Lo;
-                int isign = sign(a_side);
-                RealVect facePos;
-                Box toRegion = adjCellBox(valid, dir, a_side, 1);
-                toRegion &= a_state.box();
-                Real* value = new Real[a_state.nComp()];
-                for (BoxIterator bit(toRegion); bit.ok(); ++bit) {
-                    const IntVect& ivTo = bit();
-                    IntVect ivClose     = ivTo -   isign*BASISV(dir);
-                    //if (!a_homogeneous) {
-                    //      Real* dataPtr = facePos.dataPtr();
-
-                    //      D_TERM( dataPtr[0] = a_dx*(ivClose[0] + 0.5);,\
-                    //              dataPtr[1] = a_dx*(ivClose[1] + 0.5);,\
-                    //              dataPtr[2] = a_dx*(ivClose[2] + 0.5);)
-
-                    //      dataPtr[dir] += 0.5*Real(isign)*a_dx;
-
-                    //      DirichletValue(facePos.dataPtr(), &dir, &a_side, value);
-                    //}
-
-                    for (int icomp = a_interval.begin(); icomp <= a_interval.end(); icomp++) {
-                        Real nearVal = a_state(ivClose, icomp);
-                        Real inhomogVal = 0.0;
-                        if (!a_homogeneous) {
-                            //inhomogVal = value[icomp];
-                            Real x_loc = (ivClose[0]+0.5)*a_dx[0];
-                            Real y_loc = (ivClose[1]+0.5)*a_dx[1];
-                            Real ax       = 0.0; //1.5e-3;
-                            Real by       = -1.5e-3;
-                            Real cst      = 100.0;
-                            inhomogVal = std::max(ax*x_loc + by*y_loc + cst, 0.0);
-                            pout() << "GhoC CloC " << ivTo << " " << ivClose <<  endl;
-                        }
-                        // Lin interp
-                        a_state(ivTo, icomp) = 2*inhomogVal-nearVal;
-                        pout() << "Robin BC. GC, Edge, CloC "  << a_state(ivTo, icomp)  << " "<< inhomogVal<< " " << nearVal <<  endl;
-                    }
-                }
-                delete[] value;
+                DiriBC(a_state,
+                       valid,
+                       a_dx,
+                       a_homogeneous,
+                       DirichletValue,
+                       i,
+                       Side::Lo,
+                       1);
             // NEUM
             } else if (GlobalBCRS::s_bcLo[dir] == 1) {
 		        NeumBC(a_state,
@@ -313,6 +347,15 @@ void RobinBC(FArrayBox& a_state,
 		               NeumannValue,
 		               dir,
 		               Side::Lo);
+            // ROBIN
+            } else if (GlobalBCRS::s_bcLo[i] == 2) {
+                RobinBC(a_state,
+                        valid,
+                        a_dx,
+                        a_homogeneous,
+                        RobinValue,
+                        i,
+                        Side::Lo);
             }
         }
 
@@ -320,45 +363,14 @@ void RobinBC(FArrayBox& a_state,
         if (!a_domain.domainBox().contains(ghostBoxHi)) {
             // DIRI
             if (GlobalBCRS::s_bcHi[dir] == 0) {
-                Interval a_interval   = a_state.interval(); 
-                Side::LoHiSide a_side = Side::Hi;
-                int isign = sign(a_side);
-                RealVect facePos;
-                Box toRegion = adjCellBox(valid, dir, a_side, 1);
-                toRegion &= a_state.box();
-                Real* value = new Real[a_state.nComp()];
-                for (BoxIterator bit(toRegion); bit.ok(); ++bit) {
-                    const IntVect& ivTo = bit();
-                    IntVect ivClose     = ivTo -   isign*BASISV(dir);
-                    //if (!a_homogeneous) {
-                    //      Real* dataPtr = facePos.dataPtr();
-
-                    //      D_TERM( dataPtr[0] = a_dx*(ivClose[0] + 0.5);,\
-                    //              dataPtr[1] = a_dx*(ivClose[1] + 0.5);,\
-                    //              dataPtr[2] = a_dx*(ivClose[2] + 0.5);)
-
-                    //      dataPtr[dir] += 0.5*Real(isign)*a_dx;
-
-                    //      DirichletValue(facePos.dataPtr(), &dir, &a_side, value);
-                    //}
- 
-                    for (int icomp = a_interval.begin(); icomp <= a_interval.end(); icomp++) {
-                        Real nearVal = a_state(ivClose, icomp);
-                        Real inhomogVal = 0.0;
-                        if (!a_homogeneous) {
-                            //inhomogVal = value[icomp];
-                            Real x_loc = (ivClose[0]+0.5)*a_dx[0];
-                            Real y_loc = (ivClose[1]+0.5)*a_dx[1];
-                            Real ax       = 0.0; //1.5e-3;
-                            Real by       = -1.5e-3;
-                            Real cst      = 100.0;
-                            inhomogVal = std::max(ax*x_loc + by*y_loc + cst, 0.0);
-                        }
-                        // Lin interp
-                        a_state(ivTo, icomp) = 2*inhomogVal-nearVal;
-                    }
-                }
-                delete[] value;
+                DiriBC(a_state,
+                       valid,
+                       a_dx,
+                       a_homogeneous,
+                       DiriValue,
+                       i,
+                       Side::Hi,
+                       1);
             // NEUM
             } else if (GlobalBCRS::s_bcHi[dir] == 1) {
 		        NeumBC(a_state,
@@ -368,6 +380,15 @@ void RobinBC(FArrayBox& a_state,
 		               NeumannValue,
 		               dir,
                        Side::Hi);
+            // ROBIN
+            } else if (GlobalBCRS::s_bcHi[i] == 2) {
+                RobinBC(a_state,
+                        valid,
+                        a_dx,
+                        a_homogeneous,
+                        RobinValue,
+                        i,
+                        Side::Hi);
             }
         }
       } // end if is not periodic in ith direction

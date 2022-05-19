@@ -37,6 +37,10 @@ public:
     static Real             s_xhi_neum;
     static Real             s_ylo_neum;
     static Real             s_yhi_neum;
+    static Real s_xlo_A_robin, s_xlo_B_robin, s_xlo_C_robin;
+    static Real s_xhi_A_robin, s_xhi_B_robin, s_xhi_C_robin;
+    static Real s_ylo_A_robin, s_ylo_B_robin, s_ylo_C_robin;
+    static Real s_yhi_A_robin, s_yhi_B_robin, s_yhi_C_robin;
 };
 
 /// framework class to manage non-subcycled AMR model
