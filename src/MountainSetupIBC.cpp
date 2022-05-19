@@ -169,7 +169,7 @@ MountainIBC::initializeData(RealVect& a_dx,
 
     // randomization
     const double mean2 = 0.0;
-    const double stddev2 = 10;
+    const double stddev2 = 1;
     std::default_random_engine generator;
     std::normal_distribution<double> dist2(mean2, stddev2);
 
@@ -204,7 +204,7 @@ MountainIBC::initializeData(RealVect& a_dx,
             Real step_1   = std::max(ax*x_loc + by*y_loc + cst, 0.0);
             /* Ice height = ICE from 0 (should be ice only, so surface - (bed + gap)) */
             // parabolic profile
-            thisiceHeight(iv, 0) = ax*x_loc + by*y_loc + cst + 100.0 ; //Params.m_H;
+            thisiceHeight(iv, 0) = 2.0*(ax*x_loc + by*y_loc + cst + 100.0) ; //Params.m_H;
 
             //STEP 2 -- middle finger of the dino
             Real step_2 = 0.0;
