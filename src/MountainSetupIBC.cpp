@@ -98,7 +98,7 @@ MountainIBC::initializePi(RealVect& a_dx,
             Real step_1   = ax*x_loc + by*y_loc + cst + 100.0 ;
             /* Ice height = ICE from 0 (should be ice only, so surface - (bed + gap)) */
             // parabolic profile
-            thisiceHeight(iv, 0) = 1.5*step_1;
+            thisiceHeight(iv, 0) = 2.0*step_1;
             /* Ice overburden pressure : rho_i * g * H WITH H = Ice height - (bed + gap)*/
             thispi(iv, 0)        = Params.m_rho_i * Params.m_gravity * std::max(thisiceHeight(iv, 0), 0.0);
             /* initial gap height */
@@ -168,10 +168,10 @@ MountainIBC::initializeData(RealVect& a_dx,
     pout() << "MountainIBC::initializeData" << endl;
 
     // randomization
-    //const double mean2 = 0.0;
-    //const double stddev2 = 10;
-    //std::default_random_engine generator;
-    //std::normal_distribution<double> dist2(mean2, stddev2);
+    const double mean2 = 0.0;
+    const double stddev2 = 1;
+    std::default_random_engine generator;
+    std::normal_distribution<double> dist2(mean2, stddev2);
 
     DataIterator dit = a_head.dataIterator();
     for (dit.begin(); dit.ok(); ++dit) {
@@ -204,7 +204,7 @@ MountainIBC::initializeData(RealVect& a_dx,
             Real step_1   = std::max(ax*x_loc + by*y_loc + cst, 0.0);
             /* Ice height = ICE from 0 (should be ice only, so surface - (bed + gap)) */
             // parabolic profile
-            thisiceHeight(iv, 0) = ax*x_loc + by*y_loc + cst + 100.0 ; //Params.m_H;
+            thisiceHeight(iv, 0) = 2.0*(ax*x_loc + by*y_loc + cst + 100.0) ; //Params.m_H;
 
             //STEP 2 -- middle finger of the dino
             Real step_2 = 0.0;
@@ -264,6 +264,7 @@ MountainIBC::initializeData(RealVect& a_dx,
 
             // Putting all together
             thiszbed(iv, 0)    = step_1 + step_2 + step_3 + step_4 + step_5;
+            thiszbed(iv, 0)    = std::max( thiszbed(iv, 0) + dist2(generator), 0.0);
              
             /* Ice overburden pressure : rho_i * g * H WITH H = Ice height - (bed + gap)*/
             thispi(iv, 0)        = Params.m_rho_i * Params.m_gravity * std::max(thisiceHeight(iv, 0), 0.0);

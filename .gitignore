@@ -30,3 +30,5 @@ NOTES
 0_convergence_channelized/*_base2levs
 test/
 tmp/
+0_convergence_channelized/*_base*/
+test/
