@@ -677,7 +677,7 @@ AmrHydro::setDefaults()
     m_max_base_grid_size = 32;
     m_fill_ratio = -1;
     m_do_restart = false;
-    m_restart_step = -1;
+    m_restart_step = 0;
 
     m_domainSize = -1 * RealVect::Unit;
 
@@ -1164,7 +1164,7 @@ AmrHydro::run(Real a_max_time, int a_max_step)
         next_plot_time = std::min(next_plot_time, a_max_time);
 
         while ((next_plot_time > m_time) && (m_cur_step < a_max_step) && (dt > TIME_EPS)) {
-            if (((m_cur_step-m_restart_step) % m_plot_interval == 0) && m_plot_interval > 0) {
+            if ((m_cur_step % m_plot_interval == 0) && m_plot_interval > 0) {
 #ifdef CH_USE_HDF5
                 writePlotFile();
 #endif
@@ -3092,7 +3092,7 @@ AmrHydro::timeStepFAS(Real a_dt)
 
 
     /* FINAL custom plt here -- debug print */
-    if ((m_PrintCustom) && ((m_cur_step-m_restart_step) % m_plot_interval == 0) ) {
+    if ((m_PrintCustom) && (m_cur_step % m_plot_interval == 0) ) {
         int nStuffToPlot = 12;
         Vector<std::string> vectName;
         vectName.resize(nStuffToPlot);
@@ -3203,6 +3203,8 @@ AmrHydro::timeStepFAS(Real a_dt)
     if (m_post_proc) {
         pout() << "\n\n\n";
         pout() <<"oo POST PROC analysis (domsize is "<< m_amrDomains[0].domainBox().size(0) <<") oo "<< endl;
+
+        //interpfinest();
         
         int DomSize = m_amrDomains[0].domainBox().size(0); 
         int DomSizeY = m_amrDomains[0].domainBox().size(1); 
