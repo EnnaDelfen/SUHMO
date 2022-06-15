@@ -60,6 +60,13 @@ public:
     bool m_time_varying_input;
     Real m_runoff;
     Real m_deltaT;
+    // ramp of influx
+    bool m_ramp;
+    Real m_ramp_up;
+    Real m_duration_max;
+    Real m_relax;
+    Real m_floor_min;
+    Real m_floor_max; 
     // verbosity level
     int m_verbosity;
 };

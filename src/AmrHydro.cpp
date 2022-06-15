@@ -1835,16 +1835,16 @@ AmrHydro::Calc_moulin_source_term_distributed (LevelData<FArrayBox>& levelMoulin
        FArrayBox& moulinSrc      = levelMoulinSrc[dit];
        FArrayBox& moulinSrcTmp   = levelMoulinSrcNoNorm[dit];
 
-       moulinSrc.setVal(m_suhmoParm->m_distributed_input);
+       moulinSrc.setVal(0.0);
 
        BoxIterator bit(moulinSrcTmp.box());
        for (bit.begin(); bit.ok(); ++bit) {
            IntVect iv = bit();
            for (int m = 0; m<m_suhmoParm->m_n_moulins; m++) {
                moulinSrc(iv,0) += moulinSrcTmp(iv,m) * std::max( (1.0 - m_suhmoParm->m_runoff * std::sin(2.0 * Pi * (m_time - m_restart_time) / 86400.)), 0.0)  
-                                  / a_moulinsInteg[m] *  m_suhmoParm->m_moulin_flux[m] ; // m3/s/m2 -> m/s 
-               a_moulinsIntegFinal[m] += m_suhmoParm->m_distributed_input * m_amrDx[curr_level][0] * m_amrDx[curr_level][1] + moulinSrcTmp(iv,m) * std::max( (1.0 - m_suhmoParm->m_runoff * std::sin(2.0 * Pi * (m_time - m_restart_time) / 86400.)), 0.0)   
-                                  / a_moulinsInteg[m] * m_suhmoParm->m_moulin_flux[m] * m_amrDx[curr_level][0] * m_amrDx[curr_level][1]; 
+                                  / a_moulinsInteg[m] *  m_suhmoParm->m_moulin_flux[m]; // m3/s/m2 -> m/s 
+               a_moulinsIntegFinal[m] += ( moulinSrcTmp(iv,m) * std::max( (1.0 - m_suhmoParm->m_runoff * std::sin(2.0 * Pi * (m_time - m_restart_time) / 86400.)), 0.0)   
+                                  / a_moulinsInteg[m] * m_suhmoParm->m_moulin_flux[m] * m_amrDx[curr_level][0] * m_amrDx[curr_level][1]); 
            }
        }
    }
@@ -2159,6 +2159,21 @@ AmrHydro::timeStepFAS(Real a_dt)
         CellToEdge(levelcurPi, levelPi_ec);
 
     } // there. We should start with consistent b and h, GC BC and all ...
+
+    // RAMP
+    Real ramp = 1.0;
+    if (m_suhmoParm->m_ramp) {
+        Real sec_1month      = 2635200.0;  // s
+        Real ramp_up         = m_suhmoParm->m_ramp_up * sec_1month;
+        Real duration_max    = m_suhmoParm->m_duration_max * sec_1month;
+        Real relaxation      = m_suhmoParm->m_relax * sec_1month;
+        Real currt_inMonth   = m_time / sec_1month;
+        Real curryear_in     = std::floor(currt_inMonth/12.0);   
+        Real currMonthInYear = currt_inMonth - curryear_in*12.0;
+        Real currtInYear     = sec_1month * currMonthInYear;
+        ramp = m_suhmoParm->m_floor_min + (m_suhmoParm->m_floor_max - m_suhmoParm->m_floor_min) * 0.5 * (std::tanh( (currtInYear - ramp_up) / relaxation) *
+                       std::tanh( (-currtInYear + ramp_up + duration_max) / relaxation ) + 1.0);
+    }
 
     /* II h calc */
 
@@ -2696,7 +2711,14 @@ AmrHydro::timeStepFAS(Real a_dt)
                     if (isnan(moulinSrc(iv,0))) {
                         pout() << "MS is nan ?? " << iv << std::endl;
                     }
-                    RHSh(iv,0) += moulinSrc(iv,0);
+                    if (m_suhmoParm->m_n_moulins > 0) {
+                        if ( (ramp >1.0) || (ramp < 0.0) ){
+                            MayDay::Error("ramp should be bet 0 and 1");
+                        }
+                        RHSh(iv,0) += (moulinSrc(iv,0) * ramp + m_suhmoParm->m_distributed_input);
+                    } else {
+                        RHSh(iv,0) += moulinSrc(iv,0);
+                    }
 
                     // Diffusive term
                     RHSh(iv,0) -= m_suhmoParm->m_DiffFactor * DiffusiveTerm(iv,0);
@@ -3172,7 +3194,12 @@ AmrHydro::timeStepFAS(Real a_dt)
                 levelRHSB1STP[dit].copy(levelRHSB1[dit], 0, 0, 1);
                 levelRHSB2STP[dit].copy(levelRHSB2[dit], 0, 0, 1);
                 levelRHSB3STP[dit].copy(levelRHSB3[dit], 0, 0, 1);
+                // RAMP
                 levelRHSH1STP[dit].copy(levelRHSH1[dit], 0, 0, 1);
+                if (m_suhmoParm->m_n_moulins > 0) {
+                    levelRHSH1STP[dit].mult(ramp);
+                    levelRHSH1STP[dit].plus(m_suhmoParm->m_distributed_input);
+                }
                 levelCDSTP[dit].copy(levelCD[dit], 0, 0, 1);
                 levelqwSTP[dit].copy(levelqw[dit], 0, 0, 1);
                 levelDcXSTP[dit].copy(levelDc[dit], 0, 0, 1);
@@ -3294,7 +3321,11 @@ AmrHydro::timeStepFAS(Real a_dt)
                 // Because of mass conservation eq -basically recharge = RHS of this eq in my head.
                 // If I only use the MS, then for run B its sum of A1 and A5 which in this case does NOT equal total discharge !!
                 if (Pressi(iv,0) > 0.0) {
-                    out_recharge[iv[0]]      +=  MS(iv, 0) * m_amrDx[0][1] * m_amrDx[0][0];  
+                    if (m_suhmoParm->m_n_moulins > 0) {
+                        out_recharge[iv[0]]      += (MS(iv, 0) * ramp + m_suhmoParm->m_distributed_input) * m_amrDx[0][1] * m_amrDx[0][0];  
+                    } else {
+                        out_recharge[iv[0]]      +=  MS(iv, 0) * m_amrDx[0][1] * m_amrDx[0][0];  
+                    }
                     out_recharge_tot[iv[0]]  += (MR(iv, 0)/m_suhmoParm->m_rho_w) * m_amrDx[0][1] * m_amrDx[0][0];
                     water_vol[iv[0]]         += GH(iv, 0)* m_amrDx[0][1] * m_amrDx[0][0];
                     Ylength[iv[0]]           += m_amrDx[0][1];
@@ -3549,8 +3580,9 @@ AmrHydro::timeStepFAS(Real a_dt)
         idx_bandHi_hi  = (int) xloc_bandHi_hi/m_amrDx[0][0] - 0.5;
 
         // TEMPORAL POSTPROC
+        Real sec_1month      = 2635200.0;  // s
         int time_tmp = (int) m_time + a_dt;
-
+        pout() << "Time(months) recharge ramp = " <<  m_time/sec_1month  << " " << out_recharge[1] << " " << ramp << endl; 
         //if (time_tmp % 86400 == 0) {
         //    pout() << "Time(h - d) avgN N_LB  N_MB  N_HB = " <<  (m_time + a_dt -m_restart_time)/3600.  << " " << (m_time + a_dt -m_restart_time)/86400 
         //                                                            << " " << out_avgN[3]/count_avgN 
