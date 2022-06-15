@@ -516,8 +516,8 @@ AmrHydro::SolveForGap_nl(const Vector<DisjointBoxLayout>&               a_grids,
     int numBottom = 4;  // num of bottom smoothings
     int numMG     = 1;  // Vcycle selected
     int maxIter   = 100; // max number of v cycles
-    Real eps        =  1.0e-10;  // solution tolerance
-    Real normThresh =  1.0e-10;  // abs tol
+    Real eps        =  1.0e-7;  // solution tolerance
+    Real normThresh =  1.0e-7;  // abs tol
     Real hang       =  1.0e-6;      // next rnorm should be < (1-m_hang)*norm_last 
     //if (m_cur_step < 50) { 
     //    numBottom  = 10;  // num of bottom smoothings
@@ -617,8 +617,8 @@ AmrHydro::SolveForHead_nl(const Vector<DisjointBoxLayout>&               a_grids
     int numBottom = 16;  // num of bottom smoothings
     int numMG     = 1;  // Vcycle selected
     int maxIter   = 100; // max number of v cycles
-    Real eps        =  1.0e-10;  // solution tolerance
-    Real normThresh =  1.0e-10;  // abs tol
+    Real eps        =  1.0e-7;  // solution tolerance
+    Real normThresh =  1.0e-7;  // abs tol
     Real hang       =  0.01;      // next rnorm should be < (1-m_hang)*norm_last 
     if (m_cur_step < 50) { 
         numBottom  = 10;  // num of bottom smoothings
