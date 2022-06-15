@@ -2171,8 +2171,15 @@ AmrHydro::timeStepFAS(Real a_dt)
         Real curryear_in     = std::floor(currt_inMonth/12.0);   
         Real currMonthInYear = currt_inMonth - curryear_in*12.0;
         Real currtInYear     = sec_1month * currMonthInYear;
-        ramp = m_suhmoParm->m_floor_min + (m_suhmoParm->m_floor_max - m_suhmoParm->m_floor_min) * 0.5 * (std::tanh( (currtInYear - ramp_up) / relaxation) *
-                       std::tanh( (-currtInYear + ramp_up + duration_max) / relaxation ) + 1.0);
+        bool periodic_ramp = false;
+        if (periodic_ramp){
+            ramp = m_suhmoParm->m_floor_min + (m_suhmoParm->m_floor_max - m_suhmoParm->m_floor_min) * 0.5 * (std::tanh( (currtInYear - ramp_up) / relaxation) *
+                                               std::tanh( (-currtInYear + ramp_up + duration_max) / relaxation ) + 1.0);
+        } else {
+            ramp_up         = (m_suhmoParm->m_ramp_up) * sec_1month;
+            ramp = m_suhmoParm->m_floor_min + (m_suhmoParm->m_floor_max - m_suhmoParm->m_floor_min) * 0.5 * 
+                                              (std::tanh( (m_time - ramp_up) / relaxation) + 1.0);
+        }
     }
 
     /* II h calc */
