@@ -113,9 +113,9 @@ void ParseBC()
         } else if (GlobalBCRS::s_bcLo[0] == 1) {
             pp.get("x.lo_neumann_val",GlobalBCRS::s_xlo_neum);
         } else if (GlobalBCRS::s_bcLo[0] == 2) {  // ROBIN 
-            ppBC.get("x.lo_robin_valA" ,GlobalBCRS::s_xlo_A_robin);
-            ppBC.get("x.lo_robin_valB" ,GlobalBCRS::s_xlo_B_robin);
-            ppBC.get("x.lo_robin_valC" ,GlobalBCRS::s_xlo_C_robin);
+            pp.get("x.lo_robin_valA" ,GlobalBCRS::s_xlo_A_robin);
+            pp.get("x.lo_robin_valB" ,GlobalBCRS::s_xlo_B_robin);
+            pp.get("x.lo_robin_valC" ,GlobalBCRS::s_xlo_C_robin);
         }
         // x hi
         if (GlobalBCRS::s_bcHi[0] == 0) {
@@ -123,9 +123,9 @@ void ParseBC()
         } else if (GlobalBCRS::s_bcHi[0] == 1) {
             pp.get("x.hi_neumann_val",GlobalBCRS::s_xhi_neum);
         } else if (GlobalBCRS::s_bcHi[0] == 2) {  // ROBIN
-            ppBC.get("x.hi_robin_valA" ,GlobalBCRS::s_xhi_A_robin);
-            ppBC.get("x.hi_robin_valB" ,GlobalBCRS::s_xhi_B_robin);
-            ppBC.get("x.hi_robin_valC" ,GlobalBCRS::s_xhi_C_robin);
+            pp.get("x.hi_robin_valA" ,GlobalBCRS::s_xhi_A_robin);
+            pp.get("x.hi_robin_valB" ,GlobalBCRS::s_xhi_B_robin);
+            pp.get("x.hi_robin_valC" ,GlobalBCRS::s_xhi_C_robin);
         }
     }
     if (isPerio[1] == 0) {
@@ -135,9 +135,9 @@ void ParseBC()
         } else if (GlobalBCRS::s_bcLo[1] == 1) {
             pp.get("y.lo_neumann_val",GlobalBCRS::s_ylo_neum);
         } else if (GlobalBCRS::s_bcLo[1] == 2) { //ROBIN
-            ppBC.get("y.lo_robin_valA" ,GlobalBCRS::s_ylo_A_robin);
-            ppBC.get("y.lo_robin_valB" ,GlobalBCRS::s_ylo_B_robin);
-            ppBC.get("y.lo_robin_valC" ,GlobalBCRS::s_ylo_C_robin);
+            pp.get("y.lo_robin_valA" ,GlobalBCRS::s_ylo_A_robin);
+            pp.get("y.lo_robin_valB" ,GlobalBCRS::s_ylo_B_robin);
+            pp.get("y.lo_robin_valC" ,GlobalBCRS::s_ylo_C_robin);
         }
         // y hi
         if (GlobalBCRS::s_bcHi[1] == 0) {
@@ -145,9 +145,9 @@ void ParseBC()
         } else if (GlobalBCRS::s_bcHi[1] == 1) {
             pp.get("y.hi_neumann_val",GlobalBCRS::s_yhi_neum);
         } else if (GlobalBCRS::s_bcHi[1] == 2) { //ROBIN
-            ppBC.get("y.hi_robin_valA" ,GlobalBCRS::s_yhi_A_robin);
-            ppBC.get("y.hi_robin_valB" ,GlobalBCRS::s_yhi_B_robin);
-            ppBC.get("y.hi_robin_valC" ,GlobalBCRS::s_yhi_C_robin);
+            pp.get("y.hi_robin_valA" ,GlobalBCRS::s_yhi_A_robin);
+            pp.get("y.hi_robin_valB" ,GlobalBCRS::s_yhi_B_robin);
+            pp.get("y.hi_robin_valC" ,GlobalBCRS::s_yhi_C_robin);
         }
     }
     GlobalBCRS::s_areBCsParsed = true;
@@ -308,11 +308,11 @@ void mixBCValues(FArrayBox& a_state,
 }
 
 // RobinBC
-void RobinBC(FArrayBox& a_state,
-             const Box& a_valid,
-             const ProblemDomain& a_domain,
-             RealVect a_dx,
-             bool a_homogeneous)
+void RobinmixBCValues(FArrayBox& a_state,
+                      const Box& a_valid,
+                      const ProblemDomain& a_domain,
+                      RealVect a_dx,
+                      bool a_homogeneous)
 {
 
   if (!GlobalBCRS::s_areBCsParsed) {
@@ -589,7 +589,6 @@ AmrHydro::SolveForHead_nl(const Vector<DisjointBoxLayout>&               a_grids
                            refRatio,
                            coarsestDx,
                            &mixBCValues,
-                           //&RobinBC,
                            0.0, a_aCoef,
                            - 1.0, a_bCoef,
                           this, NLfunctTmp, wFfunctTmp,
@@ -2148,7 +2147,6 @@ AmrHydro::timeStepFAS(Real a_dt)
 
             // Fill BC ghost cells of h and b
             mixBCValues(currentH[dit], validBox, m_amrDomains[lev], m_amrDx[lev], false);
-            //RobinBC(currentH[dit], validBox, m_amrDomains[lev], m_amrDx[lev][0], false);
             FixedNeumBCFill(currentB[dit], validBox, m_amrDomains[lev], m_amrDx[lev], false);
 
             // Copy curr into old -- copy ghost cells too 
@@ -2217,7 +2215,6 @@ AmrHydro::timeStepFAS(Real a_dt)
                 // get the validBox & fill BC ghost cells
                 const Box& validBox = levelGrids.get(dit);
                 mixBCValues(levelcurH[dit], validBox, m_amrDomains[lev], m_amrDx[lev], false);
-                //RobinBC(levelcurH[dit], validBox, m_amrDomains[lev], m_amrDx[lev][0], false);
                 FixedNeumBCFill(levelcurB[dit], validBox, m_amrDomains[lev], m_amrDx[lev], false);
 
                 levelnewH_lag[dit].copy(levelcurH[dit], 0, 0, 1); // should copy ghost cells too !
@@ -2876,7 +2873,6 @@ AmrHydro::timeStepFAS(Real a_dt)
 
             // Fill BC ghost cells of h and b
             mixBCValues(levelH[dit], validBox, m_amrDomains[lev], m_amrDx[lev], false);
-            //RobinBC(levelH[dit], validBox, m_amrDomains[lev], m_amrDx[lev][0], false);
         }
      
         // needed for VC solve
@@ -3539,19 +3535,11 @@ AmrHydro::timeStepFAS(Real a_dt)
        xloc_bandHi_lo = recvMin;
 #endif
 
-        //Real RECH_TOT, RECH; 
-        //RECH_TOT = 0;
-        //RECH = 0;
-        //for (int xi = 0; xi <DomSize ; xi++) {
-        //    RECH_TOT += out_recharge_tot[xi] ;
-        //    RECH     += out_recharge[xi] ;
-        //}
         for (int xi = (DomSize - 2); xi > -1 ; xi--) {
             out_recharge[xi]  = out_recharge[xi]  + out_recharge[xi+1] ;
             out_recharge_tot[xi]  = out_recharge_tot[xi]  + out_recharge_tot[xi+1] ;
             water_vol[xi]         = water_vol[xi]  + water_vol[xi+1] ; 
         }
-        //pout() << "RECHARGE and RECHARGE TOT = " << RECH << " " << RECH_TOT << endl;
         
         idx_bandMin_lo = (int) xloc_bandMin_lo/m_amrDx[0][0] - 0.5;
         idx_bandMin_hi = (int) xloc_bandMin_hi/m_amrDx[0][0] - 0.5;
@@ -3562,45 +3550,46 @@ AmrHydro::timeStepFAS(Real a_dt)
 
         // TEMPORAL POSTPROC
         int time_tmp = (int) m_time + a_dt;
-        if (time_tmp % 86400 == 0) {
-            pout() << "Time(h - d) avgN N_LB  N_MB  N_HB = " <<  (m_time + a_dt -m_restart_time)/3600.  << " " << (m_time + a_dt -m_restart_time)/86400 
-                                                                    << " " << out_avgN[3]/count_avgN 
-                                                                    << " " << out_avgN[0]/count_avgNLow 
-                                                                    << " " << out_avgN[1]/count_avgNMed 
-                                                                    << " " << out_avgN[2]/count_avgNHigh 
-                                                                    << endl;
 
-            pout() << "Time(h - d) rech dis = " <<  (m_time + a_dt -m_restart_time)/3600.  << " " << (m_time + a_dt -m_restart_time)/86400 
-                                                               << " " << out_recharge[1] + out_recharge_tot[1] 
-                                                               << " " << - out_water_flux_x_tot[1]   
-                                                               //<< " " << - out_water_flux_x_chan[1]   
-                                                               //<< " " << - out_water_flux_x_distrib[1]
-                                                               << endl;
-            pout() << "Time(h - d) dis_LB disEff_LB disInef_LB 2disEff_LB 2disInef_LB  = " 
-                                                               <<  (m_time + a_dt -m_restart_time)/3600.  << " " << (m_time + a_dt -m_restart_time)/86400 
-                                                               << " " << - out_water_flux_x_tot[idx_bandMin_lo] 
-                                                               << " " << - out_water_flux_x_chan[idx_bandMin_lo] 
-                                                               << " " << - out_water_flux_x_distrib[idx_bandMin_lo] 
-                                                               << " " << - DomSizeY*out_water_flux_x_chan_Bands[0]/count_avgNLow 
-                                                               << " " << - DomSizeY*out_water_flux_x_distrib_Bands[0]/count_avgNLow 
-                                                               << endl;
-            pout() << "Time(h - d) dis_MB disEff_MB disInef_MB 2disEff_MB 2disInef_MB  = " 
-                                                               <<  (m_time + a_dt -m_restart_time)/3600.  << " " << (m_time + a_dt -m_restart_time)/86400 
-                                                               << " " << - out_water_flux_x_tot[idx_bandMed_lo] 
-                                                               << " " << - out_water_flux_x_chan[idx_bandMed_lo] 
-                                                               << " " << - out_water_flux_x_distrib[idx_bandMed_lo] 
-                                                               << " " << - DomSizeY*out_water_flux_x_chan_Bands[1]/count_avgNMed 
-                                                               << " " << - DomSizeY*out_water_flux_x_distrib_Bands[1]/count_avgNMed 
-                                                               << endl;
-            pout() << "Time(h - d) dis_HB disEff_HB disInef_HB 2disEff_HB 2disInef_HB  = " 
-                                                               <<  (m_time + a_dt -m_restart_time)/3600.  << " " << (m_time + a_dt -m_restart_time)/86400 
-                                                               << " " << - out_water_flux_x_tot[idx_bandHi_lo] 
-                                                               << " " << - out_water_flux_x_chan[idx_bandHi_lo] 
-                                                               << " " << - out_water_flux_x_distrib[idx_bandHi_lo] 
-                                                               << " " << - DomSizeY*out_water_flux_x_chan_Bands[2]/count_avgNHigh 
-                                                               << " " << - DomSizeY*out_water_flux_x_distrib_Bands[2]/count_avgNHigh 
-                                                               << endl;
-        }
+        //if (time_tmp % 86400 == 0) {
+        //    pout() << "Time(h - d) avgN N_LB  N_MB  N_HB = " <<  (m_time + a_dt -m_restart_time)/3600.  << " " << (m_time + a_dt -m_restart_time)/86400 
+        //                                                            << " " << out_avgN[3]/count_avgN 
+        //                                                            << " " << out_avgN[0]/count_avgNLow 
+        //                                                            << " " << out_avgN[1]/count_avgNMed 
+        //                                                            << " " << out_avgN[2]/count_avgNHigh 
+        //                                                            << endl;
+
+        //    pout() << "Time(h - d) rech dis = " <<  (m_time + a_dt -m_restart_time)/3600.  << " " << (m_time + a_dt -m_restart_time)/86400 
+        //                                                       << " " << out_recharge[1] + out_recharge_tot[1] 
+        //                                                       << " " << - out_water_flux_x_tot[1]   
+        //                                                       //<< " " << - out_water_flux_x_chan[1]   
+        //                                                       //<< " " << - out_water_flux_x_distrib[1]
+        //                                                       << endl;
+        //    pout() << "Time(h - d) dis_LB disEff_LB disInef_LB 2disEff_LB 2disInef_LB  = " 
+        //                                                       <<  (m_time + a_dt -m_restart_time)/3600.  << " " << (m_time + a_dt -m_restart_time)/86400 
+        //                                                       << " " << - out_water_flux_x_tot[idx_bandMin_lo] 
+        //                                                       << " " << - out_water_flux_x_chan[idx_bandMin_lo] 
+        //                                                       << " " << - out_water_flux_x_distrib[idx_bandMin_lo] 
+        //                                                       << " " << - DomSizeY*out_water_flux_x_chan_Bands[0]/count_avgNLow 
+        //                                                       << " " << - DomSizeY*out_water_flux_x_distrib_Bands[0]/count_avgNLow 
+        //                                                       << endl;
+        //    pout() << "Time(h - d) dis_MB disEff_MB disInef_MB 2disEff_MB 2disInef_MB  = " 
+        //                                                       <<  (m_time + a_dt -m_restart_time)/3600.  << " " << (m_time + a_dt -m_restart_time)/86400 
+        //                                                       << " " << - out_water_flux_x_tot[idx_bandMed_lo] 
+        //                                                       << " " << - out_water_flux_x_chan[idx_bandMed_lo] 
+        //                                                       << " " << - out_water_flux_x_distrib[idx_bandMed_lo] 
+        //                                                       << " " << - DomSizeY*out_water_flux_x_chan_Bands[1]/count_avgNMed 
+        //                                                       << " " << - DomSizeY*out_water_flux_x_distrib_Bands[1]/count_avgNMed 
+        //                                                       << endl;
+        //    pout() << "Time(h - d) dis_HB disEff_HB disInef_HB 2disEff_HB 2disInef_HB  = " 
+        //                                                       <<  (m_time + a_dt -m_restart_time)/3600.  << " " << (m_time + a_dt -m_restart_time)/86400 
+        //                                                       << " " << - out_water_flux_x_tot[idx_bandHi_lo] 
+        //                                                       << " " << - out_water_flux_x_chan[idx_bandHi_lo] 
+        //                                                       << " " << - out_water_flux_x_distrib[idx_bandHi_lo] 
+        //                                                       << " " << - DomSizeY*out_water_flux_x_chan_Bands[2]/count_avgNHigh 
+        //                                                       << " " << - DomSizeY*out_water_flux_x_distrib_Bands[2]/count_avgNHigh 
+        //                                                       << endl;
+        //}
         //    pout() << "Time  rechTOT  rechMS  "
         //           << "rechMS_LB_lo    rechMS_LB_hi "
         //           << " " <<  time_tmp / 86400.  << " " <<  out_recharge_tot[0]  << " "  << out_recharge[0] 
@@ -3609,13 +3598,13 @@ AmrHydro::timeStepFAS(Real a_dt)
         //}
  
         // SPATIAL POSTPROC
-        pout() << "XaxisSUHMO_B1  Ylength    dischargeSUHMO_B1   dischargeEFFSUHMO_B1   dischargeINEFFSUHMO_B1  rechargeMSSUHMO_B1  rechargeMRSUHMO_B1 PSUHMO_B1 " << endl;
-        for (int xi = 0; xi < DomSize; xi++) {
-            Real x_loc = (xi+0.5)*m_amrDx[0][0];    
-                    pout() << " " << x_loc/1e3 << " " << Ylength[xi] 
-                   << " " << -out_water_flux_x_tot[xi] << " " << -out_water_flux_x_chan[xi] << " " << -out_water_flux_x_distrib[xi] 
-                   << " " << out_recharge[xi] << " " << out_recharge_tot[xi] << " " << avPressure[xi]/dom_sizeY[xi]/1e6  
-                   << endl;
+        //pout() << "XaxisSUHMO_A1  Ylength    dischargeSUHMO_A1   dischargeEFFSUHMO_A1   dischargeINEFFSUHMO_A1  rechargeMSSUHMO_A1  rechargeMRSUHMO_A1 PSUHMO_A1 " << endl;
+        //for (int xi = 0; xi < DomSize; xi++) {
+        //    Real x_loc = (xi+0.5)*m_amrDx[0][0];    
+        //            pout() << " " << x_loc/1e3 << " " << Ylength[xi] 
+        //           << " " << -out_water_flux_x_tot[xi] << " " << -out_water_flux_x_chan[xi] << " " << -out_water_flux_x_distrib[xi] 
+        //           << " " << out_recharge[xi] << " " << out_recharge_tot[xi] << " " << avPressure[xi]/dom_sizeY[xi]/1e6  
+        //           << endl;
 
 
         //pout() << "1-Xpos   2-avgP  3-rechargeMR 4-rechargeMS 5-rechargeTOT  6-discharge  7-TOTwaterVol" << endl;
@@ -3625,7 +3614,7 @@ AmrHydro::timeStepFAS(Real a_dt)
         //           << " " << out_recharge[xi] << " " << out_recharge_tot[xi] + out_recharge[xi] 
         //           << " " << -out_water_flux_x_tot[xi] << " " << water_vol[xi] 
         //           << endl;
-        }
+        //}
     }
 
     /* Averaging down and fill in ghost cells */
@@ -5240,17 +5229,24 @@ AmrHydro::readCheckpointFile(HDF5Handle& a_handle)
         if (levheader.m_real.find("dx") == levheader.m_real.end()) {
             MayDay::Error("checkpoint file does not contain dx");
         }
+        if (levheader.m_real.find("dy") == levheader.m_real.end()) {
+            m_amrDx[lev] = RealVect::Unit * (levheader.m_real["dx"]);
+        } else {  
+            m_amrDx[lev][0] = levheader.m_real["dx"];
+            m_amrDx[lev][1] = levheader.m_real["dy"];
+            if (CH_SPACEDIM == 3) {
+                m_amrDx[lev][2] = levheader.m_real["dz"];
+            }
+        }
+        //if (levheader.m_real.find("dz") == levheader.m_real.end()) {
+        //    MayDay::Error("checkpoint file does not contain dz");
+        //}
         // TODO check why that Abs doesn't work
         //if (lev <= max_level_check) {
         //    if ( Abs(m_amrDx[lev] - levheader.m_real["dx"]) > TINY_NORM ) {
         //        MayDay::Error("restart file dx != input file dx");
         //    }
         //}
-        m_amrDx[lev][0] = levheader.m_real["dx"];
-        m_amrDx[lev][1] = levheader.m_real["dy"];
-        if (CH_SPACEDIM == 3) {
-            m_amrDx[lev][2] = levheader.m_real["dz"];
-        }
 
         // read problem domain box
         if (levheader.m_box.find("prob_domain") == levheader.m_box.end()) {
