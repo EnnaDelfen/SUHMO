@@ -186,6 +186,15 @@ private:
     void writeMetaDataHDF5(HDF5Handle& a_handle) const;
 
 public: 
+    void interpFinest();
+
+     void writePltPP(DisjointBoxLayout& fineGrids, 
+                     int numPlotComps, 
+                     Vector<std::string>& vectName,
+                     Vector<Vector<LevelData<FArrayBox>*>> stuffToPlot,
+                     int ratio_cf,
+                     string namePlot);
+
     void writePltCustom(int numPlotComps,
                         Vector<std::string>& vectName,
                         Vector<Vector<LevelData<FArrayBox>*>> stp,

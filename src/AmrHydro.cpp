@@ -3100,9 +3100,9 @@ AmrHydro::timeStepFAS(Real a_dt)
         vectName[1]="gapHeight";
         vectName[2]="RHS_head";
         vectName[3]="RHS_b";
-        vectName[4]="MRA";
-        vectName[5]="MRB";
-        vectName[6]="MRC";
+        vectName[4]="bedElevation";
+        vectName[5]="bumpHeight";
+        vectName[6]="bumpSpacing";
         vectName[7]="RHS_hmoul";
         vectName[8]="Channelization";
         vectName[9]="DiffusiveTerm";
@@ -3141,15 +3141,13 @@ AmrHydro::timeStepFAS(Real a_dt)
             LevelData<FArrayBox>& levelRHSB      = *RHS_b[lev];
             LevelData<FArrayBox>& levelRHSBSTP   = *stuffToPlot[3][lev];
 
-            //LevelData<FArrayBox>& levelRHSB1     = *MR_A[lev];
             LevelData<FArrayBox>& levelRHSB1     = *m_bedelevation[lev];
             LevelData<FArrayBox>& levelRHSB1STP  = *stuffToPlot[4][lev];
 
-            //LevelData<FArrayBox>& levelRHSB2     = *MR_B[lev];
-            LevelData<FArrayBox>& levelRHSB2     = *m_iceheight[lev];
+            LevelData<FArrayBox>& levelRHSB2     = *m_bumpHeight[lev];
             LevelData<FArrayBox>& levelRHSB2STP  = *stuffToPlot[5][lev];
 
-            LevelData<FArrayBox>& levelRHSB3     = *MR_C[lev];
+            LevelData<FArrayBox>& levelRHSB3     = *m_bumpSpacing[lev];
             LevelData<FArrayBox>& levelRHSB3STP  = *stuffToPlot[6][lev];
 
             LevelData<FArrayBox>& levelRHSH1     = *m_moulin_source_term[lev];
@@ -3294,9 +3292,9 @@ AmrHydro::timeStepFAS(Real a_dt)
                 // Because of mass conservation eq -basically recharge = RHS of this eq in my head.
                 // If I only use the MS, then for run B its sum of A1 and A5 which in this case does NOT equal total discharge !!
                 if (Pressi(iv,0) > 0.0) {
-                    out_recharge[iv[0]]      += 1.158e-6 * m_amrDx[0][1] * m_amrDx[0][0];  //MS(iv, 0) * m_amrDx[0][0] * m_amrDx[0][0];  
+                    out_recharge[iv[0]]      +=  MS(iv, 0) * m_amrDx[0][1] * m_amrDx[0][0];  
                     out_recharge_tot[iv[0]]  += (MR(iv, 0)/m_suhmoParm->m_rho_w) * m_amrDx[0][1] * m_amrDx[0][0];
-                    water_vol[iv[0]]         +=  GH(iv, 0)* m_amrDx[0][1] * m_amrDx[0][0];
+                    water_vol[iv[0]]         += GH(iv, 0)* m_amrDx[0][1] * m_amrDx[0][0];
                     Ylength[iv[0]]           += m_amrDx[0][1];
                 }
 
@@ -4135,6 +4133,201 @@ AmrHydro::tagCellsInit(Vector<IntVectSet>& a_tags)
     m_vectTags = a_tags;
 }
 
+#ifdef CH_USE_HDF5
+void
+AmrHydro::interpFinest() {
+
+    if (m_verbosity > 2) {
+        pout() << "AmrHydro::interpFinest" << endl;
+    }
+
+    // first create finest level -- all domain
+    Vector<Box> finestBoxes;
+    //domainSplit(m_amrDomains[m_finest_level], finestBoxes, m_max_box_size, m_block_factor);
+    domainSplit(m_amrDomains[m_max_level], finestBoxes, m_max_box_size, m_block_factor);
+
+    Vector<int> procAssign(finestBoxes.size());
+    LoadBalance(procAssign, finestBoxes);
+
+    //DisjointBoxLayout finestGrids(finestBoxes, procAssign, m_amrDomains[m_finest_level]);
+    DisjointBoxLayout finestGrids(finestBoxes, procAssign, m_amrDomains[m_max_level]);
+
+    if (m_verbosity > 2) {
+        pout() << "    finest level is : " << m_max_level << endl;
+        long long numCells0 = finestGrids.numCells();
+        pout() << "    finest level has : " << numCells0 << " cells. " << endl; //<< finestGrids << endl;
+    }
+
+    int nPhiComp = 1;
+    IntVect ghostVect     = IntVect::Unit;
+    IntVect ZeroghostVect     = IntVect::Zero;
+
+    /* coarsest to finest */
+    RefCountedPtr<LevelData<FArrayBox>> a_D        = RefCountedPtr<LevelData<FArrayBox>> ( new LevelData<FArrayBox>(finestGrids, nPhiComp, ZeroghostVect) );
+    RefCountedPtr<LevelData<FArrayBox>> a_D_coarse = RefCountedPtr<LevelData<FArrayBox>> ( new LevelData<FArrayBox>(m_amrGrids[0], nPhiComp, ZeroghostVect) );
+    RefCountedPtr<LevelData<FArrayBox>> a_N        = RefCountedPtr<LevelData<FArrayBox>> ( new LevelData<FArrayBox>(finestGrids, nPhiComp, ZeroghostVect) );
+    RefCountedPtr<LevelData<FArrayBox>> a_N_coarse = RefCountedPtr<LevelData<FArrayBox>> ( new LevelData<FArrayBox>(m_amrGrids[0], nPhiComp, ZeroghostVect) );
+
+    // fill a_N_coarse and a_D_coarse
+    LevelData<FArrayBox>& Pi_coarse      = *m_overburdenpress[0];
+    LevelData<FArrayBox>& Pw_coarse      = *m_Pw[0];
+    LevelData<FArrayBox>& GH_coarse      = *m_gapheight[0];
+    DataIterator dit = m_amrGrids[0].dataIterator();
+    for (dit.begin(); dit.ok(); ++dit) {
+        FArrayBox& Pi_coarse_dit = Pi_coarse[dit];
+        FArrayBox& Pw_coarse_dit = Pw_coarse[dit];
+        FArrayBox& GH_coarse_dit = GH_coarse[dit];
+        FArrayBox& a_N_coarse_dit = (*a_N_coarse)[dit];
+        FArrayBox& a_D_coarse_dit = (*a_D_coarse)[dit];
+        BoxIterator bit(a_N_coarse_dit.box());
+        for (bit.begin(); bit.ok(); ++bit) {
+            IntVect iv = bit();
+            a_N_coarse_dit(iv,0) = Pi_coarse_dit(iv,0) - Pw_coarse_dit(iv,0);
+            a_D_coarse_dit(iv,0) = GH_coarse_dit(iv,0);
+        }
+    }
+
+    // Fill with interpolated data from coarser level
+    int ratio_cf = 1;
+    for (int lev = 0; lev < m_max_level; lev++) {
+        ratio_cf *=2;
+    }
+    if (m_verbosity > 2) {
+        pout() << "    ref ratio c/f is : " << ratio_cf << endl;
+    }
+
+    FineInterp interpolator(finestGrids, nPhiComp, ratio_cf, finestGrids.physDomain());
+    interpolator.m_boundary_limit_type     = 3;
+
+    interpolator.interpToFine(*a_N, *a_N_coarse);
+    interpolator.interpToFine(*a_D, *a_D_coarse);
+
+    //interpolator.pwcinterpToFine(*a_N, *a_N_coarse);
+    //interpolator.pwcinterpToFine(*a_D, *a_D_coarse);
+      
+    //PiecewiseLinearFillPatch ghostFiller (finestGrids, 
+    //                                      m_amrGrids[0],  
+    //                                      nPhiComp, 
+    //                                      m_amrGrids[0].physDomain(), 
+    //                                      ratio_cf,
+    //                                      1);
+
+    //ghostFiller.fillInterp(*a_N, *a_N_coarse, *a_N_coarse, 1.0, 0, 0, nPhiComp);
+    //ghostFiller.fillInterp(*a_D, *a_D_coarse, *a_D_coarse, 1.0, 0, 0, nPhiComp);
+
+    //a_N->exchange();
+    //a_D->exchange();
+
+
+    /* Compute interm data -- do this on each actually filled levels */
+    for (int lev = 1; lev <= m_finest_level; lev++) {
+        if (m_verbosity > 2) {
+            pout() <<"    dealing with level " << lev << endl;
+        }
+        RefCountedPtr<LevelData<FArrayBox>> a_N_lev = RefCountedPtr<LevelData<FArrayBox>> ( new LevelData<FArrayBox>(m_amrGrids[lev], nPhiComp, ZeroghostVect) );
+        RefCountedPtr<LevelData<FArrayBox>> a_D_lev = RefCountedPtr<LevelData<FArrayBox>> ( new LevelData<FArrayBox>(m_amrGrids[lev], nPhiComp, ZeroghostVect) );
+        // fill 
+        LevelData<FArrayBox>& Pi_interm      = *m_overburdenpress[lev];
+        LevelData<FArrayBox>& Pw_interm      = *m_Pw[lev];
+        LevelData<FArrayBox>& GH_interm      = *m_gapheight[lev];
+        dit = m_amrGrids[lev].dataIterator();
+        for (dit.begin(); dit.ok(); ++dit) {
+            FArrayBox& Pi_coarse_dit = Pi_interm[dit];
+            FArrayBox& Pw_coarse_dit = Pw_interm[dit];
+            FArrayBox& GH_coarse_dit = GH_interm[dit];
+            FArrayBox& a_N_interm_dit = (*a_N_lev)[dit];
+            FArrayBox& a_D_interm_dit = (*a_D_lev)[dit];
+            BoxIterator bit(a_N_interm_dit.box());
+            for (bit.begin(); bit.ok(); ++bit) {
+                IntVect iv = bit();
+                a_N_interm_dit(iv,0) = Pi_coarse_dit(iv,0) - Pw_coarse_dit(iv,0);
+                a_D_interm_dit(iv,0) = GH_coarse_dit(iv,0);
+            }
+        }
+
+        // refine a_N interm in same dbl
+        int ratio_cf_interm = 1;
+        for (int kk = lev; kk < m_max_level; kk++) {
+            ratio_cf_interm *=2;
+        }
+        if (m_verbosity > 2) {
+            pout() << "    ref ratio c/f is : " << ratio_cf_interm << endl;
+        }
+        // refine dbl of interm lev
+        DisjointBoxLayout finestGrids_interm;
+        refine(finestGrids_interm, m_amrGrids[lev], ratio_cf_interm);
+        // create data on this refined dbl and interpolate
+        RefCountedPtr<LevelData<FArrayBox>> a_N_lev_interm = RefCountedPtr<LevelData<FArrayBox>> ( new LevelData<FArrayBox>(finestGrids_interm, nPhiComp, ZeroghostVect) );
+        RefCountedPtr<LevelData<FArrayBox>> a_D_lev_interm = RefCountedPtr<LevelData<FArrayBox>> ( new LevelData<FArrayBox>(finestGrids_interm, nPhiComp, ZeroghostVect) );
+        FineInterp interpolator_interm(finestGrids_interm, nPhiComp, ratio_cf_interm, finestGrids_interm.physDomain());
+        interpolator_interm.m_boundary_limit_type     = 3;
+        interpolator_interm.interpToFine(*a_N_lev_interm, *a_N_lev);
+        interpolator_interm.interpToFine(*a_D_lev_interm, *a_D_lev);
+        //interpolator_interm.pwcinterpToFine(*a_N_lev_interm, *a_N_lev);
+        //interpolator_interm.pwcinterpToFine(*a_D_lev_interm, *a_D_lev);
+        // copy this refined dbl portion onto the whole refined domain 
+	    a_N_lev_interm->copyTo(*a_N);
+	    a_D_lev_interm->copyTo(*a_D);
+        // ignore GC for now
+        //a_N->exchange();
+        //a_D->exchange();
+    }
+
+    /* custom plot -- only coarsest and finest level */
+    int nStuffToPlot = 2;
+    Vector<std::string> vectName;
+    vectName.resize(nStuffToPlot);
+    vectName[0]="GH";
+    vectName[1]="N";
+
+    Vector<Vector<LevelData<FArrayBox>*>> stuffToPlot;
+    stuffToPlot.resize(nStuffToPlot);
+    for (int zz = 0; zz < nStuffToPlot; zz++) {
+        stuffToPlot[zz].resize(2, NULL);
+    }
+
+    //stuffToPlot[var][lev]
+    stuffToPlot[0][0]  = new LevelData<FArrayBox>(m_amrGrids[0], 1, IntVect::Zero);  // dummy coarse
+    stuffToPlot[0][1]  = new LevelData<FArrayBox>(finestGrids, 1, IntVect::Zero);    // dummy fine
+    stuffToPlot[1][0]  = new LevelData<FArrayBox>(m_amrGrids[0], 1, IntVect::Zero);  // a_N_coarse
+    stuffToPlot[1][1]  = new LevelData<FArrayBox>(finestGrids, 1, IntVect::Zero);    // a_N fine
+
+    LevelData<FArrayBox>& levelDummy      = *a_D_coarse;
+    LevelData<FArrayBox>& levelDummySTP   = *stuffToPlot[0][0];
+
+    LevelData<FArrayBox>& levelDummyF     = *a_D;
+    LevelData<FArrayBox>& levelDummyFSTP  = *stuffToPlot[0][1];
+
+    LevelData<FArrayBox>& levelN      = *a_N_coarse;
+    LevelData<FArrayBox>& levelNSTP   = *stuffToPlot[1][0];
+
+    LevelData<FArrayBox>& levelNF     = *a_N;
+    LevelData<FArrayBox>& levelNFSTP  = *stuffToPlot[1][1];
+
+    dit = m_amrGrids[0].dataIterator();
+    for (dit.begin(); dit.ok(); ++dit) {
+        levelDummySTP[dit].copy(levelDummy[dit], 0, 0, 1);
+        levelNSTP[dit].copy(levelN[dit], 0, 0, 1);
+    }
+
+    dit = finestGrids.dataIterator();
+    for (dit.begin(); dit.ok(); ++dit) {
+        levelDummyFSTP[dit].copy(levelDummyF[dit], 0, 0, 1);
+        levelNFSTP[dit].copy(levelNF[dit], 0, 0, 1);
+    }
+
+    writePltPP(finestGrids, nStuffToPlot, vectName, stuffToPlot, ratio_cf, ".2d");
+
+    for (int lev = 0; lev <= 1; lev++) {
+        delete stuffToPlot[0][lev];
+        delete stuffToPlot[1][lev];
+    }
+
+}
+
+#endif
+
+
 void
 AmrHydro::initGrids(int a_finest_level) {
 
@@ -4605,6 +4798,102 @@ AmrHydro::writePltWFX(int numPlotComps,
         }
     }
 }
+
+
+void
+AmrHydro::writePltPP(DisjointBoxLayout& fineGrids, 
+                     int numPlotComps, 
+                     Vector<std::string>& vectName,
+                     Vector<Vector<LevelData<FArrayBox>*>> stuffToPlot,
+                     int ratio_cf,
+                     string namePlot)
+{
+    if (m_verbosity > 3) {
+        pout() << "AmrHydro::writePltCustom" << endl;
+    }
+
+    //Box domain = m_amrDomains[0].domainBox();
+    ProblemDomain PD = fineGrids.physDomain();
+    Box domain       = PD.domainBox();
+
+    Real dt = 1.;
+    //int numLevels = 2;
+    int numLevels = 1;
+
+    // Use plot data container for all vars
+    Vector<LevelData<FArrayBox>*> plotData(1, NULL);
+    IntVect ghostVect(IntVect::Zero);
+    //plotData[0] = new LevelData<FArrayBox>(m_amrGrids[0], numPlotComps, ghostVect);
+    //plotData[1] = new LevelData<FArrayBox>(fineGrids, numPlotComps, ghostVect);
+    plotData[0] = new LevelData<FArrayBox>(fineGrids, numPlotComps, ghostVect);
+    // COARSEST
+    //LevelData<FArrayBox>& plotDataLev      = *plotData[0];
+    //DataIterator dit = m_amrGrids[0].dataIterator();
+    //for (int kk = 0; kk < numPlotComps; kk++) {
+    //    LevelData<FArrayBox>& stuffToPlotLev  = *stuffToPlot[kk][0];
+    //    for (dit.begin(); dit.ok(); ++dit) {
+    //        FArrayBox& thisPlotData      = plotDataLev[dit];
+    //        FArrayBox& thisstuffToPlot   = stuffToPlotLev[dit];
+    //        thisPlotData.copy(thisstuffToPlot, 0, kk, 1);
+    //    }  // end loop over boxes on this level
+    //} // end loop over vars to add to pltData
+    // FINEST
+    LevelData<FArrayBox>& plotDataLev2      = *plotData[0]; //plotData[1]
+    DataIterator dit = fineGrids.dataIterator();
+    for (int kk = 0; kk < numPlotComps; kk++) {
+        LevelData<FArrayBox>& stuffToPlotLev  = *stuffToPlot[kk][1];
+        for (dit.begin(); dit.ok(); ++dit) {
+            FArrayBox& thisPlotData      = plotDataLev2[dit];
+            FArrayBox& thisstuffToPlot   = stuffToPlotLev[dit];
+            thisPlotData.copy(thisstuffToPlot, 0, kk, 1);
+        }  // end loop over boxes on this level
+    } // end loop over vars to add to pltData
+
+
+    // generate plotfile name
+    char iter_str[100];
+    sprintf(iter_str, "%sCustom%06d", m_plot_prefix.c_str(), m_cur_step);
+
+    string filename(iter_str);
+    
+    filename.append(namePlot);
+
+    if (SpaceDim == 1)
+    {
+        filename.append(".hdf5");
+    }
+    else if (SpaceDim == 2)
+    {
+        filename.append(".hdf5");
+    }
+    else if (SpaceDim == 3)
+    {
+        filename.append(".hdf5");
+    }
+
+    Vector<IntVect> a_refinement_ratios_vect;
+    a_refinement_ratios_vect.resize(m_max_level);  
+    for (int lev=0; lev<1; lev++) {  
+        a_refinement_ratios_vect[lev][0] = ratio_cf;
+        a_refinement_ratios_vect[lev][1] = ratio_cf;
+        if (CH_SPACEDIM == 3) {   
+            a_refinement_ratios_vect[lev][2] = ratio_cf;
+        }
+    }
+    WriteAnisotropicAMRHierarchyHDF5(
+        filename, m_amrGrids, plotData, vectName, domain, m_amrDx[m_max_level], dt, time(), a_refinement_ratios_vect, numLevels);
+
+    // need to delete plotData
+    for (int lev = 0; lev < numLevels; lev++)
+    {
+        if (plotData[lev] != NULL)
+        {
+            delete plotData[lev];
+            plotData[lev] = NULL;
+        }
+    }
+}
+
 
 // write custom debug hdf5 plotfile to the standard location
 void
