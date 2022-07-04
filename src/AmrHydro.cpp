@@ -668,6 +668,7 @@ AmrHydro::setDefaults()
     // set some bogus values as defaults
     m_PrintCustom = false;
     m_post_proc   = false;
+    m_post_proc_comparisons = false;
     m_is_defined = false;
     m_verbosity = 4;
     m_max_level = -1;
@@ -768,6 +769,7 @@ AmrHydro::initialize()
     }
     ppAmr.query("PrintCustom", m_PrintCustom); // To plot after each Picard ite -- debug mode
     ppAmr.query("post_proc", m_post_proc); // To print some post-proc analysis-- debug mode
+    ppAmr.query("post_proc_comparisons", m_post_proc_comparisons); // To print some post-proc analysis-- debug mode
     ppAmr.query("verbosity", m_verbosity);
     ppAmr.query("block_factor", m_block_factor);
     ppAmr.query("regrid_lbase", m_regrid_lbase);  // smaller lev subject to regridding
@@ -3237,8 +3239,10 @@ AmrHydro::timeStepFAS(Real a_dt)
     if (m_post_proc) {
         pout() << "\n\n\n";
         pout() <<"oo POST PROC analysis (domsize is "<< m_amrDomains[0].domainBox().size(0) <<") oo "<< endl;
-
-        //interpfinest();
+ 
+        if (m_post_proc_comparisons) {
+            interpFinest();
+        }
         
         int DomSize = m_amrDomains[0].domainBox().size(0); 
         int DomSizeY = m_amrDomains[0].domainBox().size(1); 
@@ -4184,13 +4188,11 @@ AmrHydro::interpFinest() {
 
     // first create finest level -- all domain
     Vector<Box> finestBoxes;
-    //domainSplit(m_amrDomains[m_finest_level], finestBoxes, m_max_box_size, m_block_factor);
     domainSplit(m_amrDomains[m_max_level], finestBoxes, m_max_box_size, m_block_factor);
 
     Vector<int> procAssign(finestBoxes.size());
     LoadBalance(procAssign, finestBoxes);
 
-    //DisjointBoxLayout finestGrids(finestBoxes, procAssign, m_amrDomains[m_finest_level]);
     DisjointBoxLayout finestGrids(finestBoxes, procAssign, m_amrDomains[m_max_level]);
 
     if (m_verbosity > 2) {
@@ -4201,15 +4203,22 @@ AmrHydro::interpFinest() {
 
     int nPhiComp = 1;
     IntVect ghostVect     = IntVect::Unit;
-    IntVect ZeroghostVect     = IntVect::Zero;
+    IntVect ZeroghostVect = IntVect::Zero;
 
     /* coarsest to finest */
     RefCountedPtr<LevelData<FArrayBox>> a_D        = RefCountedPtr<LevelData<FArrayBox>> ( new LevelData<FArrayBox>(finestGrids, nPhiComp, ZeroghostVect) );
     RefCountedPtr<LevelData<FArrayBox>> a_D_coarse = RefCountedPtr<LevelData<FArrayBox>> ( new LevelData<FArrayBox>(m_amrGrids[0], nPhiComp, ZeroghostVect) );
     RefCountedPtr<LevelData<FArrayBox>> a_N        = RefCountedPtr<LevelData<FArrayBox>> ( new LevelData<FArrayBox>(finestGrids, nPhiComp, ZeroghostVect) );
     RefCountedPtr<LevelData<FArrayBox>> a_N_coarse = RefCountedPtr<LevelData<FArrayBox>> ( new LevelData<FArrayBox>(m_amrGrids[0], nPhiComp, ZeroghostVect) );
+    RefCountedPtr<LevelData<FArrayBox>> a_tau        = RefCountedPtr<LevelData<FArrayBox>> ( new LevelData<FArrayBox>(finestGrids, nPhiComp, ZeroghostVect) );
+    RefCountedPtr<LevelData<FArrayBox>> a_tau_coarse = RefCountedPtr<LevelData<FArrayBox>> ( new LevelData<FArrayBox>(m_amrGrids[0], nPhiComp, ZeroghostVect) );
 
-    // fill a_N_coarse and a_D_coarse
+    // fill coarse data
+    Real Cs    = 7.624e6;
+    Real Cmax  = 1.0;
+    Real m_exp = 1./3;
+    Real n_exp = 3.;
+    Real vit = 5e-6;
     LevelData<FArrayBox>& Pi_coarse      = *m_overburdenpress[0];
     LevelData<FArrayBox>& Pw_coarse      = *m_Pw[0];
     LevelData<FArrayBox>& GH_coarse      = *m_gapheight[0];
@@ -4218,13 +4227,16 @@ AmrHydro::interpFinest() {
         FArrayBox& Pi_coarse_dit = Pi_coarse[dit];
         FArrayBox& Pw_coarse_dit = Pw_coarse[dit];
         FArrayBox& GH_coarse_dit = GH_coarse[dit];
-        FArrayBox& a_N_coarse_dit = (*a_N_coarse)[dit];
-        FArrayBox& a_D_coarse_dit = (*a_D_coarse)[dit];
+        FArrayBox& a_N_coarse_dit   = (*a_N_coarse)[dit];
+        FArrayBox& a_D_coarse_dit   = (*a_D_coarse)[dit];
+        FArrayBox& a_tau_coarse_dit = (*a_tau_coarse)[dit];
         BoxIterator bit(a_N_coarse_dit.box());
         for (bit.begin(); bit.ok(); ++bit) {
             IntVect iv = bit();
-            a_N_coarse_dit(iv,0) = Pi_coarse_dit(iv,0) - Pw_coarse_dit(iv,0);
-            a_D_coarse_dit(iv,0) = GH_coarse_dit(iv,0);
+            a_N_coarse_dit(iv,0)   = 0.8*Pi_coarse_dit(iv,0) - Pw_coarse_dit(iv,0);
+            a_D_coarse_dit(iv,0)   = GH_coarse_dit(iv,0);
+            a_tau_coarse_dit(iv,0) = 1e-6 * Cs * std::pow(vit, m_exp) 
+                                     / std::pow( 1 + vit * std::pow( Cs/(Cmax * a_N_coarse_dit(iv,0)), n_exp) , m_exp);
         }
     }
 
@@ -4242,6 +4254,7 @@ AmrHydro::interpFinest() {
 
     interpolator.interpToFine(*a_N, *a_N_coarse);
     interpolator.interpToFine(*a_D, *a_D_coarse);
+    interpolator.interpToFine(*a_tau, *a_tau_coarse);
 
     //interpolator.pwcinterpToFine(*a_N, *a_N_coarse);
     //interpolator.pwcinterpToFine(*a_D, *a_D_coarse);
@@ -4265,8 +4278,9 @@ AmrHydro::interpFinest() {
         if (m_verbosity > 2) {
             pout() <<"    dealing with level " << lev << endl;
         }
-        RefCountedPtr<LevelData<FArrayBox>> a_N_lev = RefCountedPtr<LevelData<FArrayBox>> ( new LevelData<FArrayBox>(m_amrGrids[lev], nPhiComp, ZeroghostVect) );
-        RefCountedPtr<LevelData<FArrayBox>> a_D_lev = RefCountedPtr<LevelData<FArrayBox>> ( new LevelData<FArrayBox>(m_amrGrids[lev], nPhiComp, ZeroghostVect) );
+        RefCountedPtr<LevelData<FArrayBox>> a_N_lev   = RefCountedPtr<LevelData<FArrayBox>> ( new LevelData<FArrayBox>(m_amrGrids[lev], nPhiComp, ZeroghostVect) );
+        RefCountedPtr<LevelData<FArrayBox>> a_D_lev   = RefCountedPtr<LevelData<FArrayBox>> ( new LevelData<FArrayBox>(m_amrGrids[lev], nPhiComp, ZeroghostVect) );
+        RefCountedPtr<LevelData<FArrayBox>> a_tau_lev = RefCountedPtr<LevelData<FArrayBox>> ( new LevelData<FArrayBox>(m_amrGrids[lev], nPhiComp, ZeroghostVect) );
         // fill 
         LevelData<FArrayBox>& Pi_interm      = *m_overburdenpress[lev];
         LevelData<FArrayBox>& Pw_interm      = *m_Pw[lev];
@@ -4276,13 +4290,16 @@ AmrHydro::interpFinest() {
             FArrayBox& Pi_coarse_dit = Pi_interm[dit];
             FArrayBox& Pw_coarse_dit = Pw_interm[dit];
             FArrayBox& GH_coarse_dit = GH_interm[dit];
-            FArrayBox& a_N_interm_dit = (*a_N_lev)[dit];
-            FArrayBox& a_D_interm_dit = (*a_D_lev)[dit];
+            FArrayBox& a_N_interm_dit   = (*a_N_lev)[dit];
+            FArrayBox& a_D_interm_dit   = (*a_D_lev)[dit];
+            FArrayBox& a_tau_interm_dit = (*a_tau_lev)[dit];
             BoxIterator bit(a_N_interm_dit.box());
             for (bit.begin(); bit.ok(); ++bit) {
                 IntVect iv = bit();
-                a_N_interm_dit(iv,0) = Pi_coarse_dit(iv,0) - Pw_coarse_dit(iv,0);
-                a_D_interm_dit(iv,0) = GH_coarse_dit(iv,0);
+                a_N_interm_dit(iv,0)   = 0.8*Pi_coarse_dit(iv,0) - Pw_coarse_dit(iv,0);
+                a_D_interm_dit(iv,0)   = GH_coarse_dit(iv,0);
+                a_tau_interm_dit(iv,0) = 1e-6 * Cs * std::pow(vit, m_exp) 
+                                         / std::pow( 1 + vit * std::pow( Cs/(Cmax * a_N_interm_dit(iv,0)), n_exp) , m_exp);
             }
         }
 
@@ -4298,17 +4315,20 @@ AmrHydro::interpFinest() {
         DisjointBoxLayout finestGrids_interm;
         refine(finestGrids_interm, m_amrGrids[lev], ratio_cf_interm);
         // create data on this refined dbl and interpolate
-        RefCountedPtr<LevelData<FArrayBox>> a_N_lev_interm = RefCountedPtr<LevelData<FArrayBox>> ( new LevelData<FArrayBox>(finestGrids_interm, nPhiComp, ZeroghostVect) );
-        RefCountedPtr<LevelData<FArrayBox>> a_D_lev_interm = RefCountedPtr<LevelData<FArrayBox>> ( new LevelData<FArrayBox>(finestGrids_interm, nPhiComp, ZeroghostVect) );
+        RefCountedPtr<LevelData<FArrayBox>> a_N_lev_interm   = RefCountedPtr<LevelData<FArrayBox>> ( new LevelData<FArrayBox>(finestGrids_interm, nPhiComp, ZeroghostVect) );
+        RefCountedPtr<LevelData<FArrayBox>> a_D_lev_interm   = RefCountedPtr<LevelData<FArrayBox>> ( new LevelData<FArrayBox>(finestGrids_interm, nPhiComp, ZeroghostVect) );
+        RefCountedPtr<LevelData<FArrayBox>> a_tau_lev_interm = RefCountedPtr<LevelData<FArrayBox>> ( new LevelData<FArrayBox>(finestGrids_interm, nPhiComp, ZeroghostVect) );
         FineInterp interpolator_interm(finestGrids_interm, nPhiComp, ratio_cf_interm, finestGrids_interm.physDomain());
         interpolator_interm.m_boundary_limit_type     = 3;
         interpolator_interm.interpToFine(*a_N_lev_interm, *a_N_lev);
         interpolator_interm.interpToFine(*a_D_lev_interm, *a_D_lev);
+        interpolator_interm.interpToFine(*a_tau_lev_interm, *a_tau_lev);
         //interpolator_interm.pwcinterpToFine(*a_N_lev_interm, *a_N_lev);
         //interpolator_interm.pwcinterpToFine(*a_D_lev_interm, *a_D_lev);
         // copy this refined dbl portion onto the whole refined domain 
 	    a_N_lev_interm->copyTo(*a_N);
 	    a_D_lev_interm->copyTo(*a_D);
+	    a_tau_lev_interm->copyTo(*a_tau);
         // ignore GC for now
         //a_N->exchange();
         //a_D->exchange();
@@ -4318,7 +4338,8 @@ AmrHydro::interpFinest() {
     int nStuffToPlot = 2;
     Vector<std::string> vectName;
     vectName.resize(nStuffToPlot);
-    vectName[0]="GH";
+    //vectName[0]="GH";
+    vectName[0]="Tau";
     vectName[1]="N";
 
     Vector<Vector<LevelData<FArrayBox>*>> stuffToPlot;
@@ -4333,10 +4354,12 @@ AmrHydro::interpFinest() {
     stuffToPlot[1][0]  = new LevelData<FArrayBox>(m_amrGrids[0], 1, IntVect::Zero);  // a_N_coarse
     stuffToPlot[1][1]  = new LevelData<FArrayBox>(finestGrids, 1, IntVect::Zero);    // a_N fine
 
-    LevelData<FArrayBox>& levelDummy      = *a_D_coarse;
+    //LevelData<FArrayBox>& levelDummy      = *a_D_coarse;
+    LevelData<FArrayBox>& levelDummy      = *a_tau_coarse;
     LevelData<FArrayBox>& levelDummySTP   = *stuffToPlot[0][0];
 
-    LevelData<FArrayBox>& levelDummyF     = *a_D;
+    //LevelData<FArrayBox>& levelDummyF     = *a_D;
+    LevelData<FArrayBox>& levelDummyF     = *a_tau;
     LevelData<FArrayBox>& levelDummyFSTP  = *stuffToPlot[0][1];
 
     LevelData<FArrayBox>& levelN      = *a_N_coarse;
@@ -4363,7 +4386,6 @@ AmrHydro::interpFinest() {
         delete stuffToPlot[0][lev];
         delete stuffToPlot[1][lev];
     }
-
 }
 
 #endif
