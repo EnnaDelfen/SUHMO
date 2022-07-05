@@ -3641,23 +3641,15 @@ AmrHydro::timeStepFAS(Real a_dt)
         //}
  
         // SPATIAL POSTPROC
-        //pout() << "XaxisSUHMO_A1  Ylength    dischargeSUHMO_A1   dischargeEFFSUHMO_A1   dischargeINEFFSUHMO_A1  rechargeMSSUHMO_A1  rechargeMRSUHMO_A1 PSUHMO_A1 " << endl;
-        //for (int xi = 0; xi < DomSize; xi++) {
-        //    Real x_loc = (xi+0.5)*m_amrDx[0][0];    
-        //            pout() << " " << x_loc/1e3 << " " << Ylength[xi] 
-        //           << " " << -out_water_flux_x_tot[xi] << " " << -out_water_flux_x_chan[xi] << " " << -out_water_flux_x_distrib[xi] 
-        //           << " " << out_recharge[xi] << " " << out_recharge_tot[xi] << " " << avPressure[xi]/dom_sizeY[xi]/1e6  
-        //           << endl;
+        pout() << "XaxisSUHMO_A1  Ylength    dischargeSUHMO_A1   dischargeEFFSUHMO_A1   dischargeINEFFSUHMO_A1  rechargeMSSUHMO_A1  rechargeMRSUHMO_A1 PSUHMO_A1 " << endl;
+        for (int xi = 0; xi < DomSize; xi++) {
+            Real x_loc = (xi+0.5)*m_amrDx[0][0];    
+                    pout() << " " << x_loc/1e3 << " " << Ylength[xi] 
+                   << " " << -out_water_flux_x_tot[xi] << " " << -out_water_flux_x_chan[xi] << " " << -out_water_flux_x_distrib[xi] 
+                   << " " << out_recharge[xi] << " " << out_recharge_tot[xi] << " " << avPressure[xi]/dom_sizeY[xi]/1e6  
+                   << endl;
+        }
 
-
-        //pout() << "1-Xpos   2-avgP  3-rechargeMR 4-rechargeMS 5-rechargeTOT  6-discharge  7-TOTwaterVol" << endl;
-        //for (int xi = 0; xi < DomSize; xi++) {
-        //    Real x_loc = (xi+0.5)*m_amrDx[0][0];    
-        //            pout() << " " << x_loc/1e3 << " "  << avPressure[xi]/DomSizeY/1e6  << " " << out_recharge_tot[xi]  
-        //           << " " << out_recharge[xi] << " " << out_recharge_tot[xi] + out_recharge[xi] 
-        //           << " " << -out_water_flux_x_tot[xi] << " " << water_vol[xi] 
-        //           << endl;
-        //}
     }
 
     /* Averaging down and fill in ghost cells */
