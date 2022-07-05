@@ -15,6 +15,7 @@ d/
 inputs.compare
 pout.*
 *_bu
+ramp_up.dat
 
 *lev_tooLarge
 *.agr
