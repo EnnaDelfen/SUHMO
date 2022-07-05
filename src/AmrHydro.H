@@ -438,6 +438,7 @@ protected:
    
     // Post proc
     bool m_post_proc;
+    bool m_post_proc_comparisons;
 
     /** Model outputs include spatio temporal fields of Hydraulic head,  effective  Pressure,  
         subglacial  gap  height  (the  effective  geometry  representative  of  an  entire  element),  
