@@ -27,7 +27,9 @@ jobs:
                CHOMBO_HOME: ${GITHUB_WORKSPACE}/build/Chombo_3.2/lib
                AMR_HOME: ${GITHUB_WORKSPACE}
           run: |
-          working-directory: ../exec/0_convergence_channelized
+            echo $pwd
+            cd exec/0_convergence_channelized/
+            echo $pwd
             mpicxx -v
             make -j2 all MPI=TRUE OPT=TRUE DEBUG=FALSE DIM=2
         - name: Run
