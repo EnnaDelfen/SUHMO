@@ -669,6 +669,7 @@ AmrHydro::setDefaults()
     m_PrintCustom = false;
     m_post_proc   = false;
     m_post_proc_comparisons = false;
+    m_post_proc_shmip       = false;
     m_is_defined = false;
     m_verbosity = 4;
     m_max_level = -1;
@@ -3591,9 +3592,11 @@ AmrHydro::timeStepFAS(Real a_dt)
         idx_bandHi_hi  = (int) xloc_bandHi_hi/m_amrDx[0][0] - 0.5;
 
         // TEMPORAL POSTPROC
-        Real sec_1month      = 2635200.0;  // s
-        int time_tmp = (int) m_time + a_dt;
-        pout() << "Time(months) recharge ramp = " <<  m_time/sec_1month  << " " << out_recharge[1] << " " << ramp << endl; 
+        if (m_suhmoParm->m_ramp) {
+            Real sec_1month      = 2635200.0;  // s
+            int time_tmp = (int) m_time + a_dt;
+            pout() << "Time(months) recharge ramp = " <<  m_time/sec_1month  << " " << out_recharge[1] << " " << ramp << endl; 
+        }
         //if (time_tmp % 86400 == 0) {
         //    pout() << "Time(h - d) avgN N_LB  N_MB  N_HB = " <<  (m_time + a_dt -m_restart_time)/3600.  << " " << (m_time + a_dt -m_restart_time)/86400 
         //                                                            << " " << out_avgN[3]/count_avgN 
@@ -3641,13 +3644,15 @@ AmrHydro::timeStepFAS(Real a_dt)
         //}
  
         // SPATIAL POSTPROC
-        pout() << "XaxisSUHMO_A1  Ylength    dischargeSUHMO_A1   dischargeEFFSUHMO_A1   dischargeINEFFSUHMO_A1  rechargeMSSUHMO_A1  rechargeMRSUHMO_A1 PSUHMO_A1 " << endl;
-        for (int xi = 0; xi < DomSize; xi++) {
-            Real x_loc = (xi+0.5)*m_amrDx[0][0];    
-                    pout() << " " << x_loc/1e3 << " " << Ylength[xi] 
-                   << " " << -out_water_flux_x_tot[xi] << " " << -out_water_flux_x_chan[xi] << " " << -out_water_flux_x_distrib[xi] 
-                   << " " << out_recharge[xi] << " " << out_recharge_tot[xi] << " " << avPressure[xi]/dom_sizeY[xi]/1e6  
-                   << endl;
+        if (m_post_proc_shmip) {
+            pout() << "XaxisSUHMO_A1  Ylength    dischargeSUHMO_A1   dischargeEFFSUHMO_A1   dischargeINEFFSUHMO_A1  rechargeMSSUHMO_A1  rechargeMRSUHMO_A1 PSUHMO_A1 " << endl;
+            for (int xi = 0; xi < DomSize; xi++) {
+                Real x_loc = (xi+0.5)*m_amrDx[0][0];    
+                        pout() << " " << x_loc/1e3 << " " << Ylength[xi] 
+                       << " " << -out_water_flux_x_tot[xi] << " " << -out_water_flux_x_chan[xi] << " " << -out_water_flux_x_distrib[xi] 
+                       << " " << out_recharge[xi] << " " << out_recharge_tot[xi] << " " << avPressure[xi]/dom_sizeY[xi]/1e6  
+                       << endl;
+            }
         }
 
     }
