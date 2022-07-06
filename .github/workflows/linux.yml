@@ -27,8 +27,14 @@ jobs:
                CHOMBO_HOME: ${GITHUB_WORKSPACE}/build/Chombo_3.2/lib
                AMR_HOME: ${GITHUB_WORKSPACE}
           run: |
-            cd exec/0_convergence_channelized
+          working-directory: ./exec/0_convergence_channelized
             mpicxx -v
             make -j2 all MPI=TRUE OPT=TRUE DEBUG=FALSE DIM=2
-            ./Suhmo2d.Linux.64.mpicxx.gfortran-11.OPT.MPI.ex 1lev/input.hydro
+        - name: Run
+          env:
+               CHOMBO_HOME: ${GITHUB_WORKSPACE}/build/Chombo_3.2/lib
+               AMR_HOME: ${GITHUB_WORKSPACE}
+          working-directory: ./exec/0_convergence_channelized
+          run: |
+            mpirun -n 1 ./Suhmo2d.Linux.64.mpicxx.gfortran-11.OPT.MPI.ex 1lev/input.hydro
             cat pout.0
