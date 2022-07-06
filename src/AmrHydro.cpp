@@ -43,7 +43,6 @@ using std::string;
 #include "CoarseAverage.H"
 #include "FineInterp.H"
 #include "DivergenceF_F.H"
-#include "AMRUtilF_F.H"
 #include "CH_HDF5.H"
 #include "computeNorm.H" 
 #include "MayDay.H"
@@ -69,14 +68,31 @@ using std::string;
 std::vector<int>  GlobalBCRS::s_bcLo = std::vector<int>();
 std::vector<int>  GlobalBCRS::s_bcHi = std::vector<int>();
 bool              GlobalBCRS::s_areBCsParsed= false;
+// DIRI
 Real              GlobalBCRS::s_xlo_diri= -1000;
 Real              GlobalBCRS::s_xhi_diri= -1000;
 Real              GlobalBCRS::s_ylo_diri= -1000;
 Real              GlobalBCRS::s_yhi_diri= -1000;
+// NEUM
 Real              GlobalBCRS::s_xlo_neum= -1000;
 Real              GlobalBCRS::s_xhi_neum= -1000;
 Real              GlobalBCRS::s_ylo_neum= -1000;
 Real              GlobalBCRS::s_yhi_neum= -1000;
+// ROBIN
+Real              GlobalBCRS::s_xlo_A_robin= -1000;
+Real              GlobalBCRS::s_xlo_B_robin= -1000;
+Real              GlobalBCRS::s_xlo_C_robin= -1000;
+Real              GlobalBCRS::s_xhi_A_robin= -1000;
+Real              GlobalBCRS::s_xhi_B_robin= -1000;
+Real              GlobalBCRS::s_xhi_C_robin= -1000;
+
+Real              GlobalBCRS::s_ylo_A_robin= -1000;
+Real              GlobalBCRS::s_ylo_B_robin= -1000;
+Real              GlobalBCRS::s_ylo_C_robin= -1000;
+Real              GlobalBCRS::s_yhi_A_robin= -1000;
+Real              GlobalBCRS::s_yhi_B_robin= -1000;
+Real              GlobalBCRS::s_yhi_C_robin= -1000;
+
 
 /* Parse boundary conditions and values in input file -- only once */
 void ParseBC() 
@@ -96,12 +112,20 @@ void ParseBC()
             pp.get("x.lo_dirich_val",GlobalBCRS::s_xlo_diri);
         } else if (GlobalBCRS::s_bcLo[0] == 1) {
             pp.get("x.lo_neumann_val",GlobalBCRS::s_xlo_neum);
+        } else if (GlobalBCRS::s_bcLo[0] == 2) {  // ROBIN 
+            pp.get("x.lo_robin_valA" ,GlobalBCRS::s_xlo_A_robin);
+            pp.get("x.lo_robin_valB" ,GlobalBCRS::s_xlo_B_robin);
+            pp.get("x.lo_robin_valC" ,GlobalBCRS::s_xlo_C_robin);
         }
         // x hi
         if (GlobalBCRS::s_bcHi[0] == 0) {
             pp.get("x.hi_dirich_val",GlobalBCRS::s_xhi_diri);
         } else if (GlobalBCRS::s_bcHi[0] == 1) {
             pp.get("x.hi_neumann_val",GlobalBCRS::s_xhi_neum);
+        } else if (GlobalBCRS::s_bcHi[0] == 2) {  // ROBIN
+            pp.get("x.hi_robin_valA" ,GlobalBCRS::s_xhi_A_robin);
+            pp.get("x.hi_robin_valB" ,GlobalBCRS::s_xhi_B_robin);
+            pp.get("x.hi_robin_valC" ,GlobalBCRS::s_xhi_C_robin);
         }
     }
     if (isPerio[1] == 0) {
@@ -110,25 +134,71 @@ void ParseBC()
             pp.get("y.lo_dirich_val",GlobalBCRS::s_ylo_diri);
         } else if (GlobalBCRS::s_bcLo[1] == 1) {
             pp.get("y.lo_neumann_val",GlobalBCRS::s_ylo_neum);
+        } else if (GlobalBCRS::s_bcLo[1] == 2) { //ROBIN
+            pp.get("y.lo_robin_valA" ,GlobalBCRS::s_ylo_A_robin);
+            pp.get("y.lo_robin_valB" ,GlobalBCRS::s_ylo_B_robin);
+            pp.get("y.lo_robin_valC" ,GlobalBCRS::s_ylo_C_robin);
         }
         // y hi
         if (GlobalBCRS::s_bcHi[1] == 0) {
             pp.get("y.hi_dirich_val",GlobalBCRS::s_yhi_diri);
         } else if (GlobalBCRS::s_bcHi[1] == 1) {
             pp.get("y.hi_neumann_val",GlobalBCRS::s_yhi_neum);
+        } else if (GlobalBCRS::s_bcHi[1] == 2) { //ROBIN
+            pp.get("y.hi_robin_valA" ,GlobalBCRS::s_yhi_A_robin);
+            pp.get("y.hi_robin_valB" ,GlobalBCRS::s_yhi_B_robin);
+            pp.get("y.hi_robin_valC" ,GlobalBCRS::s_yhi_C_robin);
         }
     }
     GlobalBCRS::s_areBCsParsed = true;
 }
+
+void RobinValue(Real* pos,
+                int* dir,
+                Side::LoHiSide* side,
+                Real* a_valA,
+                Real* a_valB,
+                Real* a_valC)
+{
+    Real bcValA = 0.0;
+    Real bcValB = 0.0;
+    Real bcValC = 0.0;
+    if ( *dir == 0 ) {
+       if (*side == Side::Lo) {
+          bcValA = GlobalBCRS::s_xlo_A_robin;
+          bcValB = GlobalBCRS::s_xlo_B_robin;
+          bcValC = GlobalBCRS::s_xlo_C_robin;
+       } else { 
+          bcValA = GlobalBCRS::s_xhi_A_robin;
+          bcValB = GlobalBCRS::s_xhi_B_robin;
+          bcValC = GlobalBCRS::s_xhi_C_robin;
+       }    
+    } else if ( *dir == 1 ) {
+       if (*side == Side::Lo) {
+          bcValA = GlobalBCRS::s_ylo_A_robin;
+          bcValB = GlobalBCRS::s_ylo_B_robin;
+          bcValC = GlobalBCRS::s_ylo_C_robin;
+       } else { 
+          bcValA = GlobalBCRS::s_yhi_A_robin;
+          bcValB = GlobalBCRS::s_yhi_B_robin;
+          bcValC = GlobalBCRS::s_yhi_C_robin;
+       }    
+    }
+    a_valA[0]=bcValA;
+    a_valB[0]=bcValB;
+    a_valC[0]=bcValC;
+}
+
 
 
 /* Return Neumann boundary val -- based on parsed value */
 void NeumannValue(Real* pos,
                   int*  dir, 
                   Side::LoHiSide* side, 
-                  Real* a_values)
+                  Real* a_valA,
+                  Real* a_valB,
+                  Real* a_valC)
 {
-    ParmParse pp;
     Real bcVal = 0.0;
     if ( *dir == 0 ) {
        if (*side == Side::Lo) {
@@ -143,37 +213,33 @@ void NeumannValue(Real* pos,
           bcVal = GlobalBCRS::s_yhi_neum;
        }    
     }
-    a_values[0] = bcVal;
+    a_valA[0] = bcVal;
 }
 
-
-Real DirichletValue(int dir, 
-                    Side::LoHiSide side)
-{
-    Real bcVal = 0.0;
-    if ( dir == 0 ) {
-       if (side == Side::Lo) {
-          bcVal = GlobalBCRS::s_xlo_diri;
-       } else { 
-          bcVal = GlobalBCRS::s_xhi_diri;
-       }    
-    } else if ( dir == 1 ) {
-       if (side == Side::Lo) {
-          bcVal = GlobalBCRS::s_ylo_diri;
-       } else { 
-          bcVal = GlobalBCRS::s_yhi_diri;
-       }    
-    }
-    return bcVal;
-}
 
 /* Return Dirichlet boundary val -- based on parsed value */
 void DirichletValue(Real* pos,
                     int* dir, 
                     Side::LoHiSide* side, 
-                    Real* a_values)
+                    Real* a_valA,
+                    Real* a_valB,
+                    Real* a_valC)
 {
-    a_values[0] = DirichletValue(*dir, *side);
+    Real bcVal = 0.0;
+    if ( *dir == 0 ) {
+       if (*side == Side::Lo) {
+          bcVal = GlobalBCRS::s_xlo_diri;
+       } else { 
+          bcVal = GlobalBCRS::s_xhi_diri;
+       }    
+    } else if ( *dir == 1 ) {
+       if (*side == Side::Lo) {
+          bcVal = GlobalBCRS::s_ylo_diri;
+       } else { 
+          bcVal = GlobalBCRS::s_yhi_diri;
+       }    
+    }
+    a_valA[0] = bcVal;
 }
 
 
@@ -181,7 +247,7 @@ void DirichletValue(Real* pos,
 void mixBCValues(FArrayBox& a_state,
                  const Box& a_valid,
                  const ProblemDomain& a_domain,
-                 Real a_dx,
+                 RealVect a_dx,
                  bool a_homogeneous)
 {
   if(!a_domain.domainBox().contains(a_state.box())) {
@@ -241,12 +307,12 @@ void mixBCValues(FArrayBox& a_state,
   }
 }
 
-// weird RobinBC
-void RobinBC(FArrayBox& a_state,
-             const Box& a_valid,
-             const ProblemDomain& a_domain,
-             Real a_dx,
-             bool a_homogeneous)
+// RobinBC
+void RobinmixBCValues(FArrayBox& a_state,
+                      const Box& a_valid,
+                      const ProblemDomain& a_domain,
+                      RealVect a_dx,
+                      bool a_homogeneous)
 {
 
   if (!GlobalBCRS::s_areBCsParsed) {
@@ -264,47 +330,14 @@ void RobinBC(FArrayBox& a_state,
         if (!a_domain.domainBox().contains(ghostBoxLo)) {
             // DIRI
             if (GlobalBCRS::s_bcLo[dir] == 0) {
-                Interval a_interval   = a_state.interval(); 
-                Side::LoHiSide a_side = Side::Lo;
-                int isign = sign(a_side);
-                RealVect facePos;
-                Box toRegion = adjCellBox(valid, dir, a_side, 1);
-                toRegion &= a_state.box();
-                Real* value = new Real[a_state.nComp()];
-                for (BoxIterator bit(toRegion); bit.ok(); ++bit) {
-                    const IntVect& ivTo = bit();
-                    IntVect ivClose     = ivTo -   isign*BASISV(dir);
-                    //if (!a_homogeneous) {
-                    //      Real* dataPtr = facePos.dataPtr();
-
-                    //      D_TERM( dataPtr[0] = a_dx*(ivClose[0] + 0.5);,\
-                    //              dataPtr[1] = a_dx*(ivClose[1] + 0.5);,\
-                    //              dataPtr[2] = a_dx*(ivClose[2] + 0.5);)
-
-                    //      dataPtr[dir] += 0.5*Real(isign)*a_dx;
-
-                    //      DirichletValue(facePos.dataPtr(), &dir, &a_side, value);
-                    //}
-
-                    for (int icomp = a_interval.begin(); icomp <= a_interval.end(); icomp++) {
-                        Real nearVal = a_state(ivClose, icomp);
-                        Real inhomogVal = 0.0;
-                        if (!a_homogeneous) {
-                            //inhomogVal = value[icomp];
-                            Real x_loc = (ivClose[0]+0.5)*a_dx;
-                            Real y_loc = (ivClose[1]+0.5)*a_dx;
-                            Real ax       = 0.0; //1.5e-3;
-                            Real by       = -1.5e-3;
-                            Real cst      = 100.0;
-                            inhomogVal = std::max(ax*x_loc + by*y_loc + cst, 0.0);
-                            pout() << "GhoC CloC " << ivTo << " " << ivClose <<  endl;
-                        }
-                        // Lin interp
-                        a_state(ivTo, icomp) = 2*inhomogVal-nearVal;
-                        pout() << "Robin BC. GC, Edge, CloC "  << a_state(ivTo, icomp)  << " "<< inhomogVal<< " " << nearVal <<  endl;
-                    }
-                }
-                delete[] value;
+                DiriBC(a_state,
+                       valid,
+                       a_dx,
+                       a_homogeneous,
+                       DirichletValue,
+                       dir,
+                       Side::Lo,
+                       1);
             // NEUM
             } else if (GlobalBCRS::s_bcLo[dir] == 1) {
 		        NeumBC(a_state,
@@ -314,6 +347,15 @@ void RobinBC(FArrayBox& a_state,
 		               NeumannValue,
 		               dir,
 		               Side::Lo);
+            // ROBIN
+            } else if (GlobalBCRS::s_bcLo[dir] == 2) {
+                RobinBC(a_state,
+                        valid,
+                        a_dx,
+                        a_homogeneous,
+                        RobinValue,
+                        dir,
+                        Side::Lo);
             }
         }
 
@@ -321,45 +363,14 @@ void RobinBC(FArrayBox& a_state,
         if (!a_domain.domainBox().contains(ghostBoxHi)) {
             // DIRI
             if (GlobalBCRS::s_bcHi[dir] == 0) {
-                Interval a_interval   = a_state.interval(); 
-                Side::LoHiSide a_side = Side::Hi;
-                int isign = sign(a_side);
-                RealVect facePos;
-                Box toRegion = adjCellBox(valid, dir, a_side, 1);
-                toRegion &= a_state.box();
-                Real* value = new Real[a_state.nComp()];
-                for (BoxIterator bit(toRegion); bit.ok(); ++bit) {
-                    const IntVect& ivTo = bit();
-                    IntVect ivClose     = ivTo -   isign*BASISV(dir);
-                    //if (!a_homogeneous) {
-                    //      Real* dataPtr = facePos.dataPtr();
-
-                    //      D_TERM( dataPtr[0] = a_dx*(ivClose[0] + 0.5);,\
-                    //              dataPtr[1] = a_dx*(ivClose[1] + 0.5);,\
-                    //              dataPtr[2] = a_dx*(ivClose[2] + 0.5);)
-
-                    //      dataPtr[dir] += 0.5*Real(isign)*a_dx;
-
-                    //      DirichletValue(facePos.dataPtr(), &dir, &a_side, value);
-                    //}
- 
-                    for (int icomp = a_interval.begin(); icomp <= a_interval.end(); icomp++) {
-                        Real nearVal = a_state(ivClose, icomp);
-                        Real inhomogVal = 0.0;
-                        if (!a_homogeneous) {
-                            //inhomogVal = value[icomp];
-                            Real x_loc = (ivClose[0]+0.5)*a_dx;
-                            Real y_loc = (ivClose[1]+0.5)*a_dx;
-                            Real ax       = 0.0; //1.5e-3;
-                            Real by       = -1.5e-3;
-                            Real cst      = 100.0;
-                            inhomogVal = std::max(ax*x_loc + by*y_loc + cst, 0.0);
-                        }
-                        // Lin interp
-                        a_state(ivTo, icomp) = 2*inhomogVal-nearVal;
-                    }
-                }
-                delete[] value;
+                DiriBC(a_state,
+                       valid,
+                       a_dx,
+                       a_homogeneous,
+                       DirichletValue,
+                       dir,
+                       Side::Hi,
+                       1);
             // NEUM
             } else if (GlobalBCRS::s_bcHi[dir] == 1) {
 		        NeumBC(a_state,
@@ -369,6 +380,15 @@ void RobinBC(FArrayBox& a_state,
 		               NeumannValue,
 		               dir,
                        Side::Hi);
+            // ROBIN
+            } else if (GlobalBCRS::s_bcHi[dir] == 2) {
+                RobinBC(a_state,
+                        valid,
+                        a_dx,
+                        a_homogeneous,
+                        RobinValue,
+                        dir,
+                        Side::Hi);
             }
         }
       } // end if is not periodic in ith direction
@@ -383,7 +403,7 @@ void RobinBC(FArrayBox& a_state,
 void FixedNeumBCFill(FArrayBox& a_state,
                      const Box& a_valid,
                      const ProblemDomain& a_domain,
-                     Real a_dx,
+                     RealVect a_dx,
                      bool a_homogeneous)
 {
   if(!a_domain.domainBox().contains(a_state.box())) {
@@ -417,9 +437,9 @@ void FixedNeumBCFill(FArrayBox& a_state,
 
 /* This function forces the ghost cells on the domain boundaries of a_state to be 0 -- no linear interpolation */ 
 void NullBCFill(FArrayBox& a_state,
-            const Box& a_valid,
-            const ProblemDomain& a_domain,
-            Real a_dx)
+                const Box& a_valid,
+                const ProblemDomain& a_domain,
+                RealVect a_dx)
 {
   // If box is outside of domain bounds ?
   if(!a_domain.domainBox().contains(a_state.box())) {
@@ -461,7 +481,7 @@ AmrHydro::SolveForGap_nl(const Vector<DisjointBoxLayout>&               a_grids,
                           Vector<RefCountedPtr<LevelData<FluxBox> > >&   a_bCoef,
                           Vector<ProblemDomain>& a_domains,
                           Vector<int>& refRatio,
-                          Real& coarsestDx,
+                          RealVect& coarsestDx,
                           Vector<LevelData<FArrayBox>*>& a_gapHeight, 
                           Vector<LevelData<FArrayBox>*>& a_RHS,
                           Real a_dt)
@@ -484,7 +504,8 @@ AmrHydro::SolveForGap_nl(const Vector<DisjointBoxLayout>&               a_grids,
     amrSolver = new AMRMultiGrid<LevelData<FArrayBox> >();
 
     // bottom solver ?
-    BiCGStabSolver<LevelData<FArrayBox> > bottomSolver;
+    //BiCGStabSolver<LevelData<FArrayBox> > bottomSolver;
+    RelaxSolver<LevelData<FArrayBox> > bottomSolver;
     bottomSolver.m_verbosity = 1;
 
     int numLevels = m_finest_level + 1;
@@ -495,8 +516,8 @@ AmrHydro::SolveForGap_nl(const Vector<DisjointBoxLayout>&               a_grids,
     int numBottom = 4;  // num of bottom smoothings
     int numMG     = 1;  // Vcycle selected
     int maxIter   = 100; // max number of v cycles
-    Real eps        =  1.0e-10;  // solution tolerance
-    Real normThresh =  1.0e-10;  // abs tol
+    Real eps        =  1.0e-7;  // solution tolerance
+    Real normThresh =  1.0e-7;  // abs tol
     Real hang       =  1.0e-6;      // next rnorm should be < (1-m_hang)*norm_last 
     //if (m_cur_step < 50) { 
     //    numBottom  = 10;  // num of bottom smoothings
@@ -530,7 +551,7 @@ AmrHydro::SolveForHead_nl(const Vector<DisjointBoxLayout>&               a_grids
                           Vector<RefCountedPtr<LevelData<FluxBox> > >&   a_bCoef,
                           Vector<ProblemDomain>& a_domains,
                           Vector<int>& refRatio,
-                          Real& coarsestDx,
+                          RealVect& coarsestDx,
                           Vector<LevelData<FArrayBox>*>& a_head, 
                           Vector<LevelData<FArrayBox>*>& a_RHS)
 {
@@ -568,7 +589,6 @@ AmrHydro::SolveForHead_nl(const Vector<DisjointBoxLayout>&               a_grids
                            refRatio,
                            coarsestDx,
                            &mixBCValues,
-                           //&RobinBC,
                            0.0, a_aCoef,
                            - 1.0, a_bCoef,
                           this, NLfunctTmp, wFfunctTmp,
@@ -581,7 +601,8 @@ AmrHydro::SolveForHead_nl(const Vector<DisjointBoxLayout>&               a_grids
     amrSolver = new AMRFASMultiGrid<LevelData<FArrayBox> >();
 
     // bottom solver ?
-    BiCGStabSolver<LevelData<FArrayBox> > bottomSolver;
+    //BiCGStabSolver<LevelData<FArrayBox> > bottomSolver;
+    RelaxSolver<LevelData<FArrayBox> > bottomSolver;
     if (m_verbosity > 3) {
         bottomSolver.m_verbosity = 4;
     } else {
@@ -593,11 +614,11 @@ AmrHydro::SolveForHead_nl(const Vector<DisjointBoxLayout>&               a_grids
                       &bottomSolver, numLevels);
 
     int numSmooth = 4;  // number of relax before averaging
-    int numBottom = 8;  // num of bottom smoothings
+    int numBottom = 16;  // num of bottom smoothings
     int numMG     = 1;  // Vcycle selected
     int maxIter   = 100; // max number of v cycles
-    Real eps        =  1.0e-10;  // solution tolerance
-    Real normThresh =  1.0e-10;  // abs tol
+    Real eps        =  1.0e-7;  // solution tolerance
+    Real normThresh =  1.0e-7;  // abs tol
     Real hang       =  0.01;      // next rnorm should be < (1-m_hang)*norm_last 
     if (m_cur_step < 50) { 
         numBottom  = 10;  // num of bottom smoothings
@@ -647,6 +668,8 @@ AmrHydro::setDefaults()
     // set some bogus values as defaults
     m_PrintCustom = false;
     m_post_proc   = false;
+    m_post_proc_comparisons = false;
+    m_post_proc_shmip       = false;
     m_is_defined = false;
     m_verbosity = 4;
     m_max_level = -1;
@@ -656,7 +679,7 @@ AmrHydro::setDefaults()
     m_max_base_grid_size = 32;
     m_fill_ratio = -1;
     m_do_restart = false;
-    m_restart_step = -1;
+    m_restart_step = 0;
 
     m_domainSize = -1 * RealVect::Unit;
 
@@ -747,6 +770,7 @@ AmrHydro::initialize()
     }
     ppAmr.query("PrintCustom", m_PrintCustom); // To plot after each Picard ite -- debug mode
     ppAmr.query("post_proc", m_post_proc); // To print some post-proc analysis-- debug mode
+    ppAmr.query("post_proc_comparisons", m_post_proc_comparisons); // To print some post-proc analysis-- debug mode
     ppAmr.query("verbosity", m_verbosity);
     ppAmr.query("block_factor", m_block_factor);
     ppAmr.query("regrid_lbase", m_regrid_lbase);  // smaller lev subject to regridding
@@ -828,13 +852,21 @@ AmrHydro::initialize()
 
         // Set up vector of domains
         m_amrDomains.resize(m_max_level + 1);
-        m_amrDx.resize(m_max_level + 1);
         m_amrDomains[0] = baseDomain;
-        m_amrDx[0] = m_domainSize[0] / baseDomain.domainBox().size(0) * RealVect::Unit;
+        m_amrDx.resize(m_max_level + 1);
+        m_amrDx[0][0] = m_domainSize[0]/baseDomain.domainBox().size(0);
+        m_amrDx[0][1] = m_domainSize[1]/baseDomain.domainBox().size(1);
+        if (CH_SPACEDIM == 3) { 
+            m_amrDx[0][2] = m_domainSize[2]/baseDomain.domainBox().size(2);
+        }
         for (int lev = 1; lev <= m_max_level; lev++)
         {
             m_amrDomains[lev] = refine(m_amrDomains[lev - 1], m_refinement_ratios[lev - 1]);
-            m_amrDx[lev] = m_amrDx[lev - 1] / m_refinement_ratios[lev - 1];
+            m_amrDx[lev][0] = m_amrDx[lev-1][0]/m_refinement_ratios[lev-1]; 
+            m_amrDx[lev][1] = m_amrDx[lev-1][1]/m_refinement_ratios[lev-1]; 
+            if (CH_SPACEDIM == 3) {
+                m_amrDx[lev][2] = m_amrDx[lev-1][2]/m_refinement_ratios[lev-1];     
+            }
         }
     } // leaving problem domain setup scope
 
@@ -1135,7 +1167,7 @@ AmrHydro::run(Real a_max_time, int a_max_step)
         next_plot_time = std::min(next_plot_time, a_max_time);
 
         while ((next_plot_time > m_time) && (m_cur_step < a_max_step) && (dt > TIME_EPS)) {
-            if (((m_cur_step-m_restart_step) % m_plot_interval == 0) && m_plot_interval > 0) {
+            if ((m_cur_step % m_plot_interval == 0) && m_plot_interval > 0) {
 #ifdef CH_USE_HDF5
                 writePlotFile();
 #endif
@@ -1244,7 +1276,7 @@ void AmrHydro::WFlx_level(LevelData<FluxBox>&          a_bcoef,
                           const LevelData<FArrayBox>*  a_ucoarse,
                           LevelData<FArrayBox>&        a_B,
                           LevelData<FArrayBox>&        a_Pi,
-                          Real                         a_dx,
+                          RealVect                     a_dx,
                           bool                         a_print_WFX,
                           int                          a_smooth,
                           int                          a_depth)
@@ -1286,7 +1318,7 @@ void AmrHydro::WFlx_level(LevelData<FluxBox>&          a_bcoef,
         }
 
         // Compute CC gradient of phi coarse
-        Real a_dxcoarse = a_dx*2;
+        RealVect a_dxcoarse = a_dx * 2; // assumes refRatio = 2
         LevelData<FArrayBox> lvlgradHcoarse(levelGridscoarse, SpaceDim, a_ucoarse->ghostVect() ); 
         Gradient::compGradientCC(lvlgradHcoarse, lcl_ucoarse,
                                  crsePsiPtr, finePsiPtr,
@@ -1402,7 +1434,7 @@ AmrHydro::compute_grad_zb_ec(int                 lev,
         finePsiPtr = m_bedelevation[lev+1];  // What does it do with the fine stuff ???
         nRefFine = m_refinement_ratios[lev];
     }
-    Real dx = m_amrDx[lev][0];  
+    RealVect dx = m_amrDx[lev];  
     // EC version
     Gradient::compGradientMAC(a_levelgradZb_ec, levelZb,
                               crsePsiPtr, finePsiPtr,
@@ -1433,7 +1465,7 @@ AmrHydro::compute_grad_head(int lev)
         finePsiPtr = m_head[lev+1];  // What does it do with the fine stuff ???
         nRefFine = m_refinement_ratios[lev];
     }
-    Real dx = m_amrDx[lev][0];  
+    RealVect dx = m_amrDx[lev];  
     // CC version
     Gradient::compGradientCC(levelgradH, levelcurrentH,
                              crsePsiPtr, finePsiPtr,
@@ -1442,7 +1474,7 @@ AmrHydro::compute_grad_head(int lev)
     // handle ghost cells on the coarse-fine interface
     if (lev > 0) {
         QuadCFInterp qcfi(m_amrGrids[lev], &m_amrGrids[lev-1],
-                          m_amrDx[lev][0], m_refinement_ratios[lev-1],  
+                          m_amrDx[lev], m_refinement_ratios[lev-1],  
                           2,  // num comps
                           m_amrDomains[lev]);
         qcfi.coarseFineInterp(*m_gradhead[lev], *m_gradhead[lev-1]);
@@ -1519,7 +1551,7 @@ AmrHydro::evaluate_Re_quadratic(int lev, bool computeGrad)
             finePsiPtr = m_head[lev+1];  // What does it do with the fine stuff ???
             nRefFine = m_refinement_ratios[lev];
         }
-        Real dx = m_amrDx[lev][0];  
+        RealVect dx = m_amrDx[lev];  
         // CC version
         Gradient::compGradientCC(levelgradH, levelcurrentH,
                                  crsePsiPtr, finePsiPtr,
@@ -1528,7 +1560,7 @@ AmrHydro::evaluate_Re_quadratic(int lev, bool computeGrad)
         // handle ghost cells on the coarse-fine interface
         if (lev > 0) {
             QuadCFInterp qcfi(m_amrGrids[lev], &m_amrGrids[lev-1],
-                              m_amrDx[lev][0], m_refinement_ratios[lev-1],  
+                              m_amrDx[lev], m_refinement_ratios[lev-1],  
                               2,  // num comps
                               m_amrDomains[lev]);
             qcfi.coarseFineInterp(*m_gradhead[lev], *m_gradhead[lev-1]);
@@ -1627,7 +1659,7 @@ AmrHydro::dCoeff(LevelData<FluxBox>&    leveldcoef,
 
             FORT_COMPUTEDCOEFF( CHF_BOX(region),
                                 CHF_FRA(bC[dir]),
-                                CHF_CONST_REAL(m_amrDx[lev][0]), 
+                                CHF_CONST_REALVECT(m_amrDx[lev]), 
                                 CHF_CONST_REAL(m_suhmoParm->m_rho_i),
                                 CHF_FRA(MRec[dir]), 
                                 CHF_FRA(Bec[dir]) );
@@ -1806,16 +1838,16 @@ AmrHydro::Calc_moulin_source_term_distributed (LevelData<FArrayBox>& levelMoulin
        FArrayBox& moulinSrc      = levelMoulinSrc[dit];
        FArrayBox& moulinSrcTmp   = levelMoulinSrcNoNorm[dit];
 
-       moulinSrc.setVal(m_suhmoParm->m_distributed_input);
+       moulinSrc.setVal(0.0);
 
        BoxIterator bit(moulinSrcTmp.box());
        for (bit.begin(); bit.ok(); ++bit) {
            IntVect iv = bit();
            for (int m = 0; m<m_suhmoParm->m_n_moulins; m++) {
                moulinSrc(iv,0) += moulinSrcTmp(iv,m) * std::max( (1.0 - m_suhmoParm->m_runoff * std::sin(2.0 * Pi * (m_time - m_restart_time) / 86400.)), 0.0)  
-                                  / a_moulinsInteg[m] *  m_suhmoParm->m_moulin_flux[m] ; // m3/s/m2 -> m/s 
-               a_moulinsIntegFinal[m] += m_suhmoParm->m_distributed_input * m_amrDx[curr_level][0] * m_amrDx[curr_level][1] + moulinSrcTmp(iv,m) * std::max( (1.0 - m_suhmoParm->m_runoff * std::sin(2.0 * Pi * (m_time - m_restart_time) / 86400.)), 0.0)   
-                                  / a_moulinsInteg[m] * m_suhmoParm->m_moulin_flux[m] * m_amrDx[curr_level][0] * m_amrDx[curr_level][1]; 
+                                  / a_moulinsInteg[m] *  m_suhmoParm->m_moulin_flux[m]; // m3/s/m2 -> m/s 
+               a_moulinsIntegFinal[m] += ( moulinSrcTmp(iv,m) * std::max( (1.0 - m_suhmoParm->m_runoff * std::sin(2.0 * Pi * (m_time - m_restart_time) / 86400.)), 0.0)   
+                                  / a_moulinsInteg[m] * m_suhmoParm->m_moulin_flux[m] * m_amrDx[curr_level][0] * m_amrDx[curr_level][1]); 
            }
        }
    }
@@ -1977,7 +2009,6 @@ AmrHydro::timeStepFAS(Real a_dt)
     /* End comments */
 
     IntVect HeadGhostVect = m_num_head_ghost * IntVect::Unit;
-    Real coarsestDx = m_amrDx[0][0];  
 
     /* I Copy new h and new b into old h and old b */
 
@@ -2118,9 +2149,8 @@ AmrHydro::timeStepFAS(Real a_dt)
             const Box& validBox = levelGrids.get(dit);
 
             // Fill BC ghost cells of h and b
-            mixBCValues(currentH[dit], validBox, m_amrDomains[lev], m_amrDx[lev][0], false);
-            //RobinBC(currentH[dit], validBox, m_amrDomains[lev], m_amrDx[lev][0], false);
-            FixedNeumBCFill(currentB[dit], validBox, m_amrDomains[lev], m_amrDx[lev][0], false);
+            mixBCValues(currentH[dit], validBox, m_amrDomains[lev], m_amrDx[lev], false);
+            FixedNeumBCFill(currentB[dit], validBox, m_amrDomains[lev], m_amrDx[lev], false);
 
             // Copy curr into old -- copy ghost cells too 
             oldH[dit].copy(currentH[dit], 0, 0, 1);
@@ -2132,6 +2162,28 @@ AmrHydro::timeStepFAS(Real a_dt)
         CellToEdge(levelcurPi, levelPi_ec);
 
     } // there. We should start with consistent b and h, GC BC and all ...
+
+    // RAMP
+    Real ramp = 1.0;
+    if (m_suhmoParm->m_ramp) {
+        Real sec_1month      = 2635200.0;  // s
+        Real ramp_up         = m_suhmoParm->m_ramp_up * sec_1month;
+        Real duration_max    = m_suhmoParm->m_duration_max * sec_1month;
+        Real relaxation      = m_suhmoParm->m_relax * sec_1month;
+        Real currt_inMonth   = m_time / sec_1month;
+        Real curryear_in     = std::floor(currt_inMonth/12.0);   
+        Real currMonthInYear = currt_inMonth - curryear_in*12.0;
+        Real currtInYear     = sec_1month * currMonthInYear;
+        bool periodic_ramp = false;
+        if (periodic_ramp){
+            ramp = m_suhmoParm->m_floor_min + (m_suhmoParm->m_floor_max - m_suhmoParm->m_floor_min) * 0.5 * (std::tanh( (currtInYear - ramp_up) / relaxation) *
+                                               std::tanh( (-currtInYear + ramp_up + duration_max) / relaxation ) + 1.0);
+        } else {
+            ramp_up         = (m_suhmoParm->m_ramp_up) * sec_1month;
+            ramp = m_suhmoParm->m_floor_min + (m_suhmoParm->m_floor_max - m_suhmoParm->m_floor_min) * 0.5 * 
+                                              (std::tanh( (m_time - ramp_up) / relaxation) + 1.0);
+        }
+    }
 
     /* II h calc */
 
@@ -2187,9 +2239,8 @@ AmrHydro::timeStepFAS(Real a_dt)
             for (dit.begin(); dit.ok(); ++dit) {
                 // get the validBox & fill BC ghost cells
                 const Box& validBox = levelGrids.get(dit);
-                mixBCValues(levelcurH[dit], validBox, m_amrDomains[lev], m_amrDx[lev][0], false);
-                //RobinBC(levelcurH[dit], validBox, m_amrDomains[lev], m_amrDx[lev][0], false);
-                FixedNeumBCFill(levelcurB[dit], validBox, m_amrDomains[lev], m_amrDx[lev][0], false);
+                mixBCValues(levelcurH[dit], validBox, m_amrDomains[lev], m_amrDx[lev], false);
+                FixedNeumBCFill(levelcurB[dit], validBox, m_amrDomains[lev], m_amrDx[lev], false);
 
                 levelnewH_lag[dit].copy(levelcurH[dit], 0, 0, 1); // should copy ghost cells too !
                 levelnewB_lag[dit].copy(levelcurB[dit], 0, 0, 1); // should copy ghost cells too !
@@ -2491,7 +2542,7 @@ AmrHydro::timeStepFAS(Real a_dt)
         // handle ghost cells on the coarse-fine interface
         for (int lev = 1; lev <= m_finest_level; lev++) {
             QuadCFInterp qcfi(m_amrGrids[lev], &m_amrGrids[lev-1],
-                              m_amrDx[lev][0], m_refinement_ratios[lev-1],  
+                              m_amrDx[lev], m_refinement_ratios[lev-1],  
                               1,  // num comps
                               m_amrDomains[lev]);
             qcfi.coarseFineInterp(*m_moulin_source_term[lev], *m_moulin_source_term[lev-1]);
@@ -2569,7 +2620,7 @@ AmrHydro::timeStepFAS(Real a_dt)
 
                 FORT_COMPUTEDIFTERM2D( CHF_FRA(levelB[dit]),
                                        CHF_BOX(region),
-                                       CHF_CONST_REAL(m_amrDx[lev][0]), 
+                                       CHF_CONST_REALVECT(m_amrDx[lev]), 
                                        CHF_FRA(levelDterm[dit]),
                                        CHF_CONST_FRA(thisDcoef[0]),
                                        CHF_CONST_FRA(thisDcoef[1]));
@@ -2670,7 +2721,14 @@ AmrHydro::timeStepFAS(Real a_dt)
                     if (isnan(moulinSrc(iv,0))) {
                         pout() << "MS is nan ?? " << iv << std::endl;
                     }
-                    RHSh(iv,0) += moulinSrc(iv,0);
+                    if (m_suhmoParm->m_n_moulins > 0) {
+                        if ( (ramp >1.0) || (ramp < 0.0) ){
+                            MayDay::Error("ramp should be bet 0 and 1");
+                        }
+                        RHSh(iv,0) += (moulinSrc(iv,0) * ramp + m_suhmoParm->m_distributed_input);
+                    } else {
+                        RHSh(iv,0) += moulinSrc(iv,0);
+                    }
 
                     // Diffusive term
                     RHSh(iv,0) -= m_suhmoParm->m_DiffFactor * DiffusiveTerm(iv,0);
@@ -2718,7 +2776,7 @@ AmrHydro::timeStepFAS(Real a_dt)
         }
 
         SolveForHead_nl(m_amrGrids_curr, aCoef, bCoef,
-                        m_amrDomains_curr, m_refinement_ratios, coarsestDx,
+                        m_amrDomains_curr, m_refinement_ratios, m_amrDx[0],
                         a_head_curr, RHS_h);
 
         for (int lev = 0; lev <= m_finest_level; lev++) {
@@ -2743,7 +2801,7 @@ AmrHydro::timeStepFAS(Real a_dt)
         // handle ghost cells on the coarse-fine interface
         for (int lev = 1; lev <= m_finest_level; lev++) {
             QuadCFInterp qcfi(m_amrGrids[lev], &m_amrGrids[lev-1],
-                              m_amrDx[lev][0], m_refinement_ratios[lev-1],  
+                              m_amrDx[lev], m_refinement_ratios[lev-1],  
                               1,  // num comps
                               m_amrDomains[lev]);
             qcfi.coarseFineInterp(*m_head[lev], *m_head[lev-1]);
@@ -2846,8 +2904,7 @@ AmrHydro::timeStepFAS(Real a_dt)
             const Box& validBox = levelGrids.get(dit);
 
             // Fill BC ghost cells of h and b
-            mixBCValues(levelH[dit], validBox, m_amrDomains[lev], m_amrDx[lev][0], false);
-            //RobinBC(levelH[dit], validBox, m_amrDomains[lev], m_amrDx[lev][0], false);
+            mixBCValues(levelH[dit], validBox, m_amrDomains[lev], m_amrDx[lev], false);
         }
      
         // needed for VC solve
@@ -3050,7 +3107,7 @@ AmrHydro::timeStepFAS(Real a_dt)
     if (m_use_ImplDiff) {
         //     Solve for h with FAS scheme
         SolveForGap_nl(m_amrGrids_curr, aCoef_GH, a_Dcoef,
-                       m_amrDomains_curr, m_refinement_ratios, coarsestDx,
+                       m_amrDomains_curr, m_refinement_ratios, m_amrDx[0],
                        a_gh_curr, RHS_b, a_dt);
 
         for (int lev = 0; lev <= m_finest_level; lev++) {
@@ -3067,7 +3124,7 @@ AmrHydro::timeStepFAS(Real a_dt)
 
 
     /* FINAL custom plt here -- debug print */
-    if ((m_PrintCustom) && ((m_cur_step-m_restart_step) % m_plot_interval == 0) ) {
+    if ((m_PrintCustom) && (m_cur_step % m_plot_interval == 0) ) {
         int nStuffToPlot = 12;
         Vector<std::string> vectName;
         vectName.resize(nStuffToPlot);
@@ -3075,9 +3132,9 @@ AmrHydro::timeStepFAS(Real a_dt)
         vectName[1]="gapHeight";
         vectName[2]="RHS_head";
         vectName[3]="RHS_b";
-        vectName[4]="MRA";
-        vectName[5]="MRB";
-        vectName[6]="MRC";
+        vectName[4]="bedElevation";
+        vectName[5]="bumpHeight";
+        vectName[6]="bumpSpacing";
         vectName[7]="RHS_hmoul";
         vectName[8]="Channelization";
         vectName[9]="DiffusiveTerm";
@@ -3116,15 +3173,13 @@ AmrHydro::timeStepFAS(Real a_dt)
             LevelData<FArrayBox>& levelRHSB      = *RHS_b[lev];
             LevelData<FArrayBox>& levelRHSBSTP   = *stuffToPlot[3][lev];
 
-            //LevelData<FArrayBox>& levelRHSB1     = *MR_A[lev];
             LevelData<FArrayBox>& levelRHSB1     = *m_bedelevation[lev];
             LevelData<FArrayBox>& levelRHSB1STP  = *stuffToPlot[4][lev];
 
-            //LevelData<FArrayBox>& levelRHSB2     = *MR_B[lev];
-            LevelData<FArrayBox>& levelRHSB2     = *m_iceheight[lev];
+            LevelData<FArrayBox>& levelRHSB2     = *m_bumpHeight[lev];
             LevelData<FArrayBox>& levelRHSB2STP  = *stuffToPlot[5][lev];
 
-            LevelData<FArrayBox>& levelRHSB3     = *MR_C[lev];
+            LevelData<FArrayBox>& levelRHSB3     = *m_bumpSpacing[lev];
             LevelData<FArrayBox>& levelRHSB3STP  = *stuffToPlot[6][lev];
 
             LevelData<FArrayBox>& levelRHSH1     = *m_moulin_source_term[lev];
@@ -3149,7 +3204,12 @@ AmrHydro::timeStepFAS(Real a_dt)
                 levelRHSB1STP[dit].copy(levelRHSB1[dit], 0, 0, 1);
                 levelRHSB2STP[dit].copy(levelRHSB2[dit], 0, 0, 1);
                 levelRHSB3STP[dit].copy(levelRHSB3[dit], 0, 0, 1);
+                // RAMP
                 levelRHSH1STP[dit].copy(levelRHSH1[dit], 0, 0, 1);
+                if (m_suhmoParm->m_n_moulins > 0) {
+                    levelRHSH1STP[dit].mult(ramp);
+                    levelRHSH1STP[dit].plus(m_suhmoParm->m_distributed_input);
+                }
                 levelCDSTP[dit].copy(levelCD[dit], 0, 0, 1);
                 levelqwSTP[dit].copy(levelqw[dit], 0, 0, 1);
                 levelDcXSTP[dit].copy(levelDc[dit], 0, 0, 1);
@@ -3180,6 +3240,10 @@ AmrHydro::timeStepFAS(Real a_dt)
     if (m_post_proc) {
         pout() << "\n\n\n";
         pout() <<"oo POST PROC analysis (domsize is "<< m_amrDomains[0].domainBox().size(0) <<") oo "<< endl;
+ 
+        if (m_post_proc_comparisons) {
+            interpFinest();
+        }
         
         int DomSize = m_amrDomains[0].domainBox().size(0); 
         int DomSizeY = m_amrDomains[0].domainBox().size(1); 
@@ -3258,9 +3322,9 @@ AmrHydro::timeStepFAS(Real a_dt)
                 IntVect iv = bitEC();
                 // DISCHARGE -- Q
                 if (Pressi(iv,0) > 0.0) {
-                    out_water_flux_x_tot[iv[0]]     += Qwater_ecFab(iv, 0) * m_amrDx[0][0];                          //QW(iv,0) * m_amrDx[0][0];                            
-                    out_water_flux_x_chan[iv[0]]    += Qwater_ecFab(iv, 0) * m_amrDx[0][0] * CD_ecFab(iv, 0);        //QW(iv,0) * m_amrDx[0][0] * CD_ecFab(iv, 0);          
-                    out_water_flux_x_distrib[iv[0]] += Qwater_ecFab(iv, 0) * m_amrDx[0][0] * (1.0 - CD_ecFab(iv, 0));//QW(iv,0) * m_amrDx[0][0] * (1.0 - CD_ecFab(iv, 0));  
+                    out_water_flux_x_tot[iv[0]]     += Qwater_ecFab(iv, 0) * m_amrDx[0][1];                          //QW(iv,0) * m_amrDx[0][0];                            
+                    out_water_flux_x_chan[iv[0]]    += Qwater_ecFab(iv, 0) * m_amrDx[0][1] * CD_ecFab(iv, 0);        //QW(iv,0) * m_amrDx[0][0] * CD_ecFab(iv, 0);          
+                    out_water_flux_x_distrib[iv[0]] += Qwater_ecFab(iv, 0) * m_amrDx[0][1] * (1.0 - CD_ecFab(iv, 0));//QW(iv,0) * m_amrDx[0][0] * (1.0 - CD_ecFab(iv, 0));  
                 }
 
                 // RHS B -- Moulins and mRate
@@ -3269,10 +3333,14 @@ AmrHydro::timeStepFAS(Real a_dt)
                 // Because of mass conservation eq -basically recharge = RHS of this eq in my head.
                 // If I only use the MS, then for run B its sum of A1 and A5 which in this case does NOT equal total discharge !!
                 if (Pressi(iv,0) > 0.0) {
-                    out_recharge[iv[0]]      += 1.158e-6 * m_amrDx[0][0] * m_amrDx[0][0];  //MS(iv, 0) * m_amrDx[0][0] * m_amrDx[0][0];  
-                    out_recharge_tot[iv[0]]  += (MR(iv, 0)/m_suhmoParm->m_rho_w) * m_amrDx[0][0] * m_amrDx[0][0];
-                    water_vol[iv[0]]         +=  GH(iv, 0)* m_amrDx[0][0] * m_amrDx[0][0];
-                    Ylength[iv[0]]           += m_amrDx[0][0];
+                    if (m_suhmoParm->m_n_moulins > 0) {
+                        out_recharge[iv[0]]      += (MS(iv, 0) * ramp + m_suhmoParm->m_distributed_input) * m_amrDx[0][1] * m_amrDx[0][0];  
+                    } else {
+                        out_recharge[iv[0]]      +=  MS(iv, 0) * m_amrDx[0][1] * m_amrDx[0][0];  
+                    }
+                    out_recharge_tot[iv[0]]  += (MR(iv, 0)/m_suhmoParm->m_rho_w) * m_amrDx[0][1] * m_amrDx[0][0];
+                    water_vol[iv[0]]         += GH(iv, 0)* m_amrDx[0][1] * m_amrDx[0][0];
+                    Ylength[iv[0]]           += m_amrDx[0][1];
                 }
 
                 // Pressures
@@ -3288,8 +3356,8 @@ AmrHydro::timeStepFAS(Real a_dt)
                         count_avgNLow += 1; 
                         xloc_bandMin_lo = std::min(xloc, xloc_bandMin_lo);
                         xloc_bandMin_hi = std::max(xloc, xloc_bandMin_hi);
-                        out_water_flux_x_chan_Bands[0] += Qwater_ecFab(iv, 0) * m_amrDx[0][0] * CD_ecFab(iv, 0);
-                        out_water_flux_x_distrib_Bands[0] += Qwater_ecFab(iv, 0) * m_amrDx[0][0] * (1.0 - CD_ecFab(iv, 0));
+                        out_water_flux_x_chan_Bands[0] += Qwater_ecFab(iv, 0) * m_amrDx[0][1] * CD_ecFab(iv, 0);
+                        out_water_flux_x_distrib_Bands[0] += Qwater_ecFab(iv, 0) * m_amrDx[0][1] * (1.0 - CD_ecFab(iv, 0));
                     }
                 } else if ((xloc > 3000) && (xloc < 3300)) {
                     if (Pressi(iv,0) > 0.0) {
@@ -3297,8 +3365,8 @@ AmrHydro::timeStepFAS(Real a_dt)
                         count_avgNMed += 1; 
                         xloc_bandMed_lo = std::min(xloc, xloc_bandMed_lo);
                         xloc_bandMed_hi = std::max(xloc, xloc_bandMed_hi);
-                        out_water_flux_x_chan_Bands[1] += Qwater_ecFab(iv, 0) * m_amrDx[0][0] * CD_ecFab(iv, 0);
-                        out_water_flux_x_distrib_Bands[1] += Qwater_ecFab(iv, 0) * m_amrDx[0][0] * (1.0 - CD_ecFab(iv, 0));
+                        out_water_flux_x_chan_Bands[1] += Qwater_ecFab(iv, 0) * m_amrDx[0][1] * CD_ecFab(iv, 0);
+                        out_water_flux_x_distrib_Bands[1] += Qwater_ecFab(iv, 0) * m_amrDx[0][1] * (1.0 - CD_ecFab(iv, 0));
                     }
                 } else if ((xloc > 5100) && (xloc < 5400)) {
                     if (Pressi(iv,0) > 0.0) {
@@ -3306,8 +3374,8 @@ AmrHydro::timeStepFAS(Real a_dt)
                         count_avgNHigh += 1; 
                         xloc_bandHi_lo = std::min(xloc, xloc_bandHi_lo);
                         xloc_bandHi_hi = std::max(xloc, xloc_bandHi_hi);
-                        out_water_flux_x_chan_Bands[2] += Qwater_ecFab(iv, 0) * m_amrDx[0][0] * CD_ecFab(iv, 0);
-                        out_water_flux_x_distrib_Bands[2] += Qwater_ecFab(iv, 0) * m_amrDx[0][0] * (1.0 - CD_ecFab(iv, 0));
+                        out_water_flux_x_chan_Bands[2] += Qwater_ecFab(iv, 0) * m_amrDx[0][1] * CD_ecFab(iv, 0);
+                        out_water_flux_x_distrib_Bands[2] += Qwater_ecFab(iv, 0) * m_amrDx[0][1] * (1.0 - CD_ecFab(iv, 0));
                     }
                 }  
             }
@@ -3510,19 +3578,11 @@ AmrHydro::timeStepFAS(Real a_dt)
        xloc_bandHi_lo = recvMin;
 #endif
 
-        //Real RECH_TOT, RECH; 
-        //RECH_TOT = 0;
-        //RECH = 0;
-        //for (int xi = 0; xi <DomSize ; xi++) {
-        //    RECH_TOT += out_recharge_tot[xi] ;
-        //    RECH     += out_recharge[xi] ;
-        //}
         for (int xi = (DomSize - 2); xi > -1 ; xi--) {
             out_recharge[xi]  = out_recharge[xi]  + out_recharge[xi+1] ;
             out_recharge_tot[xi]  = out_recharge_tot[xi]  + out_recharge_tot[xi+1] ;
             water_vol[xi]         = water_vol[xi]  + water_vol[xi+1] ; 
         }
-        //pout() << "RECHARGE and RECHARGE TOT = " << RECH << " " << RECH_TOT << endl;
         
         idx_bandMin_lo = (int) xloc_bandMin_lo/m_amrDx[0][0] - 0.5;
         idx_bandMin_hi = (int) xloc_bandMin_hi/m_amrDx[0][0] - 0.5;
@@ -3532,46 +3592,50 @@ AmrHydro::timeStepFAS(Real a_dt)
         idx_bandHi_hi  = (int) xloc_bandHi_hi/m_amrDx[0][0] - 0.5;
 
         // TEMPORAL POSTPROC
-        int time_tmp = (int) m_time + a_dt;
-        if (time_tmp % 86400 == 0) {
-            pout() << "Time(h - d) avgN N_LB  N_MB  N_HB = " <<  (m_time + a_dt -m_restart_time)/3600.  << " " << (m_time + a_dt -m_restart_time)/86400 
-                                                                    << " " << out_avgN[3]/count_avgN 
-                                                                    << " " << out_avgN[0]/count_avgNLow 
-                                                                    << " " << out_avgN[1]/count_avgNMed 
-                                                                    << " " << out_avgN[2]/count_avgNHigh 
-                                                                    << endl;
-
-            pout() << "Time(h - d) rech dis = " <<  (m_time + a_dt -m_restart_time)/3600.  << " " << (m_time + a_dt -m_restart_time)/86400 
-                                                               << " " << out_recharge[1] + out_recharge_tot[1] 
-                                                               << " " << - out_water_flux_x_tot[1]   
-                                                               //<< " " << - out_water_flux_x_chan[1]   
-                                                               //<< " " << - out_water_flux_x_distrib[1]
-                                                               << endl;
-            pout() << "Time(h - d) dis_LB disEff_LB disInef_LB 2disEff_LB 2disInef_LB  = " 
-                                                               <<  (m_time + a_dt -m_restart_time)/3600.  << " " << (m_time + a_dt -m_restart_time)/86400 
-                                                               << " " << - out_water_flux_x_tot[idx_bandMin_lo] 
-                                                               << " " << - out_water_flux_x_chan[idx_bandMin_lo] 
-                                                               << " " << - out_water_flux_x_distrib[idx_bandMin_lo] 
-                                                               << " " << - DomSizeY*out_water_flux_x_chan_Bands[0]/count_avgNLow 
-                                                               << " " << - DomSizeY*out_water_flux_x_distrib_Bands[0]/count_avgNLow 
-                                                               << endl;
-            pout() << "Time(h - d) dis_MB disEff_MB disInef_MB 2disEff_MB 2disInef_MB  = " 
-                                                               <<  (m_time + a_dt -m_restart_time)/3600.  << " " << (m_time + a_dt -m_restart_time)/86400 
-                                                               << " " << - out_water_flux_x_tot[idx_bandMed_lo] 
-                                                               << " " << - out_water_flux_x_chan[idx_bandMed_lo] 
-                                                               << " " << - out_water_flux_x_distrib[idx_bandMed_lo] 
-                                                               << " " << - DomSizeY*out_water_flux_x_chan_Bands[1]/count_avgNMed 
-                                                               << " " << - DomSizeY*out_water_flux_x_distrib_Bands[1]/count_avgNMed 
-                                                               << endl;
-            pout() << "Time(h - d) dis_HB disEff_HB disInef_HB 2disEff_HB 2disInef_HB  = " 
-                                                               <<  (m_time + a_dt -m_restart_time)/3600.  << " " << (m_time + a_dt -m_restart_time)/86400 
-                                                               << " " << - out_water_flux_x_tot[idx_bandHi_lo] 
-                                                               << " " << - out_water_flux_x_chan[idx_bandHi_lo] 
-                                                               << " " << - out_water_flux_x_distrib[idx_bandHi_lo] 
-                                                               << " " << - DomSizeY*out_water_flux_x_chan_Bands[2]/count_avgNHigh 
-                                                               << " " << - DomSizeY*out_water_flux_x_distrib_Bands[2]/count_avgNHigh 
-                                                               << endl;
+        if (m_suhmoParm->m_ramp) {
+            Real sec_1month      = 2635200.0;  // s
+            int time_tmp = (int) m_time + a_dt;
+            pout() << "Time(months) recharge ramp = " <<  m_time/sec_1month  << " " << out_recharge[1] << " " << ramp << endl; 
         }
+        //if (time_tmp % 86400 == 0) {
+        //    pout() << "Time(h - d) avgN N_LB  N_MB  N_HB = " <<  (m_time + a_dt -m_restart_time)/3600.  << " " << (m_time + a_dt -m_restart_time)/86400 
+        //                                                            << " " << out_avgN[3]/count_avgN 
+        //                                                            << " " << out_avgN[0]/count_avgNLow 
+        //                                                            << " " << out_avgN[1]/count_avgNMed 
+        //                                                            << " " << out_avgN[2]/count_avgNHigh 
+        //                                                            << endl;
+
+        //    pout() << "Time(h - d) rech dis = " <<  (m_time + a_dt -m_restart_time)/3600.  << " " << (m_time + a_dt -m_restart_time)/86400 
+        //                                                       << " " << out_recharge[1] + out_recharge_tot[1] 
+        //                                                       << " " << - out_water_flux_x_tot[1]   
+        //                                                       //<< " " << - out_water_flux_x_chan[1]   
+        //                                                       //<< " " << - out_water_flux_x_distrib[1]
+        //                                                       << endl;
+        //    pout() << "Time(h - d) dis_LB disEff_LB disInef_LB 2disEff_LB 2disInef_LB  = " 
+        //                                                       <<  (m_time + a_dt -m_restart_time)/3600.  << " " << (m_time + a_dt -m_restart_time)/86400 
+        //                                                       << " " << - out_water_flux_x_tot[idx_bandMin_lo] 
+        //                                                       << " " << - out_water_flux_x_chan[idx_bandMin_lo] 
+        //                                                       << " " << - out_water_flux_x_distrib[idx_bandMin_lo] 
+        //                                                       << " " << - DomSizeY*out_water_flux_x_chan_Bands[0]/count_avgNLow 
+        //                                                       << " " << - DomSizeY*out_water_flux_x_distrib_Bands[0]/count_avgNLow 
+        //                                                       << endl;
+        //    pout() << "Time(h - d) dis_MB disEff_MB disInef_MB 2disEff_MB 2disInef_MB  = " 
+        //                                                       <<  (m_time + a_dt -m_restart_time)/3600.  << " " << (m_time + a_dt -m_restart_time)/86400 
+        //                                                       << " " << - out_water_flux_x_tot[idx_bandMed_lo] 
+        //                                                       << " " << - out_water_flux_x_chan[idx_bandMed_lo] 
+        //                                                       << " " << - out_water_flux_x_distrib[idx_bandMed_lo] 
+        //                                                       << " " << - DomSizeY*out_water_flux_x_chan_Bands[1]/count_avgNMed 
+        //                                                       << " " << - DomSizeY*out_water_flux_x_distrib_Bands[1]/count_avgNMed 
+        //                                                       << endl;
+        //    pout() << "Time(h - d) dis_HB disEff_HB disInef_HB 2disEff_HB 2disInef_HB  = " 
+        //                                                       <<  (m_time + a_dt -m_restart_time)/3600.  << " " << (m_time + a_dt -m_restart_time)/86400 
+        //                                                       << " " << - out_water_flux_x_tot[idx_bandHi_lo] 
+        //                                                       << " " << - out_water_flux_x_chan[idx_bandHi_lo] 
+        //                                                       << " " << - out_water_flux_x_distrib[idx_bandHi_lo] 
+        //                                                       << " " << - DomSizeY*out_water_flux_x_chan_Bands[2]/count_avgNHigh 
+        //                                                       << " " << - DomSizeY*out_water_flux_x_distrib_Bands[2]/count_avgNHigh 
+        //                                                       << endl;
+        //}
         //    pout() << "Time  rechTOT  rechMS  "
         //           << "rechMS_LB_lo    rechMS_LB_hi "
         //           << " " <<  time_tmp / 86400.  << " " <<  out_recharge_tot[0]  << " "  << out_recharge[0] 
@@ -3580,23 +3644,17 @@ AmrHydro::timeStepFAS(Real a_dt)
         //}
  
         // SPATIAL POSTPROC
-        pout() << "XaxisSUHMO_B1  Ylength    dischargeSUHMO_B1   dischargeEFFSUHMO_B1   dischargeINEFFSUHMO_B1  rechargeMSSUHMO_B1  rechargeMRSUHMO_B1 PSUHMO_B1 " << endl;
-        for (int xi = 0; xi < DomSize; xi++) {
-            Real x_loc = (xi+0.5)*m_amrDx[0][0];    
-                    pout() << " " << x_loc/1e3 << " " << Ylength[xi] 
-                   << " " << -out_water_flux_x_tot[xi] << " " << -out_water_flux_x_chan[xi] << " " << -out_water_flux_x_distrib[xi] 
-                   << " " << out_recharge[xi] << " " << out_recharge_tot[xi] << " " << avPressure[xi]/dom_sizeY[xi]/1e6  
-                   << endl;
-
-
-        //pout() << "1-Xpos   2-avgP  3-rechargeMR 4-rechargeMS 5-rechargeTOT  6-discharge  7-TOTwaterVol" << endl;
-        //for (int xi = 0; xi < DomSize; xi++) {
-        //    Real x_loc = (xi+0.5)*m_amrDx[0][0];    
-        //            pout() << " " << x_loc/1e3 << " "  << avPressure[xi]/DomSizeY/1e6  << " " << out_recharge_tot[xi]  
-        //           << " " << out_recharge[xi] << " " << out_recharge_tot[xi] + out_recharge[xi] 
-        //           << " " << -out_water_flux_x_tot[xi] << " " << water_vol[xi] 
-        //           << endl;
+        if (m_post_proc_shmip) {
+            pout() << "XaxisSUHMO_A1  Ylength    dischargeSUHMO_A1   dischargeEFFSUHMO_A1   dischargeINEFFSUHMO_A1  rechargeMSSUHMO_A1  rechargeMRSUHMO_A1 PSUHMO_A1 " << endl;
+            for (int xi = 0; xi < DomSize; xi++) {
+                Real x_loc = (xi+0.5)*m_amrDx[0][0];    
+                        pout() << " " << x_loc/1e3 << " " << Ylength[xi] 
+                       << " " << -out_water_flux_x_tot[xi] << " " << -out_water_flux_x_chan[xi] << " " << -out_water_flux_x_distrib[xi] 
+                       << " " << out_recharge[xi] << " " << out_recharge_tot[xi] << " " << avPressure[xi]/dom_sizeY[xi]/1e6  
+                       << endl;
+            }
         }
+
     }
 
     /* Averaging down and fill in ghost cells */
@@ -4117,6 +4175,219 @@ AmrHydro::tagCellsInit(Vector<IntVectSet>& a_tags)
     m_vectTags = a_tags;
 }
 
+#ifdef CH_USE_HDF5
+void
+AmrHydro::interpFinest() {
+
+    if (m_verbosity > 2) {
+        pout() << "AmrHydro::interpFinest" << endl;
+    }
+
+    // first create finest level -- all domain
+    Vector<Box> finestBoxes;
+    domainSplit(m_amrDomains[m_max_level], finestBoxes, m_max_box_size, m_block_factor);
+
+    Vector<int> procAssign(finestBoxes.size());
+    LoadBalance(procAssign, finestBoxes);
+
+    DisjointBoxLayout finestGrids(finestBoxes, procAssign, m_amrDomains[m_max_level]);
+
+    if (m_verbosity > 2) {
+        pout() << "    finest level is : " << m_max_level << endl;
+        long long numCells0 = finestGrids.numCells();
+        pout() << "    finest level has : " << numCells0 << " cells. " << endl; //<< finestGrids << endl;
+    }
+
+    int nPhiComp = 1;
+    IntVect ghostVect     = IntVect::Unit;
+    IntVect ZeroghostVect = IntVect::Zero;
+
+    /* coarsest to finest */
+    RefCountedPtr<LevelData<FArrayBox>> a_D        = RefCountedPtr<LevelData<FArrayBox>> ( new LevelData<FArrayBox>(finestGrids, nPhiComp, ZeroghostVect) );
+    RefCountedPtr<LevelData<FArrayBox>> a_D_coarse = RefCountedPtr<LevelData<FArrayBox>> ( new LevelData<FArrayBox>(m_amrGrids[0], nPhiComp, ZeroghostVect) );
+    RefCountedPtr<LevelData<FArrayBox>> a_N        = RefCountedPtr<LevelData<FArrayBox>> ( new LevelData<FArrayBox>(finestGrids, nPhiComp, ZeroghostVect) );
+    RefCountedPtr<LevelData<FArrayBox>> a_N_coarse = RefCountedPtr<LevelData<FArrayBox>> ( new LevelData<FArrayBox>(m_amrGrids[0], nPhiComp, ZeroghostVect) );
+    RefCountedPtr<LevelData<FArrayBox>> a_tau        = RefCountedPtr<LevelData<FArrayBox>> ( new LevelData<FArrayBox>(finestGrids, nPhiComp, ZeroghostVect) );
+    RefCountedPtr<LevelData<FArrayBox>> a_tau_coarse = RefCountedPtr<LevelData<FArrayBox>> ( new LevelData<FArrayBox>(m_amrGrids[0], nPhiComp, ZeroghostVect) );
+
+    // fill coarse data
+    Real Cs    = 7.624e6;
+    Real Cmax  = 1.0;
+    Real m_exp = 1./3;
+    Real n_exp = 3.;
+    Real vit = 5e-6;
+    LevelData<FArrayBox>& Pi_coarse      = *m_overburdenpress[0];
+    LevelData<FArrayBox>& Pw_coarse      = *m_Pw[0];
+    LevelData<FArrayBox>& GH_coarse      = *m_gapheight[0];
+    DataIterator dit = m_amrGrids[0].dataIterator();
+    for (dit.begin(); dit.ok(); ++dit) {
+        FArrayBox& Pi_coarse_dit = Pi_coarse[dit];
+        FArrayBox& Pw_coarse_dit = Pw_coarse[dit];
+        FArrayBox& GH_coarse_dit = GH_coarse[dit];
+        FArrayBox& a_N_coarse_dit   = (*a_N_coarse)[dit];
+        FArrayBox& a_D_coarse_dit   = (*a_D_coarse)[dit];
+        FArrayBox& a_tau_coarse_dit = (*a_tau_coarse)[dit];
+        BoxIterator bit(a_N_coarse_dit.box());
+        for (bit.begin(); bit.ok(); ++bit) {
+            IntVect iv = bit();
+            a_N_coarse_dit(iv,0)   = 0.8*Pi_coarse_dit(iv,0) - Pw_coarse_dit(iv,0);
+            a_D_coarse_dit(iv,0)   = GH_coarse_dit(iv,0);
+            a_tau_coarse_dit(iv,0) = 1e-6 * Cs * std::pow(vit, m_exp) 
+                                     / std::pow( 1 + vit * std::pow( Cs/(Cmax * a_N_coarse_dit(iv,0)), n_exp) , m_exp);
+        }
+    }
+
+    // Fill with interpolated data from coarser level
+    int ratio_cf = 1;
+    for (int lev = 0; lev < m_max_level; lev++) {
+        ratio_cf *=2;
+    }
+    if (m_verbosity > 2) {
+        pout() << "    ref ratio c/f is : " << ratio_cf << endl;
+    }
+
+    FineInterp interpolator(finestGrids, nPhiComp, ratio_cf, finestGrids.physDomain());
+    interpolator.m_boundary_limit_type     = 3;
+
+    interpolator.interpToFine(*a_N, *a_N_coarse);
+    interpolator.interpToFine(*a_D, *a_D_coarse);
+    interpolator.interpToFine(*a_tau, *a_tau_coarse);
+
+    //interpolator.pwcinterpToFine(*a_N, *a_N_coarse);
+    //interpolator.pwcinterpToFine(*a_D, *a_D_coarse);
+      
+    //PiecewiseLinearFillPatch ghostFiller (finestGrids, 
+    //                                      m_amrGrids[0],  
+    //                                      nPhiComp, 
+    //                                      m_amrGrids[0].physDomain(), 
+    //                                      ratio_cf,
+    //                                      1);
+
+    //ghostFiller.fillInterp(*a_N, *a_N_coarse, *a_N_coarse, 1.0, 0, 0, nPhiComp);
+    //ghostFiller.fillInterp(*a_D, *a_D_coarse, *a_D_coarse, 1.0, 0, 0, nPhiComp);
+
+    //a_N->exchange();
+    //a_D->exchange();
+
+
+    /* Compute interm data -- do this on each actually filled levels */
+    for (int lev = 1; lev <= m_finest_level; lev++) {
+        if (m_verbosity > 2) {
+            pout() <<"    dealing with level " << lev << endl;
+        }
+        RefCountedPtr<LevelData<FArrayBox>> a_N_lev   = RefCountedPtr<LevelData<FArrayBox>> ( new LevelData<FArrayBox>(m_amrGrids[lev], nPhiComp, ZeroghostVect) );
+        RefCountedPtr<LevelData<FArrayBox>> a_D_lev   = RefCountedPtr<LevelData<FArrayBox>> ( new LevelData<FArrayBox>(m_amrGrids[lev], nPhiComp, ZeroghostVect) );
+        RefCountedPtr<LevelData<FArrayBox>> a_tau_lev = RefCountedPtr<LevelData<FArrayBox>> ( new LevelData<FArrayBox>(m_amrGrids[lev], nPhiComp, ZeroghostVect) );
+        // fill 
+        LevelData<FArrayBox>& Pi_interm      = *m_overburdenpress[lev];
+        LevelData<FArrayBox>& Pw_interm      = *m_Pw[lev];
+        LevelData<FArrayBox>& GH_interm      = *m_gapheight[lev];
+        dit = m_amrGrids[lev].dataIterator();
+        for (dit.begin(); dit.ok(); ++dit) {
+            FArrayBox& Pi_coarse_dit = Pi_interm[dit];
+            FArrayBox& Pw_coarse_dit = Pw_interm[dit];
+            FArrayBox& GH_coarse_dit = GH_interm[dit];
+            FArrayBox& a_N_interm_dit   = (*a_N_lev)[dit];
+            FArrayBox& a_D_interm_dit   = (*a_D_lev)[dit];
+            FArrayBox& a_tau_interm_dit = (*a_tau_lev)[dit];
+            BoxIterator bit(a_N_interm_dit.box());
+            for (bit.begin(); bit.ok(); ++bit) {
+                IntVect iv = bit();
+                a_N_interm_dit(iv,0)   = 0.8*Pi_coarse_dit(iv,0) - Pw_coarse_dit(iv,0);
+                a_D_interm_dit(iv,0)   = GH_coarse_dit(iv,0);
+                a_tau_interm_dit(iv,0) = 1e-6 * Cs * std::pow(vit, m_exp) 
+                                         / std::pow( 1 + vit * std::pow( Cs/(Cmax * a_N_interm_dit(iv,0)), n_exp) , m_exp);
+            }
+        }
+
+        // refine a_N interm in same dbl
+        int ratio_cf_interm = 1;
+        for (int kk = lev; kk < m_max_level; kk++) {
+            ratio_cf_interm *=2;
+        }
+        if (m_verbosity > 2) {
+            pout() << "    ref ratio c/f is : " << ratio_cf_interm << endl;
+        }
+        // refine dbl of interm lev
+        DisjointBoxLayout finestGrids_interm;
+        refine(finestGrids_interm, m_amrGrids[lev], ratio_cf_interm);
+        // create data on this refined dbl and interpolate
+        RefCountedPtr<LevelData<FArrayBox>> a_N_lev_interm   = RefCountedPtr<LevelData<FArrayBox>> ( new LevelData<FArrayBox>(finestGrids_interm, nPhiComp, ZeroghostVect) );
+        RefCountedPtr<LevelData<FArrayBox>> a_D_lev_interm   = RefCountedPtr<LevelData<FArrayBox>> ( new LevelData<FArrayBox>(finestGrids_interm, nPhiComp, ZeroghostVect) );
+        RefCountedPtr<LevelData<FArrayBox>> a_tau_lev_interm = RefCountedPtr<LevelData<FArrayBox>> ( new LevelData<FArrayBox>(finestGrids_interm, nPhiComp, ZeroghostVect) );
+        FineInterp interpolator_interm(finestGrids_interm, nPhiComp, ratio_cf_interm, finestGrids_interm.physDomain());
+        interpolator_interm.m_boundary_limit_type     = 3;
+        interpolator_interm.interpToFine(*a_N_lev_interm, *a_N_lev);
+        interpolator_interm.interpToFine(*a_D_lev_interm, *a_D_lev);
+        interpolator_interm.interpToFine(*a_tau_lev_interm, *a_tau_lev);
+        //interpolator_interm.pwcinterpToFine(*a_N_lev_interm, *a_N_lev);
+        //interpolator_interm.pwcinterpToFine(*a_D_lev_interm, *a_D_lev);
+        // copy this refined dbl portion onto the whole refined domain 
+	    a_N_lev_interm->copyTo(*a_N);
+	    a_D_lev_interm->copyTo(*a_D);
+	    a_tau_lev_interm->copyTo(*a_tau);
+        // ignore GC for now
+        //a_N->exchange();
+        //a_D->exchange();
+    }
+
+    /* custom plot -- only coarsest and finest level */
+    int nStuffToPlot = 2;
+    Vector<std::string> vectName;
+    vectName.resize(nStuffToPlot);
+    //vectName[0]="GH";
+    vectName[0]="Tau";
+    vectName[1]="N";
+
+    Vector<Vector<LevelData<FArrayBox>*>> stuffToPlot;
+    stuffToPlot.resize(nStuffToPlot);
+    for (int zz = 0; zz < nStuffToPlot; zz++) {
+        stuffToPlot[zz].resize(2, NULL);
+    }
+
+    //stuffToPlot[var][lev]
+    stuffToPlot[0][0]  = new LevelData<FArrayBox>(m_amrGrids[0], 1, IntVect::Zero);  // dummy coarse
+    stuffToPlot[0][1]  = new LevelData<FArrayBox>(finestGrids, 1, IntVect::Zero);    // dummy fine
+    stuffToPlot[1][0]  = new LevelData<FArrayBox>(m_amrGrids[0], 1, IntVect::Zero);  // a_N_coarse
+    stuffToPlot[1][1]  = new LevelData<FArrayBox>(finestGrids, 1, IntVect::Zero);    // a_N fine
+
+    //LevelData<FArrayBox>& levelDummy      = *a_D_coarse;
+    LevelData<FArrayBox>& levelDummy      = *a_tau_coarse;
+    LevelData<FArrayBox>& levelDummySTP   = *stuffToPlot[0][0];
+
+    //LevelData<FArrayBox>& levelDummyF     = *a_D;
+    LevelData<FArrayBox>& levelDummyF     = *a_tau;
+    LevelData<FArrayBox>& levelDummyFSTP  = *stuffToPlot[0][1];
+
+    LevelData<FArrayBox>& levelN      = *a_N_coarse;
+    LevelData<FArrayBox>& levelNSTP   = *stuffToPlot[1][0];
+
+    LevelData<FArrayBox>& levelNF     = *a_N;
+    LevelData<FArrayBox>& levelNFSTP  = *stuffToPlot[1][1];
+
+    dit = m_amrGrids[0].dataIterator();
+    for (dit.begin(); dit.ok(); ++dit) {
+        levelDummySTP[dit].copy(levelDummy[dit], 0, 0, 1);
+        levelNSTP[dit].copy(levelN[dit], 0, 0, 1);
+    }
+
+    dit = finestGrids.dataIterator();
+    for (dit.begin(); dit.ok(); ++dit) {
+        levelDummyFSTP[dit].copy(levelDummyF[dit], 0, 0, 1);
+        levelNFSTP[dit].copy(levelNF[dit], 0, 0, 1);
+    }
+
+    writePltPP(finestGrids, nStuffToPlot, vectName, stuffToPlot, ratio_cf, ".2d");
+
+    for (int lev = 0; lev <= 1; lev++) {
+        delete stuffToPlot[0][lev];
+        delete stuffToPlot[1][lev];
+    }
+}
+
+#endif
+
+
 void
 AmrHydro::initGrids(int a_finest_level) {
 
@@ -4316,7 +4587,7 @@ AmrHydro::setupFixedGrids(const std::string& a_gridFile)
     broadcast(gridvect, uniqueProc(SerialTask::compute));
 
     m_amrGrids.resize(m_max_level + 1);
-    RealVect dx = m_amrDx[0] * RealVect::Unit;
+    //RealVect dx = m_amrDx[0] * RealVect::Unit;
     for (int lev = 0; lev < gridvect.size(); lev++) {
         int numGridsLev = gridvect[lev].size();
         Vector<int> procIDs(numGridsLev);
@@ -4325,9 +4596,9 @@ AmrHydro::setupFixedGrids(const std::string& a_gridFile)
         m_amrGrids[lev] = newDBL;
         // build storage for this level
         levelSetup(lev, m_amrGrids[lev]);
-        if (lev < gridvect.size() - 1) {
-            dx /= m_refinement_ratios[lev];
-        }
+        //if (lev < gridvect.size() - 1) {
+        //    dx /= m_refinement_ratios[lev];
+        //}
     }
 
     // finally set finest level and initialize data on hierarchy
@@ -4417,7 +4688,7 @@ AmrHydro::initData(Vector<RefCountedPtr<LevelData<FArrayBox>> >& a_head)
         //    gapHeightFiller.fillInterp(levelGapHeight, coarseGapHeight, coarseGapHeight, 0.0, 0, 0, 1);
         //}
 
-        RealVect levelDx = m_amrDx[lev] * RealVect::Unit;
+        RealVect levelDx = m_amrDx[lev] ;
         m_IBCPtr->define(m_amrDomains[lev], levelDx[0]);
         // int refRatio = (lev > 0)?m_refinement_ratios[lev-1]:0;
 
@@ -4439,7 +4710,7 @@ AmrHydro::initData(Vector<RefCountedPtr<LevelData<FArrayBox>> >& a_head)
         for (dit.begin(); dit.ok(); ++dit) {
             // get the validBox
             const Box& validBox = levelGrids.get(dit);
-            FixedNeumBCFill(levelzBed[dit], validBox, m_amrDomains[lev], m_amrDx[lev][0], false);
+            FixedNeumBCFill(levelzBed[dit], validBox, m_amrDomains[lev], m_amrDx[lev], false);
         }
     }
 
@@ -4565,8 +4836,17 @@ AmrHydro::writePltWFX(int numPlotComps,
     //filename.append(namePlot);
     filename.append(".hdf5");
 
-    WriteAMRHierarchyHDF5(
-        filename, m_amrGrids, plotData, vectName, domain, m_amrDx[0][0], dt, time(), m_refinement_ratios, numLevels);
+    Vector<IntVect> a_refinement_ratios_vect;
+    a_refinement_ratios_vect.resize(m_max_level);  
+    for (int lev=0; lev<m_max_level; lev++) {  
+        a_refinement_ratios_vect[lev][0] = m_refinement_ratios[lev];
+        a_refinement_ratios_vect[lev][1] = m_refinement_ratios[lev];
+        if (CH_SPACEDIM == 3) {   
+            a_refinement_ratios_vect[lev][2] = m_refinement_ratios[lev];
+        }
+    }
+    WriteAnisotropicAMRHierarchyHDF5(
+        filename, m_amrGrids, plotData, vectName, domain, m_amrDx[0], dt, time(), a_refinement_ratios_vect, numLevels);
 
     // need to delete plotData
     for (int lev = 0; lev < numLevels; lev++)
@@ -4578,6 +4858,102 @@ AmrHydro::writePltWFX(int numPlotComps,
         }
     }
 }
+
+
+void
+AmrHydro::writePltPP(DisjointBoxLayout& fineGrids, 
+                     int numPlotComps, 
+                     Vector<std::string>& vectName,
+                     Vector<Vector<LevelData<FArrayBox>*>> stuffToPlot,
+                     int ratio_cf,
+                     string namePlot)
+{
+    if (m_verbosity > 3) {
+        pout() << "AmrHydro::writePltCustom" << endl;
+    }
+
+    //Box domain = m_amrDomains[0].domainBox();
+    ProblemDomain PD = fineGrids.physDomain();
+    Box domain       = PD.domainBox();
+
+    Real dt = 1.;
+    //int numLevels = 2;
+    int numLevels = 1;
+
+    // Use plot data container for all vars
+    Vector<LevelData<FArrayBox>*> plotData(1, NULL);
+    IntVect ghostVect(IntVect::Zero);
+    //plotData[0] = new LevelData<FArrayBox>(m_amrGrids[0], numPlotComps, ghostVect);
+    //plotData[1] = new LevelData<FArrayBox>(fineGrids, numPlotComps, ghostVect);
+    plotData[0] = new LevelData<FArrayBox>(fineGrids, numPlotComps, ghostVect);
+    // COARSEST
+    //LevelData<FArrayBox>& plotDataLev      = *plotData[0];
+    //DataIterator dit = m_amrGrids[0].dataIterator();
+    //for (int kk = 0; kk < numPlotComps; kk++) {
+    //    LevelData<FArrayBox>& stuffToPlotLev  = *stuffToPlot[kk][0];
+    //    for (dit.begin(); dit.ok(); ++dit) {
+    //        FArrayBox& thisPlotData      = plotDataLev[dit];
+    //        FArrayBox& thisstuffToPlot   = stuffToPlotLev[dit];
+    //        thisPlotData.copy(thisstuffToPlot, 0, kk, 1);
+    //    }  // end loop over boxes on this level
+    //} // end loop over vars to add to pltData
+    // FINEST
+    LevelData<FArrayBox>& plotDataLev2      = *plotData[0]; //plotData[1]
+    DataIterator dit = fineGrids.dataIterator();
+    for (int kk = 0; kk < numPlotComps; kk++) {
+        LevelData<FArrayBox>& stuffToPlotLev  = *stuffToPlot[kk][1];
+        for (dit.begin(); dit.ok(); ++dit) {
+            FArrayBox& thisPlotData      = plotDataLev2[dit];
+            FArrayBox& thisstuffToPlot   = stuffToPlotLev[dit];
+            thisPlotData.copy(thisstuffToPlot, 0, kk, 1);
+        }  // end loop over boxes on this level
+    } // end loop over vars to add to pltData
+
+
+    // generate plotfile name
+    char iter_str[100];
+    sprintf(iter_str, "%sCustom%06d", m_plot_prefix.c_str(), m_cur_step);
+
+    string filename(iter_str);
+    
+    filename.append(namePlot);
+
+    if (SpaceDim == 1)
+    {
+        filename.append(".hdf5");
+    }
+    else if (SpaceDim == 2)
+    {
+        filename.append(".hdf5");
+    }
+    else if (SpaceDim == 3)
+    {
+        filename.append(".hdf5");
+    }
+
+    Vector<IntVect> a_refinement_ratios_vect;
+    a_refinement_ratios_vect.resize(m_max_level);  
+    for (int lev=0; lev<1; lev++) {  
+        a_refinement_ratios_vect[lev][0] = ratio_cf;
+        a_refinement_ratios_vect[lev][1] = ratio_cf;
+        if (CH_SPACEDIM == 3) {   
+            a_refinement_ratios_vect[lev][2] = ratio_cf;
+        }
+    }
+    WriteAnisotropicAMRHierarchyHDF5(
+        filename, m_amrGrids, plotData, vectName, domain, m_amrDx[m_max_level], dt, time(), a_refinement_ratios_vect, numLevels);
+
+    // need to delete plotData
+    for (int lev = 0; lev < numLevels; lev++)
+    {
+        if (plotData[lev] != NULL)
+        {
+            delete plotData[lev];
+            plotData[lev] = NULL;
+        }
+    }
+}
+
 
 // write custom debug hdf5 plotfile to the standard location
 void
@@ -4635,8 +5011,17 @@ AmrHydro::writePltCustom(int numPlotComps,
         filename.append(".hdf5");
     }
 
-    WriteAMRHierarchyHDF5(
-        filename, m_amrGrids, plotData, vectName, domain, m_amrDx[0][0], dt, time(), m_refinement_ratios, numLevels);
+    Vector<IntVect> a_refinement_ratios_vect;
+    a_refinement_ratios_vect.resize(m_max_level);  
+    for (int lev=0; lev<m_max_level; lev++) {  
+        a_refinement_ratios_vect[lev][0] = m_refinement_ratios[lev];
+        a_refinement_ratios_vect[lev][1] = m_refinement_ratios[lev];
+        if (CH_SPACEDIM == 3) {   
+            a_refinement_ratios_vect[lev][2] = m_refinement_ratios[lev];
+        }
+    }
+    WriteAnisotropicAMRHierarchyHDF5(
+        filename, m_amrGrids, plotData, vectName, domain, m_amrDx[0], dt, time(), a_refinement_ratios_vect, numLevels);
 
     // need to delete plotData
     for (int lev = 0; lev < numLevels; lev++)
@@ -4820,8 +5205,17 @@ AmrHydro::writePlotFile()
         filename.append("3d.hdf5");
     }
 
-    WriteAMRHierarchyHDF5(
-        filename, m_amrGrids, plotData, vectName, domain, m_amrDx[0][0], dt, time(), m_refinement_ratios, numLevels);
+    Vector<IntVect> a_refinement_ratios_vect;
+    a_refinement_ratios_vect.resize(m_max_level);  
+    for (int lev=0; lev<m_max_level; lev++) {  
+        a_refinement_ratios_vect[lev][0] = m_refinement_ratios[lev];
+        a_refinement_ratios_vect[lev][1] = m_refinement_ratios[lev];
+        if (CH_SPACEDIM == 3) {   
+            a_refinement_ratios_vect[lev][2] = m_refinement_ratios[lev];
+        }
+    }
+    WriteAnisotropicAMRHierarchyHDF5(
+        filename, m_amrGrids, plotData, vectName, domain, m_amrDx[0], dt, time(), a_refinement_ratios_vect, numLevels);
 
     // need to delete plotData
     for (int lev = 0; lev < numLevels; lev++) {
@@ -4971,6 +5365,10 @@ AmrHydro::writeCheckpointFile() const
             levelHeader.m_int["ref_ratio"] = m_refinement_ratios[lev];
         }
         levelHeader.m_real["dx"] = m_amrDx[lev][0];
+        levelHeader.m_real["dy"] = m_amrDx[lev][1];
+        if (CH_SPACEDIM == 3) {
+            levelHeader.m_real["dz"] = m_amrDx[lev][2];
+        }
         levelHeader.m_box["prob_domain"] = m_amrDomains[lev].domainBox();
 
         levelHeader.writeToFile(handle);
@@ -5180,13 +5578,24 @@ AmrHydro::readCheckpointFile(HDF5Handle& a_handle)
         if (levheader.m_real.find("dx") == levheader.m_real.end()) {
             MayDay::Error("checkpoint file does not contain dx");
         }
+        if (levheader.m_real.find("dy") == levheader.m_real.end()) {
+            m_amrDx[lev] = RealVect::Unit * (levheader.m_real["dx"]);
+        } else {  
+            m_amrDx[lev][0] = levheader.m_real["dx"];
+            m_amrDx[lev][1] = levheader.m_real["dy"];
+            if (CH_SPACEDIM == 3) {
+                m_amrDx[lev][2] = levheader.m_real["dz"];
+            }
+        }
+        //if (levheader.m_real.find("dz") == levheader.m_real.end()) {
+        //    MayDay::Error("checkpoint file does not contain dz");
+        //}
         // TODO check why that Abs doesn't work
         //if (lev <= max_level_check) {
         //    if ( Abs(m_amrDx[lev] - levheader.m_real["dx"]) > TINY_NORM ) {
         //        MayDay::Error("restart file dx != input file dx");
         //    }
         //}
-        m_amrDx[lev] = RealVect::Unit * (levheader.m_real["dx"]);
 
         // read problem domain box
         if (levheader.m_box.find("prob_domain") == levheader.m_box.end()) {
@@ -5354,7 +5763,7 @@ AmrHydro::restart(string& a_restart_file)
     // now loop through levels and redefine if necessary
     //m_IBCPtr->initializeBed(levelDx, *m_suhmoParm, *m_bedelevation[0], *m_bumpHeight[0], *m_bumpHeight[0]);  
     for (int lev = 0; lev <= m_finest_level; lev++) {
-        RealVect levelDx = m_amrDx[lev] * RealVect::Unit;
+        //RealVect levelDx = m_amrDx[lev] * RealVect::Unit;
         //m_IBCPtr->initializePi(levelDx,
         //                       *m_suhmoParm,       
         //                       *m_head[lev],

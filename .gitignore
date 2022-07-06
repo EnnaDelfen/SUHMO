@@ -15,6 +15,7 @@ d/
 inputs.compare
 pout.*
 *_bu
+ramp_up.dat
 
 *lev_tooLarge
 *.agr
@@ -23,5 +24,13 @@ input*_pp
 convergence*.dat
 1_misc_scripts/
 time.table.*
+inputs.compare*
+list_files.dat
+NOTES
+0_convergence_channelized/*_base
+0_convergence_channelized/*_base2levs
+test/
+tmp/
 0_convergence_channelized/*_base*/
 test/
+postproc_A*/

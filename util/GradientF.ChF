@@ -31,7 +31,7 @@ c -----------------------------------------------------------------
      &                      CHF_FRA1[mask],
      &                      CHF_FRA1[phi],
      &                      CHF_BOX[edgeGrid],
-     &                      CHF_CONST_REAL[dx],
+     &                      CHF_CONST_REALVECT[dx],
      &                      CHF_INT[dir],
      &                      CHF_INT[hasMask],
      &                      CHF_INT[edgeDir])
@@ -54,7 +54,7 @@ c ::: local variables
 
       if (dir.eq.edgeDir) then
 c ::: this is a normal derivative (simpler stencil)
-         factor = one/dx
+         factor = one/dx(dir)
          CHF_MULTIDO[edgeGrid;i;j;k]
          if ( (mask(CHF_IX[i;j;k])<1E-6) .OR. (mask(CHF_IX[i-ii;j-jj;k-kk])<1E-6) ) then
              edgeGrad(CHF_IX[i;j;k]) =  0.0
@@ -66,7 +66,7 @@ c ::: this is a normal derivative (simpler stencil)
 
       else
 c ::: this is a transverse derivative
-         factor = fourth/dx
+         factor = fourth/dx(dir)
 
          CHF_MULTIDO[edgeGrid;i;j;k]
          edgeGrad(CHF_IX[i;j;k]) =
@@ -200,7 +200,7 @@ c ----------------------------------------------------------------
       subroutine GRADCC(CHF_FRA1[gradPhi],
      &                  CHF_FRA1[phi],
      &                  CHF_BOX[gridBox],
-     &                  CHF_CONST_REAL[dx],
+     &                  CHF_CONST_REALVECT[dx],
      &                  CHF_INT[dir],
      &                  CHF_FRA1[usermask],
      &                  CHF_INT[hasMask])
@@ -215,7 +215,7 @@ c ::: local variables
       jj = CHF_ID(dir,1);
       kk = CHF_ID(dir,2)]
 
-      factor = half/dx
+      factor = half/dx(dir)
 
       CHF_MULTIDO[gridBox;i;j;k]
       gradPhi(CHF_IX[i;j;k]) = factor*(phi(CHF_IX[i+ii;j+jj;k+kk])

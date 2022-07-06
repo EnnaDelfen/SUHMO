@@ -34,6 +34,13 @@ void suhmo_params::setDefaults()
     m_time_varying_input = false;
     m_runoff             = 0.0;
     m_deltaT             = 0.0;
+
+    m_ramp = false;
+    m_ramp_up = 1.0;  
+    m_duration_max = 1.0;
+    m_relax =   0.1;
+    m_floor_min = 0.0;
+    m_floor_max = 1.0;
 }
 
 void suhmo_params::readInputs()
@@ -67,6 +74,7 @@ void suhmo_params::readInputs()
     ppParams.get("ReInit", m_ReInit);
     // MOULINS
     ppParams.get("time_varying_input", m_time_varying_input);
+    ppParams.get("ramp", m_ramp);
     ppParams.get("distributed_input", m_distributed_input);
     ppParams.get("n_moulins", m_n_moulins);
     if (m_n_moulins > 0 ) {
@@ -78,6 +86,13 @@ void suhmo_params::readInputs()
         ppParams.getarr("moulin_sigma", m_sigma, 0, m_n_moulins);
         if (m_time_varying_input) {
             ppParams.get("Ra", m_runoff);
+        }
+        if (m_ramp) {
+            ppParams.get("ramp_up", m_ramp_up);  
+            ppParams.get("duration_max", m_duration_max);
+            ppParams.get("relax", m_relax);
+            ppParams.get("floor_min", m_floor_min);
+            ppParams.get("floor_max", m_floor_max);
         }
     } else if (m_n_moulins < 0) {
         if (m_time_varying_input) {

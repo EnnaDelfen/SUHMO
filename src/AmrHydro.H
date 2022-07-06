@@ -20,6 +20,7 @@
 #include "BiCGStabSolver.H"
 #include "CellToEdge.H"
 #include "EdgeToCell.H"
+#include "RelaxSolver.H"
 #include "CH_HDF5.H"
 
 #include "NamespaceHeader.H"
@@ -37,6 +38,10 @@ public:
     static Real             s_xhi_neum;
     static Real             s_ylo_neum;
     static Real             s_yhi_neum;
+    static Real s_xlo_A_robin, s_xlo_B_robin, s_xlo_C_robin;
+    static Real s_xhi_A_robin, s_xhi_B_robin, s_xhi_C_robin;
+    static Real s_ylo_A_robin, s_ylo_B_robin, s_ylo_C_robin;
+    static Real s_yhi_A_robin, s_yhi_B_robin, s_yhi_C_robin;
 };
 
 /// framework class to manage non-subcycled AMR model
@@ -95,7 +100,7 @@ public:
                     const LevelData<FArrayBox>*  a_ucoarse,
                     LevelData<FArrayBox>&        a_B,
                     LevelData<FArrayBox>&        a_Pi,
-                    Real                         a_dx,
+                    RealVect                     a_dx,
                     bool                         a_print,
                     int                          a_smooth,
                     int                          a_depth);
@@ -154,7 +159,7 @@ public:
                           Vector<RefCountedPtr<LevelData<FluxBox> > >&   a_bCoef,
                           Vector<ProblemDomain>& a_domains,
                           Vector<int>& refRatio,
-                          Real& coarsestDx,
+                          RealVect& coarsestDx,
                           Vector<LevelData<FArrayBox>*>& a_head, 
                           Vector<LevelData<FArrayBox>*>& a_RHS);
 
@@ -164,7 +169,7 @@ public:
                        Vector<RefCountedPtr<LevelData<FluxBox> > >&   a_bCoef,
                        Vector<ProblemDomain>& a_domains,
                        Vector<int>& refRatio,
-                       Real& coarsestDx,
+                       RealVect& coarsestDx,
                        Vector<LevelData<FArrayBox>*>& a_gapHeight, 
                        Vector<LevelData<FArrayBox>*>& a_RHS,
                        Real a_dt);
@@ -181,6 +186,15 @@ private:
     void writeMetaDataHDF5(HDF5Handle& a_handle) const;
 
 public: 
+    void interpFinest();
+
+     void writePltPP(DisjointBoxLayout& fineGrids, 
+                     int numPlotComps, 
+                     Vector<std::string>& vectName,
+                     Vector<Vector<LevelData<FArrayBox>*>> stuffToPlot,
+                     int ratio_cf,
+                     string namePlot);
+
     void writePltCustom(int numPlotComps,
                         Vector<std::string>& vectName,
                         Vector<Vector<LevelData<FArrayBox>*>> stp,
@@ -424,6 +438,8 @@ protected:
    
     // Post proc
     bool m_post_proc;
+    bool m_post_proc_comparisons;
+    bool m_post_proc_shmip;
 
     /** Model outputs include spatio temporal fields of Hydraulic head,  effective  Pressure,  
         subglacial  gap  height  (the  effective  geometry  representative  of  an  entire  element),  
