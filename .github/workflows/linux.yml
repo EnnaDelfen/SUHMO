@@ -1,0 +1,34 @@
+name: SUHMO_linux
+
+on:
+    workflow_dispatch:
+    push:
+        branches: [ master ]
+    pull_request:
+        branches: [ master ]
+
+jobs:
+    #Build the CV_CHANNEL
+    CV_CHANNEL:
+        name: GNU@10 NOMPI [CV_CHANNEL]
+        runs-on: ubuntu-18.04
+        steps:
+        - name: Cancel previous runs
+          uses: styfle/cancel-workflow-action@0.6.0
+          with:
+               access_token: ${{ github.token }}
+        - uses: actions/checkout@v2
+        - name: System deps
+          run: .github/deps/dependencies_gcc.sh
+        - name: Suhmo deps
+          run: mk/CloneChombo.sh
+        - name: Build
+          env:
+               CHOMBO_HOME: ${GITHUB_WORKSPACE}/build/Chombo_3.2/lib
+               AMR_HOME: ${GITHUB_WORKSPACE}
+          run: |
+            cd exec/0_convergence_channelized
+            mpicxx -v
+            make -j2 all MPI=TRUE OPT=TRUE DEBUG=FALSE DIM=2
+            ./Suhmo2d.Linux.64.mpicxx.gfortran-11.OPT.MPI.ex 1lev/input.hydro
+            cat pout.0
