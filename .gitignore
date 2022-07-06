@@ -33,3 +33,4 @@ test/
 tmp/
 0_convergence_channelized/*_base*/
 test/
+postproc_A*/
