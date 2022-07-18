@@ -25,11 +25,11 @@
 
 Go back to the [main documentation page](https://ennadelfen.github.io/SUHMO/index)
 
-# Introduction 
-SUHMO stands for SUblglacial Hydrology MOdel, and is an Adaptive Mesh Refinement (AMR) model based on the Chombo[^1] software framework. We extend the model proposed by Sommers et al. (2018)[^2] with a few changes to accommodate the transition from unresolved to resolved flow features. We handle the strong nonlinearities present in the equations by resorting to an efficient nonlinear Full Approximation Scheme multigrid (FAS-MG) algorithm. We outline the details of the algorithm next.
-
-
 # Model equations
+
+SUHMO stands for SUblglacial Hydrology MOdel, and is an Adaptive Mesh Refinement (AMR) model based on the Chombo[^1] software framework. We extend the model proposed by Sommers et al. (2018)[^2] with a few changes to accommodate the transition from unresolved to resolved flow features. We handle the strong nonlinearities present in the equations by resorting to an efficient nonlinear Full Approximation Scheme multigrid (FAS-MG) algorithm. We present the set of equations and outline the details of the algorithm next.
+
+
 ## Starting set of Equations
 The governing equation set starts with a two-dimensional expression for the conservation of mass – assuming we are dealing with an incompressible fluid:
 
@@ -87,7 +87,7 @@ With this formulation, we aim to represent melting of channel walls as heat diss
 $$ \nabla \cdot \Big[ \frac{-b^3g}{12 \nu (1 + \omega Re)} \nabla h \Big] = \dot{m} \Big[ \frac{1}{\rho_w} - \frac{1}{\rho_i} \Big] + A |P_i - P_w|^{n-1}(P_i - P_w) l_c - \nabla \cdot \mathcal{D} \nabla b -\beta u_b + e_s $$
 
 
-# Algorithm overview
+## Algorithm overview
 
 
 
