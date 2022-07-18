@@ -23,14 +23,14 @@
 </head>
 
 
-# Model equations
-
 Go back to the [main documentation page](https://ennadelfen.github.io/SUHMO/index)
 
-## Introduction 
+# Introduction 
 SUHMO stands for SUblglacial Hydrology MOdel, and is an Adaptive Mesh Refinement (AMR) model based on the Chombo[^1] software framework. We extend the model proposed by Sommers et al. (2018)[^2] with a few changes to accommodate the transition from unresolved to resolved flow features. We handle the strong nonlinearities present in the equations by resorting to an efficient nonlinear Full Approximation Scheme multigrid (FAS-MG) algorithm. We outline the details of the algorithm next.
 
-## Model Equations
+
+# Model equations
+## Starting set of Equations
 The governing equation set starts with a two-dimensional expression for the conservation of mass – assuming we are dealing with an incompressible fluid:
 
 $$\frac{\partial b}{\partial t} + \frac{\partial b_e}{\partial t} + \nabla \cdot \mathbf{q} = \frac{\dot{m}}{\rho_w} + e_s$$
@@ -70,6 +70,24 @@ The quantity $l_c$ is the creep length scale, which is generally equal to $b$.
 We do not allow for the drainage space to be partially filled, such that $b=b'$ always. These equations can then be combined to produce an equation for the evolution of the hydraulic head: 
 
 $$ \nabla \cdot \Big[ \frac{-b^3g}{12 \nu (1 + \omega Re)} \nabla h \Big] + \frac{\partial b_e}{\partial t} = \dot{m} \Big[ \frac{1}{\rho_w} - \frac{1}{\rho_i} \Big] + A |P_i - P_w|^{n-1}(P_i - P_w) l_c -\beta u_b + e_s $$
+
+
+## Diffusion parameter and final set of Equations
+
+We modify the equation for $b$ by adding a diffusion-like term, as follows:
+
+$$ \frac{\partial b}{\partial t} = \frac{\dot{m}}{\rho_i} + \beta u_b - A |P_i-P_w|^{n-1} (P_i - P_w) l_c + \nabla \cdot \mathcal{D} \nabla b $$
+
+where the diffusion coefficient depends on the heat dissipation piece of the melt rate:
+
+$$ \mathcal{D} = \frac{b}{\rho_i L} (- \rho_w g \mathbf{q} \cdot \nabla h + c_t c_w \rho_w \mathbf{q} \cdot \nabla P_w) $$
+    
+With this formulation, we aim to represent melting of channel walls as heat dissipation is no longer limited to channel/cavity ceilings. Adding this diffusion term and neglecting englacial storage, the equation for $h$ then becomes:
+
+$$ \nabla \cdot \Big[ \frac{-b^3g}{12 \nu (1 + \omega Re)} \nabla h \Big] = \dot{m} \Big[ \frac{1}{\rho_w} - \frac{1}{\rho_i} \Big] + A |P_i - P_w|^{n-1}(P_i - P_w) l_c - \nabla \cdot \mathcal{D} \nabla b -\beta u_b + e_s $$
+
+
+# Algorithm overview
 
 
 
