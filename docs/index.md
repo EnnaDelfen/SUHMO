@@ -1,5 +1,8 @@
 # Welcome to SUHMO's documentation!
 
+[Getting Started](https://ennadelfen.github.io/SUHMO/GettingStarted)
+[Core Algorithm](https://ennadelfen.github.io/SUHMO/Model)
+[Tutorials](https://ennadelfen.github.io/SUHMO/Tutorials)
 
 ## Overview
 SUHMO is an adaptive-mesh code for simulating the 2D evolution of subglacial hydrology. SUHMO is parallelized with MPI for CPUs. Support for complex geometries so far is minimal.
