@@ -35,7 +35,7 @@ The governing equation set starts with a two-dimensional expression for the cons
 
 $$\frac{\partial b}{\partial t} + \frac{\partial b_e}{\partial t} + \nabla \cdot \mathbf{q} = \frac{\dot{m}}{\rho_w} + e_s$$
 
-where \(b\) is the subglacial water gap height (m), $b_e$ is the volume of water stored englacially per unit area of bed (m), $\mathbf{q}$ is the gap-integrated basal water flux (m$^2$ s$^{-1}$), $\dot{m}$ is the melt rate (kg m$^{-2}$ s$^{-1}$), $\rho_w$ is the density of water (kg m$^{-3}$), and $e_s$ encompasses all external sources of meltwater (produced englacially or surface meltwater, for example) (m s$^{-1}$).
+where $b$ is the subglacial water gap height (m), $b_e$ is the volume of water stored englacially per unit area of bed (m), $\mathbf{q}$ is the gap-integrated basal water flux (m$^2$ s$^{-1}$), $\dot{m}$ is the melt rate (kg m$^{-2}$ s$^{-1}$), $\rho_w$ is the density of water (kg m$^{-3}$), and $e_s$ encompasses all external sources of meltwater (produced englacially or surface meltwater, for example) (m s$^{-1}$).
 
 An approximate momentum equation for water velocity integrated over the gap height gives rise to an expression for the water flux, based on equations developed for flow in rock fractures[^3]:
 
