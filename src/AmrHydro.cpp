@@ -3476,8 +3476,8 @@ AmrHydro::timeStepFAS(Real a_dt)
        }
        out_avgN = recvavN;
 
-       Vector<Real> recChanBand(3);
-       result = MPI_Allreduce(&out_water_flux_x_chan_Bands[0], &recChanBand[0], 4, MPI_CH_REAL,
+       Vector<Real> recChanBand(3, 0.0);
+       result = MPI_Allreduce(&out_water_flux_x_chan_Bands[0], &recChanBand[0], 3, MPI_CH_REAL,
                                   MPI_SUM, Chombo_MPI::comm);
        if (result != MPI_SUCCESS)
        {
@@ -3485,8 +3485,8 @@ AmrHydro::timeStepFAS(Real a_dt)
        }
        out_water_flux_x_chan_Bands= recChanBand;
 
-       Vector<Real> recChanDistr(3);
-       result = MPI_Allreduce(&out_water_flux_x_distrib_Bands[0], &recChanDistr[0], 4, MPI_CH_REAL,
+       Vector<Real> recChanDistr(3, 0.0);
+       result = MPI_Allreduce(&out_water_flux_x_distrib_Bands[0], &recChanDistr[0], 3, MPI_CH_REAL,
                                   MPI_SUM, Chombo_MPI::comm);
        if (result != MPI_SUCCESS)
        {
