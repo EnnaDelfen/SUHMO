@@ -51,7 +51,6 @@ $$ \nabla \cdot \Big[ \frac{-b^3g}{12 \nu (1 + \omega Re)} \nabla h \Big] + \fra
 
 [^1]:Adams, M., Colella, P., Graves, D. T., Johnson, J. N., Keen, N. D., Ligocki, T. J., Martin, D. F., McCorquodale, P. W., Modiano, D., Schwartz, P. O., Sternberg, T. D., and Van Straalen, B.: Chombo Software Package for AMR Applications - Design Document, Tech. Rep. LBNL-6616E, Lawrence Berkeley National Laboratory, [link](https://commons.lbl.gov/display/chombo/Chombo+-+Software+for+Adaptive+Solutions+of+Partial+Differential+Equations), 2001-2021.
 [^2]:Sommers, A., Rajaram, H., and Morlighem, M.: SHAKTI: Subglacial Hydrology and Kinetic, Transient Interactions v1.0., Geoscientific Model Development, 11, 2955–2974, [doi](https://doi.org/10.5194/gmd-11-2955-2018), 2018.
-[^3]:Zimmerman, R. W., Al-Yaarubi, A., Pain, C. C., and Grattoni, C. A.: Non-linear regimes of fluid flow in rock fractures, International Journal
-of Rock Mechanics and Mining Sciences, 41, 163–169, [doi](https://doi.org/10.1016/j.ijrmms.2003.12.045), 2004.
+[^3]:Zimmerman, R. W., Al-Yaarubi, A., Pain, C. C., and Grattoni, C. A.: Non-linear regimes of fluid flow in rock fractures, International Journal of Rock Mechanics and Mining Sciences, 41, 163–169, [doi](https://doi.org/10.1016/j.ijrmms.2003.12.045), 2004.
 [^4]:de Fleurian, B., Werder, M. A., Beyer, S., Brinkerhoff, D. J., Delaney, I., Dow, C. F., Downs, J., Gagliardini, O., Hoffman, M. J., Hooke, R. L., et al.: SHMIP The subglacial hydrology model intercomparison Project, Journal of Glaciology, 64, 897–916, [doi](https://doi.org/10.1017/jog.2018.78), 2018.
 
