@@ -11,29 +11,25 @@ SUHMO relies on the Software for Adaptive Solutions of Partial Differential Equa
 
 ## Documentation
 
-A partial documentation with tutorials for SUHMO is available [here](https://??/).
-It is also possible to build a local version of the documentation once you have obtained the source code using :
-
-        cd ${SUHMO_HOME}/docs
-        make html
+A partial documentation with tutorials for SUHMO is available [here](https://ennadelfen.github.io/SUHMO/).
 
 ### Getting started
 
 A first simple 2D channelizing problem is available under the SUHMO QuickStart section:
 
-https://.../GettingStarted.html
+https://ennadelfen.github.io/SUHMO/GettingStarted.html
 
 ### Core Algorithm
 
 The SUHMO governing equations and core algorithm are described in:
 
-https://.../Model.html
+https://ennadelfen.github.io/SUHMO/Model.html
 
 ### SHMIP test cases
 
 A set of self-contained tutorials describing more complex problems is also provided:
 
-https://.../Tutorials.html
+https://ennadelfen.github.io/SUHMO/Tutorials.html
 
 ## Contributing
 
