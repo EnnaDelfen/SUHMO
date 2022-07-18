@@ -17,19 +17,19 @@ A partial documentation with tutorials for SUHMO is available [here](https://enn
 
 A first simple 2D channelizing problem is available under the SUHMO QuickStart section:
 
-https://ennadelfen.github.io/SUHMO/GettingStarted.md
+https://ennadelfen.github.io/SUHMO/GettingStarted
 
 ### Core Algorithm
 
 The SUHMO governing equations and core algorithm are described in:
 
-https://ennadelfen.github.io/SUHMO/Model.md
+https://ennadelfen.github.io/SUHMO/Model
 
 ### SHMIP test cases
 
 A set of self-contained tutorials describing more complex problems is also provided:
 
-https://ennadelfen.github.io/SUHMO/Tutorials.md
+https://ennadelfen.github.io/SUHMO/Tutorials
 
 ## Contributing
 
