@@ -41,7 +41,8 @@ export SUHMO_HOME=path_to_your_SUHMO1.0_folder/lib/
 ```
 
 
-### Makefiles 
+### Additional dependencies
+To be successful at building and running SUHMO, you will also need MPI and HDF5 installed somewhere on your system.
 
 
 ## Get Started !
