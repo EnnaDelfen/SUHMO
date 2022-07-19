@@ -88,7 +88,7 @@ and modify the local `local/Make.defs.template` to provide the requested paths, 
 
 ```
 rm -rf Make.defs.local
-ln -s local/Make.def.GH Make.defs.local
+ln -s local/Make.def.template Make.defs.local
 ```
 
 You should be all set to compile and run your first example ! 
@@ -126,20 +126,22 @@ If everything goes according to plan you should not have to wait more than a min
 
 - A `pout.0` output file filled with run information
 - A check file `chk003000.2d.hdf5` to restart your simulation if needed
-- 2 plot files `plot00XXXX.2d.hdf5` corresponding to the initial and final states of your simulation.
+- 2 plot files `plot00XXXX.2d.hdf5` corresponding to the initial and final states of your simulation
 
 ### Analysing the results
 There are several tools that enable you to visualize simulations results. [ParaView](https://www.paraview.org/) is an option, as well as [VisIt](https://visit-dav.github.io/visit-website/).
 
 
-The fields of gap height and head resulting from this (coarse) simulation are shown in the top row of the following image. Note that the discretization is 32x8, leading to a $\Delta_x$ of 2m. This test case can be used to run a convergence study, and results from a much finer mesh are also shown, in the bottom row. In that case, the discretization is 512x128 so that $\Delta_x$ is 0.125m (input files for that run are provided in the `5lev` test case folder). 
+The fields of gap height and head resulting from this (coarse) simulation are shown in the top row of the following image. Note that the discretization is 32x8, leading to a $\Delta_x$ of 2 m. This test case can be used to run a convergence study, and results from a much finer mesh are also shown, in the bottom row. In that case, the discretization is 512x128 so that $\Delta_x$ is 0.125 m (input files for that run are provided in the `5lev` test case folder). 
 
 <p align="center">
   <img width="800" src="http://ennadelfen.github.io/SUHMO/IMG/Solution1lev_5lev.png">
 </p>
 
-The `pout.0` file can also be checked for useful information. The number of Picard iterations, FASMG iterations (for h) and MG iterations (for b) are reported for each time step. The first 50 timesteps exhibit from 2 to 3 Picard interations and over 30 FASMG iterations while the initial state gets settled. Then the moulin input ramps up and as many as 7 Picard iterations are required for another 200-300 iterations, while the channel develops. Steady state is reached soon after.
+The `pout.0` file can also be checked for useful information. The number of Picard iterations, FASMG iterations (for $h$) and MG iterations (for $b$) are reported for each time step. The first 50 timesteps exhibit from 2 to 3 Picard interations and over 30 FASMG iterations while the initial state gets settled. Then the moulin input ramps up and as many as 7 Picard iterations are required for another 200-300 iterations, while the channel develops. Steady state is reached soon after.
 
 
 ### Go a bit further
-Congrats on running your first SUHMO test case ! You will note many subfolders in the `0_convergence_channelized` exec folder. All subfolders labelled `Xlev`, where X is a number, are single level simulations. Subfolders labelled `Xlev_base` are 2 level simulations, where the base level refinement is as for the `Xlev`. Subfolders labelled `Xlev_base2levs` are 3 level simulations, where the base level refinement is as for the `Xlev`.
+Congrats on running your first SUHMO test case ! 
+
+You will note many subfolders in the `0_convergence_channelized` exec folder. All subfolders labelled `Xlev`, where X is a number, are single level simulations. Subfolders labelled `Xlev_base` are 2 level simulations, where the base level refinement is as for the `Xlev`. Subfolders labelled `Xlev_base2levs` are 3 level simulations, where the base level refinement is as for the `Xlev`.
