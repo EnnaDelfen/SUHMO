@@ -1,4 +1,7 @@
 # -*- Mode: Makefile -*- 
+SUHMO_HOME  ?= ../../
+CHOMBO_HOME ?= $(SUHMO_HOME)/Submodules/Chombo_git/lib
+AMR_HOME    ?= $(SUHMO_HOME)
 
 ### This makefile produces an executable for each 
 ### name in the `ebase' variable
@@ -12,8 +15,9 @@ UNAMEM = $(shell uname -m)
 
 DIM=2
 USE_PETSC=FALSE
-MPI=FALSE
+MPI=TRUE
 USE_MF=TRUE
+DEBUG=FALSE
 
 ##
 ## names of Chombo libraries needed by this program, in order of search.
@@ -36,4 +40,3 @@ src_dirs = $(SRC_DIR) $(UTIL_DIR)
 include $(CHOMBO_HOME)/mk/Make.example
 
 VERBOSE=-v
-#BISICLES_MK = ../mk/

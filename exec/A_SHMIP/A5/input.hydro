@@ -26,7 +26,7 @@ suhmo.SlidingVelocity = 1.0e-6 0.0
 suhmo.br = 0.1
 suhmo.lr = 2.0
 suhmo.A  = 5e-25
-suhmo.cutOffbr  = -0.01
+suhmo.cutOffbr  = 0.0
 suhmo.maxOffbr  = 10000.0
 suhmo.diffFactor= 0.0
 
