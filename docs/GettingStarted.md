@@ -96,6 +96,13 @@ You should be all set to compile and run your first example !
 
 ## Setting up the channelizing test case
 
+### Test case description
+![Sketch of the synthetic glacier topography used. The red dot shows the location of the moulin, which has a diameter of 1.5 m.](https://ennadelfen.github.io/SUHMO/ConvergenceChannelTC.png)
+
+The domain is a rectangle of 64 m in the $x$ direction by 16 m in the $y$ direction. The bed is sloped in the $x$ direction (with a +2$\%$ slope) and is topped with a slab of ice of constant thickness everywhere (500 m). A moulin delivering a total input of 30 m$^3$ s$^{-1}$ of water at steady state is located 16 m from the outlet of the domain in the $x$ direction. The geometry is shown above. The moulin influx is ramped up over a period of a little under a month. 
+Periodicity is assumed in the $y$ direction, a homogeneous Neumann boundary condition (outlet) is prescribed at x$=$0 m while a homogeneous Dirichlet boundary condition is prescribed at x$=$64 m. Note that the moulin source term follows a Gaussian distribution.
+
+
 ### Building the executable
 Start by going into the following SUHMO test case folder and building the executable:
 
