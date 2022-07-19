@@ -97,7 +97,10 @@ You should be all set to compile and run your first example !
 ## Setting up the channelizing test case
 
 ### Test case description
-![Sketch of the synthetic glacier topography used. The red dot shows the location of the moulin, which has a diameter of 1.5 m.](https://ennadelfen.github.io/SUHMO/IMG/ConvergenceChannelTC.png)
+
+<p align="center">
+  <img width="500" src="http://ennadelfen.github.io/SUHMO/IMG/ConvergenceChannelTC.png">
+</p>
 
 The domain is a rectangle of 64 m in the $x$ direction by 16 m in the $y$ direction. The bed is sloped in the $x$ direction (with a +2$\%$ slope) and is topped with a slab of ice of constant thickness everywhere (500 m). A moulin delivering a total input of 30 m$^3$ s$^{-1}$ of water at steady state is located 16 m from the outlet of the domain in the $x$ direction. The geometry is shown above. The moulin influx is ramped up over a period of a little under a month. 
 Periodicity is assumed in the $y$ direction, a homogeneous Neumann boundary condition (outlet) is prescribed at x$=$0 m while a homogeneous Dirichlet boundary condition is prescribed at x$=$64 m. Note that the moulin source term follows a Gaussian distribution.
@@ -128,4 +131,7 @@ If everything goes according to plan you should not have to wait more than a min
 ### Analysing the results
 There are several tools that enable you to visualize simulations results. [ParaView](https://www.paraview.org/) is an option, as well as [VisIt](https://visit-dav.github.io/visit-website/) 
 The fields of gap height and head resulting from this (coarse) simulation are shown in the top row of the following image. Note that the discretization is 32x8, leading to a $\Delta_x$ of 2m. This test case can be used to run a convergence study, and results from a much finer mesh are also shown, in the bottom row. In that case, the discretization is 512x128 so that $\Delta_x$ is 0.125m (input files for that run are provided in the `5lev` test case folder). 
-![GH and Head fields. 1lev and 5lev simulations, from top to bottom.](https://ennadelfen.github.io/SUHMO/IMG/Solution1lev_5lev.png)
+
+<p align="center">
+  <img width="800" src="http://ennadelfen.github.io/SUHMO/IMG/Solution1lev_5lev.png">
+</p>
