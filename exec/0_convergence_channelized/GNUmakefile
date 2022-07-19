@@ -15,8 +15,9 @@ UNAMEM = $(shell uname -m)
 
 DIM=2
 USE_PETSC=FALSE
-MPI=FALSE
+MPI=TRUE
 USE_MF=TRUE
+DEBUG=FALSE
 
 ##
 ## names of Chombo libraries needed by this program, in order of search.
