@@ -94,6 +94,29 @@ ln -s local/Make.def.GH Make.defs.local
 You should be all set to compile and run your first example ! 
 
 
-## Setting up the test case
+## Setting up the channelizing test case
 
-## Running the test case -- and results
+### Building the executable
+Start by going into the following SUHMO test case folder and building the executable:
+
+```
+cd $SUHMO_HOME/exec/0_convergence_channelized
+make all
+```
+
+### Running the first example
+Go into the `1lev` test case and launch your first SUHMO simulation:
+
+```
+cd 1lev
+../Suhmo2d.**.ex  input.hydro
+```
+
+If everything goes according to plan you should not have to wait more than a minute for the simulation to complete. The following files should have been generated:
+
+- A `pout.0` output file filled with run information
+- A check file `chk003000.2d.hdf5` to restart your simulation if needed
+- 2 plot files `plot00XXXX.2d.hdf5` corresponding to the initial and final states of your simulation.
+
+### Analysing the results
+There are several tools that enable you to visualize simulations results. [ParaView](https://www.paraview.org/) is an option, as well as [VisIt](https://visit-dav.github.io/visit-website/) 
