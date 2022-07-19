@@ -1677,9 +1677,9 @@ AmrHydro::Calc_moulin_integral(std::vector<Real>& a_moulinsInteg,
    // X dir
    //Real v_1 = 1.0;
    //Real v_2 = 1.0;
-   Real v_m1 = 0.55555;
-   Real v_c1 = 0.88888;
-   Real v_p1 = 0.55555;
+   Real v_m1 = 0.5555555555;
+   Real v_c1 = 0.8888888888;
+   Real v_p1 = 0.5555555555;
    // Y dir -- same than X dir for now
    //Real w_1 = 1.0;
    //Real w_2 = 1.0;
@@ -1690,9 +1690,9 @@ AmrHydro::Calc_moulin_integral(std::vector<Real>& a_moulinsInteg,
    // X dir -- same in Y dir for now
    //Real l_m1 = - std::sqrt(3.0) / 3.0;
    //Real l_p1 =   std::sqrt(3.0) / 3.0;
-   Real l_m1 = - 0.77459/2.0;
+   Real l_m1 = - 0.77459666924/2.0;
    Real l_c1 =   0.0;
-   Real l_p1 =   0.77459/2.0;
+   Real l_p1 =   0.77459666924/2.0;
 
    for (int lev = m_finest_level; lev >= 0; lev--) {
        LevelData<FArrayBox>& levelMoulinSrcTmp  =  *a_MS_noNorm[lev];
@@ -1838,11 +1838,10 @@ AmrHydro::Calc_moulin_source_term_distributed (LevelData<FArrayBox>& levelMoulin
        FArrayBox& moulinSrc      = levelMoulinSrc[dit];
        FArrayBox& moulinSrcTmp   = levelMoulinSrcNoNorm[dit];
 
-       moulinSrc.setVal(0.0);
-
        BoxIterator bit(moulinSrcTmp.box());
        for (bit.begin(); bit.ok(); ++bit) {
            IntVect iv = bit();
+           moulinSrc(iv,0) = 0.0;
            for (int m = 0; m<m_suhmoParm->m_n_moulins; m++) {
                moulinSrc(iv,0) += moulinSrcTmp(iv,m) * std::max( (1.0 - m_suhmoParm->m_runoff * std::sin(2.0 * Pi * (m_time - m_restart_time) / 86400.)), 0.0)  
                                   / a_moulinsInteg[m] *  m_suhmoParm->m_moulin_flux[m]; // m3/s/m2 -> m/s 
@@ -2107,7 +2106,7 @@ AmrHydro::timeStepFAS(Real a_dt)
         // Head and b RHS
         RHS_h[lev]                = new LevelData<FArrayBox>(m_amrGrids[lev], 1, IntVect::Zero);
         if (m_suhmoParm->m_n_moulins > 0) {
-            moulin_source_term_noNorm[lev]   = new LevelData<FArrayBox>(m_amrGrids[lev], m_suhmoParm->m_n_moulins, HeadGhostVect);
+            moulin_source_term_noNorm[lev]   = new LevelData<FArrayBox>(m_amrGrids[lev], m_suhmoParm->m_n_moulins, IntVect::Zero);
         }
         RHS_b[lev]                = new LevelData<FArrayBox>(m_amrGrids[lev], 1, IntVect::Zero);
         a_diffusiveTerm[lev]      = new LevelData<FArrayBox>(m_amrGrids[lev], 1, IntVect::Zero);
@@ -2466,6 +2465,7 @@ AmrHydro::timeStepFAS(Real a_dt)
                     pout() <<"        Compute moulins "<< endl;
                 }
                 std::vector<Real> a_moulinsInteg(m_suhmoParm->m_n_moulins, 0.0);    
+                // calc integral over all domain, zeroing overlayed areas 
                 Calc_moulin_integral(a_moulinsInteg, moulin_source_term_noNorm); // m2 and no units
                 for (int lev = 0; lev <= m_finest_level; lev++) {
                     LevelData<FArrayBox>& levelmoulin_source_term         = *m_moulin_source_term[lev];
@@ -2475,6 +2475,30 @@ AmrHydro::timeStepFAS(Real a_dt)
                                                         a_moulinsInteg,                 // m2
                                                         lev);
                 }
+
+                // average down
+                for (int lev = m_finest_level; lev > 0; lev--) {
+                    if (m_suhmoParm->m_n_moulins > 0) {
+                        if (lev > 0 ) {
+                            CoarseAverage averager(m_amrGrids[lev], 1, m_refinement_ratios[lev-1]);
+                            averager.averageToCoarse(*m_moulin_source_term[lev - 1], *m_moulin_source_term[lev]);
+                        }
+                    }
+                }
+
+                // handle ghost cells on the coarse-fine interface
+                for (int lev = 0; lev <= m_finest_level; lev++) {
+                    if (lev > 0) {
+                        QuadCFInterp qcfi(m_amrGrids[lev], &m_amrGrids[lev-1],
+                                          m_amrDx[lev], m_refinement_ratios[lev-1],  
+                                          1,  // num comps
+                                          m_amrDomains[lev]);
+                        qcfi.coarseFineInterp(*m_moulin_source_term[lev], *m_moulin_source_term[lev-1]);
+                    }
+                    (*m_moulin_source_term[lev]).exchange();
+                    ExtrapGhostCells( (*m_moulin_source_term[lev]), m_amrDomains[lev]);
+                }
+
             }
         } else if (m_suhmoParm->m_n_moulins < 0) {
             if (m_verbosity > 3) {
@@ -2513,7 +2537,18 @@ AmrHydro::timeStepFAS(Real a_dt)
                         }
                     }
                 }
+
+                if (lev > 0) {
+                    QuadCFInterp qcfi(m_amrGrids[lev], &m_amrGrids[lev-1],
+                                      m_amrDx[lev], m_refinement_ratios[lev-1],  
+                                      1,  // num comps
+                                      m_amrDomains[lev]);
+                    qcfi.coarseFineInterp(*m_moulin_source_term[lev], *m_moulin_source_term[lev-1]);
+                }
+                (*m_moulin_source_term[lev]).exchange();
+                ExtrapGhostCells( (*m_moulin_source_term[lev]), m_amrDomains[lev]);
             }
+
         } else {
             if (m_verbosity > 3) {
                 pout() <<"        No external water input "<< endl;
@@ -2526,28 +2561,17 @@ AmrHydro::timeStepFAS(Real a_dt)
                     FArrayBox& moulinSrc = levelmoulin_source_term[dit];
                     moulinSrc.setVal(0.0);
                 }
-            }
-        }
-
-        for (int lev = m_finest_level; lev > 0; lev--) {
-            if (m_suhmoParm->m_n_moulins > 0) {
-                if (lev > 0 ) {
-                    CoarseAverage averager(m_amrGrids[lev], 1, m_refinement_ratios[lev-1]);
-                    averager.averageToCoarse(*m_moulin_source_term[lev - 1], *m_moulin_source_term[lev]);
+                if (lev > 0) {
+                    QuadCFInterp qcfi(m_amrGrids[lev], &m_amrGrids[lev-1],
+                                      m_amrDx[lev], m_refinement_ratios[lev-1],  
+                                      1,  // num comps
+                                      m_amrDomains[lev]);
+                    qcfi.coarseFineInterp(*m_moulin_source_term[lev], *m_moulin_source_term[lev-1]);
                 }
+                (*m_moulin_source_term[lev]).exchange();
+                ExtrapGhostCells( (*m_moulin_source_term[lev]), m_amrDomains[lev]);
             }
         }
-
-
-        // handle ghost cells on the coarse-fine interface
-        for (int lev = 1; lev <= m_finest_level; lev++) {
-            QuadCFInterp qcfi(m_amrGrids[lev], &m_amrGrids[lev-1],
-                              m_amrDx[lev], m_refinement_ratios[lev-1],  
-                              1,  // num comps
-                              m_amrDomains[lev]);
-            qcfi.coarseFineInterp(*m_moulin_source_term[lev], *m_moulin_source_term[lev-1]);
-        }
-
 
         //     Update  RHS = f(Qw, grad(zb)) 
         //     Compute lagged adv term = f((Qw, grad(h))
@@ -3592,11 +3616,11 @@ AmrHydro::timeStepFAS(Real a_dt)
         idx_bandHi_hi  = (int) xloc_bandHi_hi/m_amrDx[0][0] - 0.5;
 
         // TEMPORAL POSTPROC
-        if (m_suhmoParm->m_ramp) {
+        //if (m_suhmoParm->m_ramp) {
             Real sec_1month      = 2635200.0;  // s
             int time_tmp = (int) m_time + a_dt;
             pout() << "Time(months) recharge ramp = " <<  m_time/sec_1month  << " " << out_recharge[1] << " " << ramp << endl; 
-        }
+        //}
         //if (time_tmp % 86400 == 0) {
         //    pout() << "Time(h - d) avgN N_LB  N_MB  N_HB = " <<  (m_time + a_dt -m_restart_time)/3600.  << " " << (m_time + a_dt -m_restart_time)/86400 
         //                                                            << " " << out_avgN[3]/count_avgN 
