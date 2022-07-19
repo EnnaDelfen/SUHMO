@@ -70,37 +70,37 @@ All simulations are single level, and use a $dt$ of 1 hour, and a $\Delta_x$ of 
 ### A1
 
 <p align="center">
-  <img width="500" src="http://ennadelfen.github.io/SUHMO/IMG/SHMIPA1.png">
+  <img width="800" src="http://ennadelfen.github.io/SUHMO/IMG/SHMIPA1.png">
 </p>
 
 ### A2
 
 <p align="center">
-  <img width="500" src="http://ennadelfen.github.io/SUHMO/IMG/SHMIPA2.png">
+  <img width="800" src="http://ennadelfen.github.io/SUHMO/IMG/SHMIPA2.png">
 </p>
 
 ### A3
 
 <p align="center">
-  <img width="500" src="http://ennadelfen.github.io/SUHMO/IMG/SHMIPA3.png">
+  <img width="800" src="http://ennadelfen.github.io/SUHMO/IMG/SHMIPA3.png">
 </p>
 
 ### A4
 
 <p align="center">
-  <img width="500" src="http://ennadelfen.github.io/SUHMO/IMG/SHMIPA4.png">
+  <img width="800" src="http://ennadelfen.github.io/SUHMO/IMG/SHMIPA4.png">
 </p>
 
 ### A5
 
 <p align="center">
-  <img width="500" src="http://ennadelfen.github.io/SUHMO/IMG/SHMIPA5.png">
+  <img width="800" src="http://ennadelfen.github.io/SUHMO/IMG/SHMIPA5.png">
 </p>
 
 ### A6
 
 <p align="center">
-  <img width="500" src="http://ennadelfen.github.io/SUHMO/IMG/SHMIPA6.png">
+  <img width="800" src="http://ennadelfen.github.io/SUHMO/IMG/SHMIPA6.png">
 </p>
 
 
