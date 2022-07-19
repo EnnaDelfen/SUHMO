@@ -88,6 +88,7 @@ $$ \nabla \cdot \Big[ \frac{-b^3g}{12 \nu (1 + \omega Re)} \nabla h \Big] = \dot
 
 
 ## Algorithm overview
+We solve these equations on a hierarchy of block-structured, Cartesian meshes using a finite volume discretization, facilitated by the Chombo framework. We solve the nonlinear evolution equation for the hydraulic head implicitly using the Full Approximation Scheme[^5], and we use a traditional MG to solve for the gap height. To deal with the remaining nonlinearities in the formulation of the h equation, we embbed the FAS-MG solve for h in external Picard iterations (during which the value of the gap height is frozen). We have found the required number of Picard iterations is typically 1 or 2. More details about the algorithm will be found in an upcoming SUHMO publication[^6].
 
 
 
@@ -96,4 +97,5 @@ $$ \nabla \cdot \Big[ \frac{-b^3g}{12 \nu (1 + \omega Re)} \nabla h \Big] = \dot
 [^2]:Sommers, A., Rajaram, H., and Morlighem, M.: SHAKTI: Subglacial Hydrology and Kinetic, Transient Interactions v1.0., Geoscientific Model Development, 11, 2955–2974, [doi](https://doi.org/10.5194/gmd-11-2955-2018), 2018.
 [^3]:Zimmerman, R. W., Al-Yaarubi, A., Pain, C. C., and Grattoni, C. A.: Non-linear regimes of fluid flow in rock fractures, International Journal of Rock Mechanics and Mining Sciences, 41, 163–169, [doi](https://doi.org/10.1016/j.ijrmms.2003.12.045), 2004.
 [^4]:de Fleurian, B., Werder, M. A., Beyer, S., Brinkerhoff, D. J., Delaney, I., Dow, C. F., Downs, J., Gagliardini, O., Hoffman, M. J., Hooke, R. L., et al.: SHMIP The subglacial hydrology model intercomparison Project, Journal of Glaciology, 64, 897–916, [doi](https://doi.org/10.1017/jog.2018.78), 2018.
-
+[^5]:Briggs, W., Henson, V., and McCormick, S.: A Multigrid Tutorial, 2nd Edition, SIAM, 2000.
+[^6]:Felden, A., Martin, D., NG, E.: SUHMO: an AMR SUbglacial Hydrology MOdel v1.0
