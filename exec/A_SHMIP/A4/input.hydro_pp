@@ -2,7 +2,7 @@
 main.domain_size=100000.00 20000.00 # physical dimensions of domain
 main.problem_type=sqrt
 main.maxTime = 1000000000000.0
-main.maxStep= 10000 # approx 416 jours
+main.maxStep= 10002 # approx 416 jours
 
 # bc - 0 = diri / 1 = neum
 bc.lo_bc = 0 1
@@ -36,9 +36,9 @@ suhmo.ReInit  = 1000.0
 
 suhmo.n_moulins=-1
 suhmo.moulin_position = 400. 250. 
-suhmo.moulin_flux = 4.5e-8 # vol flux
+suhmo.moulin_flux = 2.5e-8 # vol flux
 suhmo.moulin_sigma = 30.0 # vol flux
-suhmo.distributed_input = 4.5e-8 # vol flux
+suhmo.distributed_input = 2.5e-8 # vol flux
 suhmo.time_varying_input = false
 suhmo.deltaT = -4.0 
 suhmo.ramp = false
@@ -57,8 +57,9 @@ solver.use_ImplDiff=false
 
 # class AmrHydro.cpp
 # misc
-AmrHydro.PrintCustom=false
-AmrHydro.post_proc=false
+AmrHydro.PrintCustom=true
+AmrHydro.post_proc=true
+AmrHydro.post_proc_shmip=true
 AmrHydro.verbosity=5
 # mesh and refinement
 AmrHydro.num_cells=320 64  # number of cells on coarsest domain
@@ -90,12 +91,14 @@ AmrHydro.fixed_dt=3600.0 # 1 h dt
 AmrHydro.offsetTime=0.0
 # Typically -1 for never, 0 for last step only, or integer interval (number of steps)
 # Plot and output
-AmrHydro.plot_interval=10000
+AmrHydro.plot_interval=2
 AmrHydro.plot_time_interval=0.0 # If we want to plot at a given time interval (rather than number of steps)
 AmrHydro.plot_prefix = plot
 AmrHydro.write_gradPhi=false
 # Typically -1 for never, 0 for last step only, or interval
-AmrHydro.check_interval=10000
+AmrHydro.check_interval=-5000
 AmrHydro.check_prefix=chk
 AmrHydro.check_overwrite=false # if true, rewrite old checkpoints with new ones.
 AmrHydro.check_exit=false # if true, exit immediately after writing a checkpoint
+
+AmrHydro.restart_file=chk010000.2d.hdf5

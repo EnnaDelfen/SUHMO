@@ -771,6 +771,7 @@ AmrHydro::initialize()
     ppAmr.query("PrintCustom", m_PrintCustom); // To plot after each Picard ite -- debug mode
     ppAmr.query("post_proc", m_post_proc); // To print some post-proc analysis-- debug mode
     ppAmr.query("post_proc_comparisons", m_post_proc_comparisons); // To print some post-proc analysis-- debug mode
+    ppAmr.query("post_proc_shmip", m_post_proc_shmip); // To print some post-proc analysis-- debug mode
     ppAmr.query("verbosity", m_verbosity);
     ppAmr.query("block_factor", m_block_factor);
     ppAmr.query("regrid_lbase", m_regrid_lbase);  // smaller lev subject to regridding
@@ -3669,7 +3670,7 @@ AmrHydro::timeStepFAS(Real a_dt)
  
         // SPATIAL POSTPROC
         if (m_post_proc_shmip) {
-            pout() << "XaxisSUHMO_A1  Ylength    dischargeSUHMO_A1   dischargeEFFSUHMO_A1   dischargeINEFFSUHMO_A1  rechargeMSSUHMO_A1  rechargeMRSUHMO_A1 PSUHMO_A1 " << endl;
+            pout() << "XaxisSUHMO_  Ylength    dischargeSUHMO_   dischargeEFFSUHMO_   dischargeINEFFSUHMO_  rechargeMSSUHMO_  rechargeMRSUHMO_ PSUHMO_ " << endl;
             for (int xi = 0; xi < DomSize; xi++) {
                 Real x_loc = (xi+0.5)*m_amrDx[0][0];    
                         pout() << " " << x_loc/1e3 << " " << Ylength[xi] 
