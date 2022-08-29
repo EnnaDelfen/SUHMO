@@ -2731,7 +2731,7 @@ AmrHydro::timeStepFAS(Real a_dt)
                     }
                     RHSh(iv,0) += sca_prod * rho_coef / m_suhmoParm->m_L ;
 
-                    RHSh(iv,0) = std::max(RHSh(iv,0), 0.0);
+                    //RHSh(iv,0) = std::max(RHSh(iv,0), 0.0);
                     //if (RHSh(iv,0) < 0) {
                     //    pout() << "melt rate in h RHS is negative " << iv << std::endl;
                     //}
@@ -4001,11 +4001,11 @@ AmrHydro::regrid()
 
             // Special treatment for Pi ?
             RealVect levelDx = m_amrDx[lev] * RealVect::Unit;
-            //m_IBCPtr->initializeBed(levelDx,
-            //                        *m_suhmoParm,
-            //                        *m_bedelevation[lev],
-            //                        *m_bumpHeight[lev],
-            //                        *m_bumpSpacing[lev]);
+            m_IBCPtr->initializeBed(levelDx,
+                                    *m_suhmoParm,
+                                    *m_bedelevation[lev],
+                                    *m_bumpHeight[lev],
+                                    *m_bumpSpacing[lev]);
 
             //m_IBCPtr->initializePi(levelDx, 
             //                       *m_suhmoParm,       
