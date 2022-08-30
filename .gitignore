@@ -17,6 +17,9 @@ inputs.compare
 pout.*
 *_bu
 ramp_up.dat
+postproc_A*/
+postproc_B*/
+postproc_E*/
 
 *lev_tooLarge
 *.agr
@@ -32,7 +35,6 @@ NOTES
 test/
 tmp/
 test/
-postproc_A*/
 N0000.png
 N0000.curve
 CD0000.png
