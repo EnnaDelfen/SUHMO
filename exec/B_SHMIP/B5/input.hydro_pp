@@ -1,0 +1,104 @@
+# main - driver.cpp
+main.domain_size=100000.00 20000.00 # physical dimensions of domain
+main.problem_type=sqrt
+main.maxTime = 1000000000000.0
+main.maxStep= 10002 # approx 416 jours
+
+# bc - 0 = diri / 1 = neum
+bc.lo_bc = 0 1
+bc.hi_bc = 1 1
+x.lo_dirich_val = 0.0
+y.lo_neumann_val = 0.0
+x.hi_neumann_val = 0.0
+y.hi_neumann_val = 0.0
+
+# problem specific inputs
+suhmo.basalFriction = true
+suhmo.GeoFlux   = 0.0
+suhmo.LatHeat   = 3.34e5
+suhmo.IceHeight = 5000.0
+suhmo.WaterViscosity = 1.787e-6
+suhmo.ct = 7.5e-8
+suhmo.cw = 4.22e3
+suhmo.turbulentParam = 0.001
+
+suhmo.SlidingVelocity = 1.0e-6 0.0
+suhmo.br = 0.1
+suhmo.lr = 2.0
+suhmo.A  = 5e-25
+suhmo.cutOffbr  = 0.0
+suhmo.maxOffbr  = 10000.0
+suhmo.diffFactor= 1.0
+
+suhmo.slope   = 0.0
+suhmo.GapInit = 0.01
+suhmo.ReInit  = 1000.0
+
+suhmo.n_moulins=100       # > 0 means moulins - < 0 means only distr input - 0 means 0.0 input 
+suhmo.moulin_position = 5000.   1000.  8000.   1000.  27000.  1000.  44000.  1000.  75000.  1000.  78000.  1000.  94000.  1000.  11000.  2000.  29000.  2000.  43000.  2000.  56000.  2000.  65000.  2000.  68000.  2000.  77000.  2000.  6000.   3000.  90000.  3000.  99000.  3000.  6000.   4000.  8000.   4000.  12000.  4000.  21000.  4000.  50000.  4000.  56000.  4000.  67000.  4000.  89000.  4000.  6000.   5000.  13000.  5000.  14000.  5000.  23000.  5000.  32000.  5000.  40000.  5000.  52000.  5000.  5000.   6000.  19000.  6000.  31000.  6000.  32000.  6000.  64000.  6000.  57000.  7000.  66000.  7000.  94000.  7000.  5000.   8000.  41000.  8000.  5000.   9000.  6000.   9000.  8000.   9000.  20000.  9000.  22000.  9000.  28000.  9000.  61000.  9000.  64000.  9000.  71000.  9000.  5000.   10000.  12000.  10000.  15000.  10000.  20000.  10000.  30000.  10000.  73000.  10000.  88000.  10000.  5000.   11000.  8000.   11000.  47000.  11000.  79000.  11000.  14000.  12000.  17000.  12000.  31000.  12000.  91000.  12000.  5000.   13000.  7000.   13000.  10000.  13000.  15000.  13000.  34000.  13000.  41000.  13000.  49000.  13000.  54000.  13000.  5000.   14000.  11000.  14000.  13000.  14000.  37000.  14000.  58000.  14000.  5000.   15000.  13000.  15000.  14000.  15000.  17000.  15000.  23000.  16000.  30000.  16000.  38000.  16000.  39000.  16000.  55000.  16000.  57000.  16000.  5000.   17000.  13000.  17000.  22000.  17000.  54000.  17000.  83000.  17000.  5000.   18000.  12000.  18000.  47000.  18000.  53000.  18000.  74000.  18000.  94000.  18000.
+suhmo.moulin_flux = 0.9 0.9 0.9 0.9 0.9 0.9 0.9 0.9 0.9 0.9 0.9 0.9 0.9 0.9 0.9 0.9 0.9 0.9 0.9 0.9 0.9 0.9 0.9 0.9 0.9 0.9 0.9 0.9 0.9 0.9 0.9 0.9 0.9 0.9 0.9 0.9 0.9 0.9 0.9 0.9 0.9 0.9 0.9 0.9 0.9 0.9 0.9 0.9 0.9 0.9 0.9 0.9 0.9 0.9 0.9 0.9 0.9 0.9 0.9 0.9 0.9 0.9 0.9 0.9 0.9 0.9 0.9 0.9 0.9 0.9 0.9 0.9 0.9 0.9 0.9 0.9 0.9 0.9 0.9 0.9 0.9 0.9 0.9 0.9 0.9 0.9 0.9 0.9 0.9 0.9 0.9 0.9 0.9 0.9 0.9 0.9 0.9 0.9 0.9 0.9 # total input vol flux - only if n_moulins > 0
+suhmo.moulin_sigma = 200.0 200.0 200.0 200.0 200.0 200.0 200.0 200.0 200.0 200.0 200.0 200.0 200.0 200.0 200.0 200.0 200.0 200.0 200.0 200.0 200.0 200.0 200.0 200.0 200.0 200.0 200.0 200.0 200.0 200.0 200.0 200.0 200.0 200.0 200.0 200.0 200.0 200.0 200.0 200.0 200.0 200.0 200.0 200.0 200.0 200.0 200.0 200.0 200.0 200.0 200.0 200.0 200.0 200.0 200.0 200.0 200.0 200.0 200.0 200.0 200.0 200.0 200.0 200.0 200.0 200.0 200.0 200.0 200.0 200.0 200.0 200.0 200.0 200.0 200.0 200.0 200.0 200.0 200.0 200.0 200.0 200.0 200.0 200.0 200.0 200.0 200.0 200.0 200.0 200.0 200.0 200.0 200.0 200.0 200.0 200.0 200.0 200.0 200.0 200.0   # control size of moulin - only if n_moulins > 0
+suhmo.distributed_input = 7.93e-11   # ALSO used as background input if n_moulins > 0
+suhmo.time_varying_input = false
+suhmo.deltaT = -4.0 
+suhmo.ramp = false
+suhmo.ramp_up = 0.5
+suhmo.duration_max = 3.0
+suhmo.relax = 0.1 
+suhmo.floor_min = 0.001
+suhmo.floor_max = 1.0
+
+# Solver
+solver.use_fas=true
+solver.use_NL=true
+solver.bcoeff_otf=true
+solver.eps_PicardIte=0.0001
+solver.use_ImplDiff=true
+
+# class AmrHydro.cpp
+# misc
+AmrHydro.PrintCustom=true
+AmrHydro.post_proc=true
+AmrHydro.post_proc_shmip=true
+AmrHydro.verbosity=5
+# mesh and refinement
+AmrHydro.num_cells=320 64  # number of cells on coarsest domain
+AmrHydro.max_level=0
+AmrHydro.ref_ratios=2 2 2 2
+AmrHydro.block_factor=2
+AmrHydro.max_box_size=64
+AmrHydro.max_base_grid_size=64
+AmrHydro.regrid_lbase=0  # coarsest level that you regrid
+AmrHydro.regrid_interval=25
+AmrHydro.domainLoIndex=0 0 # 2D
+AmrHydro.is_periodic=0 0   # 2D
+AmrHydro.fill_ratio=0.5
+AmrHydro.nestingRadius=4
+AmrHydro.tags_grow = 2  # amount to buffer tags
+AmrHydro.n_tag_variables = 1
+AmrHydro.tag_variables=meltingRate
+AmrHydro.tagging_mins=0
+AmrHydro.tagging_caps=4
+AmrHydro.tagging_values_min=0.02
+AmrHydro.tagging_values_max=100000000.0
+#AmrHydro.tagSubsetBoxesFile=somefile
+#AmrHydro.grids_file=grids.dat
+# Time Stepping params
+AmrHydro.cfl=0.5
+AmrHydro.initial_cfl=0.5
+AmrHydro.max_dt_grow_factor=1.1
+AmrHydro.fixed_dt=3600.0 # 1 h dt
+AmrHydro.offsetTime=0.0
+# Typically -1 for never, 0 for last step only, or integer interval (number of steps)
+# Plot and output
+AmrHydro.plot_interval=2
+AmrHydro.plot_time_interval=0.0 # If we want to plot at a given time interval (rather than number of steps)
+AmrHydro.plot_prefix = plot
+AmrHydro.write_gradPhi=false
+# Typically -1 for never, 0 for last step only, or interval
+AmrHydro.check_interval=-5000
+AmrHydro.check_prefix=chk
+AmrHydro.check_overwrite=false # if true, rewrite old checkpoints with new ones.
+AmrHydro.check_exit=false # if true, exit immediately after writing a checkpoint
+
+AmrHydro.restart_file=chk010000.2d.hdf5
