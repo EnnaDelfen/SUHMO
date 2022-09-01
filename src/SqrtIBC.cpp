@@ -111,12 +111,13 @@ SqrtIBC::initializeBed(RealVect& a_dx,
             if (AGU_test_case) {
                 // add randomness
                 thiszbed(iv, 0)      = std::max(Params.m_slope*x_loc + dist2(generator2) 
-                                       + 3.0*std::sin(x_loc/10.0) 
-                                       + 1000*std::sin(3.0*x_loc) 
-                                       + 50*std::sin(x_loc+2.0)
-                                       + 5000*std::sin(x_loc/100.0), 0.0); 
+                                       + 30.0*std::sin(x_loc/10.0) 
+                                       //+ 1000*std::sin(3.0*x_loc) 
+                                       //+ 50*std::sin(x_loc+2.0)
+                                       //+ 5000*std::sin(x_loc/100.0), 0.0); 
                                        //+ 500.0*std::sin(y_loc/50.0+1.0)
                                        //+ 0.01*(y_loc - 1000) * (y_loc - 1000) , 0.0);
+                                       , 0.0);
 
                 //if (x_loc < 400.0) {
                 //    thiszbed(iv, 0)      = Params.m_slope*x_loc;

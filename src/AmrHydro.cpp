@@ -670,6 +670,7 @@ AmrHydro::setDefaults()
     m_post_proc   = false;
     m_post_proc_comparisons = false;
     m_post_proc_shmip       = false;
+    m_post_proc_shmip_temporal  = false;
     m_is_defined = false;
     m_verbosity = 4;
     m_max_level = -1;
@@ -771,6 +772,8 @@ AmrHydro::initialize()
     ppAmr.query("PrintCustom", m_PrintCustom); // To plot after each Picard ite -- debug mode
     ppAmr.query("post_proc", m_post_proc); // To print some post-proc analysis-- debug mode
     ppAmr.query("post_proc_comparisons", m_post_proc_comparisons); // To print some post-proc analysis-- debug mode
+    ppAmr.query("post_proc_shmip", m_post_proc_shmip); // To print some post-proc analysis-- debug mode
+    ppAmr.query("post_proc_shmip_temporal", m_post_proc_shmip_temporal); // To print some post-proc analysis-- debug mode
     ppAmr.query("verbosity", m_verbosity);
     ppAmr.query("block_factor", m_block_factor);
     ppAmr.query("regrid_lbase", m_regrid_lbase);  // smaller lev subject to regridding
@@ -2714,8 +2717,13 @@ AmrHydro::timeStepFAS(Real a_dt)
                     //              (tmp_cc(iv, 0) + tmp_cc(iv, 1));
 
 
+                    // Pw = rho_w g (h - zb) --  tmp_cc = Q*h tmp2_cc = Q*zb 
                     //Real abs_QPw = std::abs(tmp_cc(iv, 0) + tmp_cc(iv, 1) - (tmp2_cc(iv, 0) + tmp2_cc(iv, 1)));
                     Real abs_QPw = tmp_cc(iv, 0) + tmp_cc(iv, 1) - (tmp2_cc(iv, 0) + tmp2_cc(iv, 1));
+                    if ((abs_QPw < 0) && (B(iv,0) < 1e-6)) {
+                        //pout() << "neg Q*PW "<< iv << " " << abs_QPw << endl;
+                        abs_QPw = 0.0;
+                    } 
                     //Real abs_QPw = (tmp_cc(iv, 0) + tmp_cc(iv, 1));
 
                     RHSh(iv,0) = rho_coef / m_suhmoParm->m_L *
@@ -3026,11 +3034,13 @@ AmrHydro::timeStepFAS(Real a_dt)
         LevelData<FArrayBox>& levelPi    = *m_overburdenpress[lev];
         LevelData<FArrayBox>& levelZb    = *m_bedelevation[lev];
         LevelData<FArrayBox>& levelmR    = *m_meltRate[lev];
+        LevelData<FArrayBox>& levelB     = *m_gapheight[lev];    
         // DEBUG
         LevelData<FArrayBox>& levelMR_A = *MR_A[lev];
         LevelData<FArrayBox>& levelMR_B = *MR_B[lev];
         LevelData<FArrayBox>& levelMR_C = *MR_C[lev];
         for (dit.begin(); dit.ok(); ++dit) {
+            FArrayBox& B       = levelB[dit];
             FArrayBox& newH    = levelH[dit];
             FArrayBox& Pressw  = levelPw[dit];
             FArrayBox& Pressi  = levelPi[dit];
@@ -3054,6 +3064,9 @@ AmrHydro::timeStepFAS(Real a_dt)
                 }
                 //Real abs_QPw = std::abs(tmp_cc(iv, 0) + tmp_cc(iv, 1) - (tmp2_cc(iv, 0) + tmp2_cc(iv, 1)));
                 Real abs_QPw = (tmp_cc(iv, 0) + tmp_cc(iv, 1) - (tmp2_cc(iv, 0) + tmp2_cc(iv, 1)));
+                if ((abs_QPw < 0) && (B(iv,0) < 1e-6)) {
+                    abs_QPw = 0.0;
+                } 
                 //Real abs_QPw = (tmp_cc(iv, 0) + tmp_cc(iv, 1));
                 mR(iv,0)   = m_suhmoParm->m_G + 
                              sca_prod
@@ -3076,7 +3089,6 @@ AmrHydro::timeStepFAS(Real a_dt)
 
         // 2. a : Get the RHS of gh eqs:
         LevelData<FArrayBox>& levelRHS_b = *RHS_b[lev];
-        LevelData<FArrayBox>& levelB     = *m_gapheight[lev];    
         LevelData<FArrayBox>& levelBH    = *m_bumpHeight[lev];    
         LevelData<FArrayBox>& levelBL    = *m_bumpSpacing[lev];    
         LevelData<FArrayBox>& levelDT    = *a_diffusiveTerm[lev];    
@@ -3149,7 +3161,7 @@ AmrHydro::timeStepFAS(Real a_dt)
 
     /* FINAL custom plt here -- debug print */
     if ((m_PrintCustom) && (m_cur_step % m_plot_interval == 0) ) {
-        int nStuffToPlot = 12;
+        int nStuffToPlot = 15;
         Vector<std::string> vectName;
         vectName.resize(nStuffToPlot);
         vectName[0]="head";
@@ -3164,6 +3176,9 @@ AmrHydro::timeStepFAS(Real a_dt)
         vectName[9]="DiffusiveTerm";
         vectName[10]="Dcoef_x";
         vectName[11]="Dcoef_y";
+        vectName[12]="MRA";
+        vectName[13]="MRB";
+        vectName[14]="MRC";
 
         Vector<Vector<LevelData<FArrayBox>*>> stuffToPlot;
         stuffToPlot.resize(nStuffToPlot);
@@ -3184,6 +3199,9 @@ AmrHydro::timeStepFAS(Real a_dt)
             stuffToPlot[9][lev]  = new LevelData<FArrayBox>(m_amrGrids[lev], 1, IntVect::Zero);
             stuffToPlot[10][lev]  = new LevelData<FArrayBox>(m_amrGrids[lev], 1, IntVect::Zero);
             stuffToPlot[11][lev]  = new LevelData<FArrayBox>(m_amrGrids[lev], 1, IntVect::Zero);
+            stuffToPlot[12][lev]  = new LevelData<FArrayBox>(m_amrGrids[lev], 1, IntVect::Zero);
+            stuffToPlot[13][lev]  = new LevelData<FArrayBox>(m_amrGrids[lev], 1, IntVect::Zero);
+            stuffToPlot[14][lev]  = new LevelData<FArrayBox>(m_amrGrids[lev], 1, IntVect::Zero);
 
             LevelData<FArrayBox>& levelHead      = *m_head[lev];
             LevelData<FArrayBox>& levelHeadSTP   = *stuffToPlot[0][lev];
@@ -3219,6 +3237,13 @@ AmrHydro::timeStepFAS(Real a_dt)
             LevelData<FArrayBox>& levelDcXSTP     = *stuffToPlot[10][lev];
             LevelData<FArrayBox>& levelDcYSTP     = *stuffToPlot[11][lev];
 
+            LevelData<FArrayBox>& levelMRA        = *MR_A[lev];
+            LevelData<FArrayBox>& levelMRASTP     = *stuffToPlot[12][lev];
+            LevelData<FArrayBox>& levelMRB        = *MR_B[lev];
+            LevelData<FArrayBox>& levelMRBSTP     = *stuffToPlot[13][lev];
+            LevelData<FArrayBox>& levelMRC        = *MR_C[lev];
+            LevelData<FArrayBox>& levelMRCSTP     = *stuffToPlot[14][lev];
+
             DataIterator dit = levelHead.dataIterator();
             for (dit.begin(); dit.ok(); ++dit) {
                 levelHeadSTP[dit].copy(levelHead[dit], 0, 0, 1);
@@ -3238,6 +3263,9 @@ AmrHydro::timeStepFAS(Real a_dt)
                 levelqwSTP[dit].copy(levelqw[dit], 0, 0, 1);
                 levelDcXSTP[dit].copy(levelDc[dit], 0, 0, 1);
                 levelDcYSTP[dit].copy(levelDc[dit], 1, 0, 1);
+                levelMRASTP[dit].copy(levelMRA[dit], 0, 0, 1);
+                levelMRBSTP[dit].copy(levelMRB[dit], 0, 0, 1);
+                levelMRCSTP[dit].copy(levelMRC[dit], 0, 0, 1);
             }
         } // loop on levs
         writePltCustom(nStuffToPlot, vectName, stuffToPlot, ".2d");
@@ -3255,6 +3283,9 @@ AmrHydro::timeStepFAS(Real a_dt)
             delete stuffToPlot[9][lev];
             delete stuffToPlot[10][lev];
             delete stuffToPlot[11][lev];
+            delete stuffToPlot[12][lev];
+            delete stuffToPlot[13][lev];
+            delete stuffToPlot[14][lev];
         }
     } // end customPlt
 
@@ -3621,45 +3652,47 @@ AmrHydro::timeStepFAS(Real a_dt)
             int time_tmp = (int) m_time + a_dt;
             pout() << "Time(months) recharge ramp = " <<  m_time/sec_1month  << " " << out_recharge[1] << " " << ramp << endl; 
         //}
-        //if (time_tmp % 86400 == 0) {
-        //    pout() << "Time(h - d) avgN N_LB  N_MB  N_HB = " <<  (m_time + a_dt -m_restart_time)/3600.  << " " << (m_time + a_dt -m_restart_time)/86400 
-        //                                                            << " " << out_avgN[3]/count_avgN 
-        //                                                            << " " << out_avgN[0]/count_avgNLow 
-        //                                                            << " " << out_avgN[1]/count_avgNMed 
-        //                                                            << " " << out_avgN[2]/count_avgNHigh 
-        //                                                            << endl;
+        if (m_post_proc_shmip_temporal) {
+            if (time_tmp % 86400 == 0) {
+                pout() << "Time(h - d) avgN N_LB  N_MB  N_HB = " <<  (m_time + a_dt -m_restart_time)/3600.  << " " << (m_time + a_dt -m_restart_time)/86400 
+                                                                        << " " << out_avgN[3]/count_avgN 
+                                                                        << " " << out_avgN[0]/count_avgNLow 
+                                                                        << " " << out_avgN[1]/count_avgNMed 
+                                                                        << " " << out_avgN[2]/count_avgNHigh 
+                                                                        << endl;
 
-        //    pout() << "Time(h - d) rech dis = " <<  (m_time + a_dt -m_restart_time)/3600.  << " " << (m_time + a_dt -m_restart_time)/86400 
-        //                                                       << " " << out_recharge[1] + out_recharge_tot[1] 
-        //                                                       << " " << - out_water_flux_x_tot[1]   
-        //                                                       //<< " " << - out_water_flux_x_chan[1]   
-        //                                                       //<< " " << - out_water_flux_x_distrib[1]
-        //                                                       << endl;
-        //    pout() << "Time(h - d) dis_LB disEff_LB disInef_LB 2disEff_LB 2disInef_LB  = " 
-        //                                                       <<  (m_time + a_dt -m_restart_time)/3600.  << " " << (m_time + a_dt -m_restart_time)/86400 
-        //                                                       << " " << - out_water_flux_x_tot[idx_bandMin_lo] 
-        //                                                       << " " << - out_water_flux_x_chan[idx_bandMin_lo] 
-        //                                                       << " " << - out_water_flux_x_distrib[idx_bandMin_lo] 
-        //                                                       << " " << - DomSizeY*out_water_flux_x_chan_Bands[0]/count_avgNLow 
-        //                                                       << " " << - DomSizeY*out_water_flux_x_distrib_Bands[0]/count_avgNLow 
-        //                                                       << endl;
-        //    pout() << "Time(h - d) dis_MB disEff_MB disInef_MB 2disEff_MB 2disInef_MB  = " 
-        //                                                       <<  (m_time + a_dt -m_restart_time)/3600.  << " " << (m_time + a_dt -m_restart_time)/86400 
-        //                                                       << " " << - out_water_flux_x_tot[idx_bandMed_lo] 
-        //                                                       << " " << - out_water_flux_x_chan[idx_bandMed_lo] 
-        //                                                       << " " << - out_water_flux_x_distrib[idx_bandMed_lo] 
-        //                                                       << " " << - DomSizeY*out_water_flux_x_chan_Bands[1]/count_avgNMed 
-        //                                                       << " " << - DomSizeY*out_water_flux_x_distrib_Bands[1]/count_avgNMed 
-        //                                                       << endl;
-        //    pout() << "Time(h - d) dis_HB disEff_HB disInef_HB 2disEff_HB 2disInef_HB  = " 
-        //                                                       <<  (m_time + a_dt -m_restart_time)/3600.  << " " << (m_time + a_dt -m_restart_time)/86400 
-        //                                                       << " " << - out_water_flux_x_tot[idx_bandHi_lo] 
-        //                                                       << " " << - out_water_flux_x_chan[idx_bandHi_lo] 
-        //                                                       << " " << - out_water_flux_x_distrib[idx_bandHi_lo] 
-        //                                                       << " " << - DomSizeY*out_water_flux_x_chan_Bands[2]/count_avgNHigh 
-        //                                                       << " " << - DomSizeY*out_water_flux_x_distrib_Bands[2]/count_avgNHigh 
-        //                                                       << endl;
-        //}
+                pout() << "Time(h - d) rech dis = " <<  (m_time + a_dt -m_restart_time)/3600.  << " " << (m_time + a_dt -m_restart_time)/86400 
+                                                                   << " " << out_recharge[1] + out_recharge_tot[1] 
+                                                                   << " " << - out_water_flux_x_tot[1]   
+                                                                   //<< " " << - out_water_flux_x_chan[1]   
+                                                                   //<< " " << - out_water_flux_x_distrib[1]
+                                                                   << endl;
+                pout() << "Time(h - d) dis_LB disEff_LB disInef_LB 2disEff_LB 2disInef_LB  = " 
+                                                                   <<  (m_time + a_dt -m_restart_time)/3600.  << " " << (m_time + a_dt -m_restart_time)/86400 
+                                                                   << " " << - out_water_flux_x_tot[idx_bandMin_lo] 
+                                                                   << " " << - out_water_flux_x_chan[idx_bandMin_lo] 
+                                                                   << " " << - out_water_flux_x_distrib[idx_bandMin_lo] 
+                                                                   << " " << - DomSizeY*out_water_flux_x_chan_Bands[0]/count_avgNLow 
+                                                                   << " " << - DomSizeY*out_water_flux_x_distrib_Bands[0]/count_avgNLow 
+                                                                   << endl;
+                pout() << "Time(h - d) dis_MB disEff_MB disInef_MB 2disEff_MB 2disInef_MB  = " 
+                                                                   <<  (m_time + a_dt -m_restart_time)/3600.  << " " << (m_time + a_dt -m_restart_time)/86400 
+                                                                   << " " << - out_water_flux_x_tot[idx_bandMed_lo] 
+                                                                   << " " << - out_water_flux_x_chan[idx_bandMed_lo] 
+                                                                   << " " << - out_water_flux_x_distrib[idx_bandMed_lo] 
+                                                                   << " " << - DomSizeY*out_water_flux_x_chan_Bands[1]/count_avgNMed 
+                                                                   << " " << - DomSizeY*out_water_flux_x_distrib_Bands[1]/count_avgNMed 
+                                                                   << endl;
+                pout() << "Time(h - d) dis_HB disEff_HB disInef_HB 2disEff_HB 2disInef_HB  = " 
+                                                                   <<  (m_time + a_dt -m_restart_time)/3600.  << " " << (m_time + a_dt -m_restart_time)/86400 
+                                                                   << " " << - out_water_flux_x_tot[idx_bandHi_lo] 
+                                                                   << " " << - out_water_flux_x_chan[idx_bandHi_lo] 
+                                                                   << " " << - out_water_flux_x_distrib[idx_bandHi_lo] 
+                                                                   << " " << - DomSizeY*out_water_flux_x_chan_Bands[2]/count_avgNHigh 
+                                                                   << " " << - DomSizeY*out_water_flux_x_distrib_Bands[2]/count_avgNHigh 
+                                                                   << endl;
+            }
+        }
         //    pout() << "Time  rechTOT  rechMS  "
         //           << "rechMS_LB_lo    rechMS_LB_hi "
         //           << " " <<  time_tmp / 86400.  << " " <<  out_recharge_tot[0]  << " "  << out_recharge[0] 
@@ -3669,7 +3702,7 @@ AmrHydro::timeStepFAS(Real a_dt)
  
         // SPATIAL POSTPROC
         if (m_post_proc_shmip) {
-            pout() << "XaxisSUHMO_A1  Ylength    dischargeSUHMO_A1   dischargeEFFSUHMO_A1   dischargeINEFFSUHMO_A1  rechargeMSSUHMO_A1  rechargeMRSUHMO_A1 PSUHMO_A1 " << endl;
+            pout() << "XaxisSUHMO_  Ylength    dischargeSUHMO_   dischargeEFFSUHMO_   dischargeINEFFSUHMO_  rechargeMSSUHMO_  rechargeMRSUHMO_ PSUHMO_ " << endl;
             for (int xi = 0; xi < DomSize; xi++) {
                 Real x_loc = (xi+0.5)*m_amrDx[0][0];    
                         pout() << " " << x_loc/1e3 << " " << Ylength[xi] 
@@ -4001,11 +4034,11 @@ AmrHydro::regrid()
 
             // Special treatment for Pi ?
             RealVect levelDx = m_amrDx[lev] * RealVect::Unit;
-            //m_IBCPtr->initializeBed(levelDx,
-            //                        *m_suhmoParm,
-            //                        *m_bedelevation[lev],
-            //                        *m_bumpHeight[lev],
-            //                        *m_bumpSpacing[lev]);
+            m_IBCPtr->initializeBed(levelDx,
+                                    *m_suhmoParm,
+                                    *m_bedelevation[lev],
+                                    *m_bumpHeight[lev],
+                                    *m_bumpSpacing[lev]);
 
             //m_IBCPtr->initializePi(levelDx, 
             //                       *m_suhmoParm,       

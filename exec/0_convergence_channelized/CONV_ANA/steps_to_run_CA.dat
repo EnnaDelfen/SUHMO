@@ -1,0 +1,11 @@
+#SingleLevel
+python scripts/multi_runs.py 
+python scripts/launch_comparaison.py
+python scripts/postproc_convergence.py
+#more Levels
+python scripts/multi_runs_AMR*.py 
+python scripts/launch_comparaison_AMR*.py
+python scripts/postproc_convergence_AMR*.py
+..where * is 1 or 2 for 2 levels or 3 levels total, respectively.
+
+--> this produces files labelled convergence_data_*.dat that can be plotted to produce the middle plot of Fig. 3 
