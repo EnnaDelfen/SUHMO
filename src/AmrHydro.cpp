@@ -2739,7 +2739,7 @@ AmrHydro::timeStepFAS(Real a_dt)
                     }
                     RHSh(iv,0) += sca_prod * rho_coef / m_suhmoParm->m_L ;
 
-                    //RHSh(iv,0) = std::max(RHSh(iv,0), 0.0);
+                    RHSh(iv,0) = std::max(RHSh(iv,0), 0.0);
                     //if (RHSh(iv,0) < 0) {
                     //    pout() << "melt rate in h RHS is negative " << iv << std::endl;
                     //}
@@ -3079,7 +3079,7 @@ AmrHydro::timeStepFAS(Real a_dt)
                 mMR_B(iv,0) = m_suhmoParm->m_ct * m_suhmoParm->m_cw * m_suhmoParm->m_rho_w * m_suhmoParm->m_rho_w * m_suhmoParm->m_gravity * (tmp_cc(iv, 0) + tmp_cc(iv, 1)) / m_suhmoParm->m_L;
                 mMR_C(iv,0) = -m_suhmoParm->m_ct * m_suhmoParm->m_cw * m_suhmoParm->m_rho_w * m_suhmoParm->m_rho_w * m_suhmoParm->m_gravity * (tmp2_cc(iv, 0) + tmp2_cc(iv, 1)) / m_suhmoParm->m_L; //+ tmp2_cc(iv, 1)) / m_suhmoParm->m_L;
 
-                //mR(iv,0)   = std::max(mR(iv,0), 0.0);
+                mR(iv,0)   = std::max(mR(iv,0), 0.0);
                 if (Pressi(iv, 0) == 0.0) {
                     mR(iv,0)   = 0.0;
                 }
