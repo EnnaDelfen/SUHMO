@@ -3,8 +3,8 @@ visitlog.py
 plotCustom*hdf5
 chk*.2d.hdf5
 *F_F.H
-HmaxMin
-BmaxMin
+HmaxMin*
+BmaxMin*
 diff*.hdf5
 err*.hdf5
 *.ex
@@ -39,4 +39,7 @@ test/
 N0000.png
 N0000.curve
 CD0000.png
+GH*.png
 .DS_Store
+SAVE_EGU/
+list
