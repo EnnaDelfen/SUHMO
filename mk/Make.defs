@@ -6,6 +6,28 @@ MACHINE = $(shell uname)
 UNAMEM = $(shell uname -m)
 UNAMEN := $(shell uname -n)
 WHO := $(shell whoami)
+THIS_DIR := $(shell dirname $(realpath $(lastword $(MAKEFILE_LIST))))
+
+#see if there is a host specific file.
+HOST_DEFS := $(THIS_DIR)/Make.defs.$(UNAMEN)
+
+#NERSC_HOST is more useful than UNAMEN on NERSC hosts....
+ifneq ($(NERSC_HOST),)
+HOST_DEFS := $(THIS_DIR)/Make.defs.$(NERSC_HOST)
+endif
+
+$(info HOST_DEFS=$(HOST_DEFS))
+ifneq ($(wildcard $(HOST_DEFS)), )
+$(info including $(HOST_DEFS) )
+include $(HOST_DEFS)
+else
+NONE_DEFS=$(THIS_DIR)/Make.defs.none
+$(info NONE_DEFS=$(NONE_DEFS))
+ifneq ($(wildcard $(NONE_DEFS)), )
+$(info including $(NONE_DEFS) )
+include $(NONE_DEFS)
+endif
+endif
 
 # if AMR_HOME and CHOMBO_HOME aren't already defined, 
 # have a default for machines not defined here.
@@ -22,10 +44,21 @@ endif
 include $(CHOMBO_HOME)/mk/Make.defs
 include $(CHOMBO_HOME)/mk/Make.defs.config
 
-# machine-dependent defines
-ifeq ($(UNAMEN),loren)
 
+
+$(info HOST_DEFS=$(HOST_DEFS))
+ifneq ($(wildcard $(HOST_DEFS)), )
+$(info including $(HOST_DEFS) )
+include $(HOST_DEFS)
+else
+NONE_DEFS=$(THIS_DIR)/Make.defs.none
+$(info NONE_DEFS=$(NONE_DEFS))
+ifneq ($(wildcard $(NONE_DEFS)), )
+$(info including $(NONE_DEFS) )
+include $(NONE_DEFS)
 endif
+endif
+
 
 
 
