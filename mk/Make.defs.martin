@@ -1,0 +1,2 @@
+CHOMBO_HOME=$(THIS_DIR)/../../Chombo_3.2/lib
+$(info CHOMBO_HOME= $(CHOMBO_HOME))
