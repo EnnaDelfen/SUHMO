@@ -216,10 +216,13 @@ ValleyIBC::initializeData(RealVect& a_dx,
     pout() << "ValleyIBC::initializeData" << endl;
 
     // randomization
-    //const double mean2 = 0.0;
-    //const double stddev2 = 10;
-    //std::default_random_engine generator;
-    //std::normal_distribution<double> dist2(mean2, stddev2);
+    const double mean = 0.0;
+    const double stddev  = 0.05;
+    const double stddev2 = 0.001;
+    std::default_random_engine generator;
+    std::default_random_engine generator2;
+    std::normal_distribution<double> dist(mean, stddev);
+    std::normal_distribution<double> dist2(mean, stddev2);
 
     DataIterator dit = a_head.dataIterator();
     for (dit.begin(); dit.ok(); ++dit) {
@@ -266,6 +269,8 @@ ValleyIBC::initializeData(RealVect& a_dx,
                 //thiszbed(iv, 0)      = std::max(fx + gy*hx + dist2(generator), 0.0);
                 //thispi(iv, 0)        = Params.m_rho_i * Params.m_gravity * std::max(thisiceHeight(iv, 0) - thiszbed(iv, 0), 0.0);
                 thisGapHeight(iv, 0) = Params.m_gapInit;
+                //thisGapHeight(iv, 0) = std::max(Params.m_gapInit + dist2(generator2), 0.0001);
+
             }
             
             /* option 1: guess Pw, find head */
@@ -282,6 +287,7 @@ ValleyIBC::initializeData(RealVect& a_dx,
             thisbumpHeight(iv, 0)      = Params.m_br;
             thisbumpSpacing(iv, 0)     = Params.m_lr;
             // if randomness
+            //thisbumpHeight(iv, 0)      = std::min(std::max(Params.m_br + dist(generator), 0.0), 0.1); 
             //thisbumpHeight(iv, 0)      = std::max(thisbumpHeight(iv, 0)  + 0.01*(thiszbed(iv, 0) - (fx + gy*hx)), 0.0);
             if (thispi(iv, 0) == 0.0) {
                 thisbumpHeight(iv, 0)      = 0.1 * Params.m_br;
