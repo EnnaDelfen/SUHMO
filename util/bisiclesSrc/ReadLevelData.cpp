@@ -49,6 +49,7 @@ void readLevelData(Vector<RefCountedPtr<LevelData<FArrayBox> > >& a_data,
   if (vectData.size() != 1)
       MayDay::Error("bad data");
  
+  // AF: is this only to get RefCountedPtr instead of star qties ?
   Vector<Box> boxes;
   int max_box_size = 64;
   int block_factor = 8;
@@ -67,7 +68,7 @@ void readLevelData(Vector<RefCountedPtr<LevelData<FArrayBox> > >& a_data,
       pout() << " looking for variable " << a_names[j] << std::endl;
       for (int i = 0; i < names.size(); i++) {
           if (names[i] == a_names[j]) {
-              pout() << " found variable " << names[i] << std::endl;
+              pout() << " ... found ! (" << names[i] << ")" << std::endl;
               vectData[0]->copyTo(Interval(i,i+a_nComp-1),*a_data[j],Interval(0,a_nComp-1));
               read++;
           }
