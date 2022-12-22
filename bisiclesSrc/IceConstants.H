@@ -30,20 +30,8 @@
 #define seconds_per_tropical_year     (31556926)
 #define SECONDS_PER_TROPICAL_YEAR     (31556926)
 
-
 #define HUGE_NORM (1.0e10)
 #define TINY_NORM (1.0e-10)
-#define tiny_thickness (1.0e-2)
-#define TINY_THICKNESS (1.0e-2)
-#define huge_thickness (1.0e+4)
-#define HUGE_THICKNESS (1.0e+4)
-#define HUGE_VEL (1.0e+6)
-#define huge_vel (1.0e+6)
-#define TINY_VEL (1.0e-3)
-#define tiny_vel (1.0e-3)
-#define ICE_DENSITY 918.0
-#define SEA_WATER_DENSITY 1028.0
-#define GRAVITY 9.81
 
 #elif defined(CH_USE_DOUBLE) && !defined(CH_LANG_CC)
 
@@ -52,14 +40,6 @@
 
 #define HUGE_NORM (1.0d10)
 #define TINY_NORM (1.0d-10)
-#define tiny_thickness (1.0d-2)
-#define TINY_THICKNESS (1.0d-2)
-#define huge_thickness (1.0e+4)
-#define HUGE_THICKNESS (1.0e+4)
-#define HUGE_VEL (1.0d+6)
-#define huge_vel (1.0d+6)
-#define TINY_VEL (1.0d-2)
-#define tiny_vel (1.0d-2)
 
 #else
 
