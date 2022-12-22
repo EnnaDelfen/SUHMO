@@ -32,14 +32,13 @@
 /**
    
  */
-
 void FillFromReference(LevelData<FArrayBox>& a_destData,
-		       const FArrayBox& a_srcData,
-		       const RealVect&  a_destDx,
-		       const RealVect&  a_srcDx,
-		       const IntVect& a_srcGhost,
-		       bool a_verbose, 
-		       CoarseAverage::averageType a_avgType = CoarseAverage::arithmetic);
+                       const FArrayBox& a_srcData,
+                       const RealVect&  a_destDx,
+                       const RealVect&  a_srcDx,
+                       const IntVect& a_srcGhost,
+                       bool a_verbose, 
+                       CoarseAverage::averageType a_avgType = CoarseAverage::arithmetic);
 
 
 
@@ -49,11 +48,11 @@ void FillFromReference(LevelData<FArrayBox>& a_destData,
    
  */
 void FillFromReference(LevelData<FArrayBox>& a_destData,
-		       const LevelData<FArrayBox>&  a_srcData,
-		       const RealVect&  a_destDx,
-		       const RealVect&  a_srcDx,
-		       bool a_verbose, 
-		       CoarseAverage::averageType a_avgType = CoarseAverage::arithmetic);
+                       const LevelData<FArrayBox>&  a_srcData,
+                       const RealVect&  a_destDx,
+                       const RealVect&  a_srcDx,
+                       bool a_verbose, 
+                       CoarseAverage::averageType a_avgType = CoarseAverage::arithmetic);
 
 
 // fill a single LevelData wth a flattened AMR hierarchy's worth of data
@@ -66,7 +65,7 @@ flattenCellData(LevelData<FArrayBox>& a_destData,
                 Vector<LevelData<FArrayBox>* >& a_srcData,
                 const Vector<RealVect>& a_srcDx,
                 bool a_verbose, 
-		CoarseAverage::averageType a_avgType = CoarseAverage::arithmetic);
+                CoarseAverage::averageType a_avgType = CoarseAverage::arithmetic);
 
 
 // fill a single LevelData wth a flattened AMR hierarchy's worth of data
@@ -80,13 +79,13 @@ flattenCellData(LevelData<FArrayBox>& a_destData,
                 Vector<RefCountedPtr<LevelData<FArrayBox> >  >& a_srcData,
                 const Vector<RealVect>& a_srcDx,
                 bool a_verbose, 
-		CoarseAverage::averageType a_avgType = CoarseAverage::arithmetic);
+                CoarseAverage::averageType a_avgType = CoarseAverage::arithmetic);
 
 
 // fill a single LevelData wth a flattened AMR hierarchy's worth of data
 /** This version perserves const-ness of the src data, but requires some 
     constraints on the fine meshes (grids on all levels must be coarsenable
-    to the destination resolution.
+    to the destination resolution).
  */
 void
 flattenCellDataConst(LevelData<FArrayBox>& a_destData,
@@ -94,7 +93,7 @@ flattenCellDataConst(LevelData<FArrayBox>& a_destData,
                      const Vector<LevelData<FArrayBox>* >& a_srcData,
                      const Vector<RealVect>& a_srcDx,
                      bool a_verbose, 
-		     CoarseAverage::averageType a_avgType = CoarseAverage::arithmetic);
+                     CoarseAverage::averageType a_avgType = CoarseAverage::arithmetic);
 
 #include "NamespaceFooter.H"
 

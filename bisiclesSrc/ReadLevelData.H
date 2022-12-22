@@ -19,10 +19,10 @@
 
 //fill a LevelData<FArrayBox> from data stored in an AMR file 
 void readLevelData(Vector<RefCountedPtr<LevelData<FArrayBox> > >& a_data,
-		   Real& a_dx,
-		   const std::string a_file,
-		   const Vector<std::string>& a_names,
-		   int a_nComp);
+                   Real& a_dx,
+                   const std::string a_file,
+                   const Vector<std::string>& a_names,
+                   int a_nComp);
 
 
 ///create one or more AMR Hieracrhies from data stored in an AMR file
@@ -38,13 +38,12 @@ void readLevelData(Vector<RefCountedPtr<LevelData<FArrayBox> > >& a_data,
    (b) a multi-component LevelData, stored consecutively and beginning with name
    \param a_nComp : the number of components in each heirachy
 */
-void readMultiLevelData
-(Vector< Vector <RefCountedPtr<LevelData<FArrayBox> > > >& a_data,
- Real& a_crseDx,
- Vector<int>& a_refRatio,
- const std::string a_file,
- const Vector<std::string>& a_names, 
- int a_nComp);
+void readMultiLevelData(Vector< Vector <RefCountedPtr<LevelData<FArrayBox> > > >& a_data,
+                        Real& a_crseDx,
+                        Vector<int>& a_refRatio,
+                        const std::string a_file,
+                        const Vector<std::string>& a_names, 
+                        int a_nComp);
 
 #include "NamespaceFooter.H"
 
