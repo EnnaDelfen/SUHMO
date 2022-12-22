@@ -54,23 +54,23 @@ SqrtIBC::new_hydroIBC()
  */
 void
 SqrtIBC::initializePi(RealVect& a_dx,
-                       suhmo_params Params,     
-                       LevelData<FArrayBox>& a_Pi)
+                      suhmo_params Params,     
+                      LevelData<FArrayBox>& a_Pi)
 {
     // Do nothing 
 }
 
-void 
+void
 SqrtIBC::initializePi(RealVect& a_dx,
-                       suhmo_params Params,     
-                       LevelData<FArrayBox>& a_head,
-                       LevelData<FArrayBox>& a_gapHeight,
-                       LevelData<FArrayBox>& a_Pw,
-                       LevelData<FArrayBox>& a_zbed,
-                       LevelData<FArrayBox>& a_Pi,
-                       LevelData<FArrayBox>& a_iceHeight,
-                       LevelData<FArrayBox>& a_bumpHeight,
-                       LevelData<FArrayBox>& a_bumpSpacing)
+                      suhmo_params Params,     
+                      LevelData<FArrayBox>& a_head,
+                      LevelData<FArrayBox>& a_gapHeight,
+                      LevelData<FArrayBox>& a_Pw,
+                      LevelData<FArrayBox>& a_zbed,
+                      LevelData<FArrayBox>& a_Pi,
+                      LevelData<FArrayBox>& a_iceHeight,
+                      LevelData<FArrayBox>& a_bumpHeight,
+                      LevelData<FArrayBox>& a_bumpSpacing)
 {
     // Do nothing 
 }
