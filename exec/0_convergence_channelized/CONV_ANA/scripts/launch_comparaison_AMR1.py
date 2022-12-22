@@ -17,7 +17,7 @@ import numpy as np
 
 # Path to CHOMBO's compare tool
 CHDIR = os.getenv('CHOMBO_HOME')
-chdiff_dir = CHDIR+"util/ChomboCompare/"
+chdiff_dir = CHDIR+"/util/ChomboCompare/"
 for f in os.listdir(chdiff_dir):
     if ( f.startswith("compare2d") and f.endswith(".ex")):
         executable = chdiff_dir+f 
