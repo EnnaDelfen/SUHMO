@@ -2721,6 +2721,7 @@ AmrHydro::timeStepFAS(Real a_dt)
                     //Real abs_QPw = std::abs(tmp_cc(iv, 0) + tmp_cc(iv, 1) - (tmp2_cc(iv, 0) + tmp2_cc(iv, 1)));
                     Real abs_QPw = tmp_cc(iv, 0) + tmp_cc(iv, 1) - (tmp2_cc(iv, 0) + tmp2_cc(iv, 1));
                     if ((abs_QPw < 0) && (B(iv,0) < 1e-6)) {
+                    //if (B(iv,0) < 1e-6) {
                         //pout() << "neg Q*PW "<< iv << " " << abs_QPw << endl;
                         abs_QPw = 0.0;
                     } 
@@ -3065,6 +3066,7 @@ AmrHydro::timeStepFAS(Real a_dt)
                 //Real abs_QPw = std::abs(tmp_cc(iv, 0) + tmp_cc(iv, 1) - (tmp2_cc(iv, 0) + tmp2_cc(iv, 1)));
                 Real abs_QPw = (tmp_cc(iv, 0) + tmp_cc(iv, 1) - (tmp2_cc(iv, 0) + tmp2_cc(iv, 1)));
                 if ((abs_QPw < 0) && (B(iv,0) < 1e-6)) {
+                //if (B(iv,0) < 1e-6) {
                     abs_QPw = 0.0;
                 } 
                 //Real abs_QPw = (tmp_cc(iv, 0) + tmp_cc(iv, 1));

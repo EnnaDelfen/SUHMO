@@ -167,9 +167,11 @@ SqrtIBC::initializeData(RealVect& a_dx,
     //if (AGU_test_case) {
         // randomization
         const double mean    = 0.0;
-        const double stddev2 = 0.5;
+        const double stddev  = 0.05;
+        const double stddev2 = 0.001;
         std::default_random_engine generator;
         std::default_random_engine generator2;
+        std::normal_distribution<double> dist(mean, stddev);
         std::normal_distribution<double> dist2(mean, stddev2);
     //}
 
@@ -217,7 +219,8 @@ SqrtIBC::initializeData(RealVect& a_dx,
                 thiszbed(iv, 0)      = Params.m_slope*x_loc;
             }
             /* initial gap height */
-            thisGapHeight(iv, 0) = Params.m_gapInit;
+            //thisGapHeight(iv, 0) = Params.m_gapInit;
+            thisGapHeight(iv, 0) = std::max(Params.m_gapInit + dist2(generator2), 0.0001);
             /* Ice height (should be ice only, so surface - (bed + gap)) */
             // parabolic profile
             thisiceHeight(iv, 0) = 6.0 * (std::sqrt(x_loc + Params.m_H) - std::sqrt(Params.m_H)) + 1.0;
@@ -235,7 +238,7 @@ SqrtIBC::initializeData(RealVect& a_dx,
             thisbumpHeight(iv, 0)      = Params.m_br;
             thisbumpSpacing(iv, 0)     = Params.m_lr;
             // if randomness
-            //thisbumpHeight(iv, 0)      = std::max(Params.m_br + dist(generator), 0.0); 
+            //thisbumpHeight(iv, 0)      = std::min(std::max(Params.m_br + dist(generator), 0.0), 0.1); 
 
             /* dummy stuff -- will be erased right away */
             thisRe(iv, 0)        = std::max(100.0 - 0.1*Params.m_ReInit*x_loc, 10.0);
