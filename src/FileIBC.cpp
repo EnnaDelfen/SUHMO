@@ -15,7 +15,6 @@
 #include "ReadLevelData.H"
 #include <random>
 
-
 #include "NamespaceHeader.H"
 
 // Indicate that define() hasn't been called
@@ -49,7 +48,6 @@ FileIBC::new_hydroIBC()
 {
     pout() << "Initializing a new FileIBC"<< endl; 
     FileIBC* retval = new FileIBC();
-    retval->m_gamma = m_gamma;
     retval->m_refDx = m_refDx;
     retval->m_refThickness = m_refThickness;
     retval->m_refTopography = m_refTopography;
@@ -57,25 +55,15 @@ FileIBC::new_hydroIBC()
     return static_cast<HydroIBC*>(retval);
 }
 
-/* Set Parameters */
-void
-FileIBC::setParameters(const Real& a_gamma) {
-    m_gamma = a_gamma;
-}
 
-
-/// set up file input and names
-void
-FileIBC::setup(std::string a_geomFile,
-               std::string a_thicknessName,
-               std::string a_topographyName)
+/* set up file input and names */
+void FileIBC::setup(std::string a_geomFile,
+                    std::string a_thicknessName,
+                    std::string a_topographyName)
 {
-  // read level data and
-
-  RefCountedPtr<LevelData<FArrayBox> > levelThck
-    (new LevelData<FArrayBox>());
-  RefCountedPtr<LevelData<FArrayBox> > levelTopg
-    (new LevelData<FArrayBox>());
+  /* read level data from external source */
+  RefCountedPtr<LevelData<FArrayBox> > levelThck(new LevelData<FArrayBox>());
+  RefCountedPtr<LevelData<FArrayBox> > levelTopg(new LevelData<FArrayBox>());
   
   Real dx;
   
@@ -88,150 +76,47 @@ FileIBC::setup(std::string a_geomFile,
   names[1] = a_topographyName;
   readLevelData(vectData,dx,a_geomFile,names,1);
 
-  // now copy into persistent storage
-  m_refDx = dx*RealVect::Unit;
-  m_refThickness = levelThck;
-  m_refTopography = levelTopg;
-
+  /* now copy into persistent storage */
+  m_refDx         = dx*RealVect::Unit;
+  m_refThickness  = levelThck;   // ice thickness
+  m_refTopography = levelTopg;  // bed topography
 
 }
-
 
 /** Set up mask 
  */
 void
 FileIBC::initializePi(RealVect& a_dx,
-                        suhmo_params Params,     
-                        LevelData<FArrayBox>& a_Pi)
+                      suhmo_params Params,     
+                      LevelData<FArrayBox>& a_Pi)
 {
-    
-    pout() << "FileIBC::initializePi" << endl;
-
-    DataIterator dit = a_Pi.dataIterator();
-
-    for (dit.begin(); dit.ok(); ++dit) {
-        FArrayBox& thispi        = a_Pi[dit];
-
-        BoxIterator bit(thispi.box()); // Default .box() have ghostcells ?
-        for (bit.begin(); bit.ok(); ++bit) {
-            IntVect iv = bit();
-            Real x_loc = (iv[0]+0.5)*a_dx[0];
-            Real y_loc = (iv[1]+0.5)*a_dx[1] - 750.0;
-
-            /* bed topography */
-            /* Ice height = ICE from 0 (should be ice only, so surface - (bed + gap)) */
-            // parabolic profile
-            Real IceHeight = 100.0 * std::pow(x_loc + 200.0, 0.25) + x_loc/60.0 - std::pow(2.0e10, 0.25) + 1.0;
-            // Weird bed
-            Real gamma_b         = 0.05;
-            Real H_6000          = 100.0 * std::pow(6000. + 200.0, 0.25) + 6000./60.0 - std::pow(2.0e10, 0.25) + 1.0;
-            Real fx              = (H_6000 - 6000.*m_gamma) * x_loc * x_loc / (6000.0*6000.0) + m_gamma*x_loc;
-            Real fx_gb           = (H_6000 - 6000.*gamma_b) * x_loc * x_loc / (6000.0*6000.0) + gamma_b*x_loc;
-            Real gy              = 0.5e-6 * std::abs(y_loc*y_loc*y_loc); 
-            Real hx              = (-4.5 * x_loc / 6000. + 5.0) * (IceHeight - fx) / (IceHeight - fx_gb + 1.0e-16);
-            Real Bed             = fx + gy*hx;
-
-            /* Ice overburden pressure : rho_i * g * H WITH H = Ice height - (bed + gap)*/
-            thispi(iv, 0)        = Params.m_rho_i * Params.m_gravity * std::max(IceHeight - Bed, 0.0);
-        } // end loop over cells
-    }     // end loop over boxes
-
-    if (Params.m_verbosity > 3) {
-        pout() << "(Done with FileIBC::initializePi)" << endl;
-    }
+    // Do nothing 
 }
 
 void
 FileIBC::initializePi(RealVect& a_dx,
-                        suhmo_params Params,     
-                        LevelData<FArrayBox>& a_head,
-                        LevelData<FArrayBox>& a_gapHeight,
-                        LevelData<FArrayBox>& a_Pw,
-                        LevelData<FArrayBox>& a_zbed,
-                        LevelData<FArrayBox>& a_Pi,
-                        LevelData<FArrayBox>& a_iceHeight,
-                        LevelData<FArrayBox>& a_bumpHeight,
-                        LevelData<FArrayBox>& a_bumpSpacing)
-{
-    
-    pout() << "FileIBC::initializePi" << endl;
-
-    DataIterator dit = a_Pi.dataIterator();
-    for (dit.begin(); dit.ok(); ++dit) {
-        FArrayBox& thisHead      = a_head[dit];
-        FArrayBox& thisGapHeight = a_gapHeight[dit];
-        FArrayBox& thiszbed      = a_zbed[dit];
-        FArrayBox& thispi        = a_Pi[dit];
-        FArrayBox& thisPw        = a_Pw[dit];
-        FArrayBox& thisiceHeight = a_iceHeight[dit];
-        FArrayBox& thisbumpHeight    = a_bumpHeight[dit];
-        FArrayBox& thisbumpSpacing   = a_bumpSpacing[dit];
-
-        BoxIterator bit(thispi.box()); // Default .box() have ghostcells ?
-        for (bit.begin(); bit.ok(); ++bit) {
-            IntVect iv = bit();
-            Real x_loc = (iv[0]+0.5)*a_dx[0];
-            Real y_loc = (iv[1]+0.5)*a_dx[1] - 750.0;
-
-            /* bed topography */
-            /* Ice height = ICE from 0 (should be ice only, so surface - (bed + gap)) */
-            // parabolic profile
-            thisiceHeight(iv, 0) = 100.0 * std::pow(x_loc + 200.0, 0.25) + x_loc/60.0 - std::pow(2.0e10, 0.25) + 1.0;
-            // Weird bed
-            Real gamma_b         = 0.05;
-            Real H_6000          = 100.0 * std::pow(6000. + 200.0, 0.25) + 6000./60.0 - std::pow(2.0e10, 0.25) + 1.0;
-            Real fx              = (H_6000 - 6000.*m_gamma) * x_loc * x_loc / (6000.0*6000.0) + m_gamma*x_loc;
-            Real fx_gb           = (H_6000 - 6000.*gamma_b) * x_loc * x_loc / (6000.0*6000.0) + gamma_b*x_loc;
-            Real gy              = 0.5e-6 * std::abs(y_loc*y_loc*y_loc); 
-            Real hx              = (-4.5 * x_loc / 6000. + 5.0) * (thisiceHeight(iv, 0) - fx) / (thisiceHeight(iv, 0) - fx_gb + 1.0e-16);
-            thiszbed(iv, 0)      = fx + gy*hx;
-            /* Ice overburden pressure : rho_i * g * H WITH H = Ice height - (bed + gap)*/
-            thispi(iv, 0)        = Params.m_rho_i * Params.m_gravity * std::max(thisiceHeight(iv, 0) - thiszbed(iv, 0), 0.0);
-
-            /* initial gap height */
-            //if (thispi(iv, 0) == 0.0) {
-            //    thisGapHeight(iv, 0) = 1.0e-16;
-            //} 
-
-        } // end loop over cells
-    }     // end loop over boxes
-
-    if (Params.m_verbosity > 3) {
-        pout() << "(Done with FileIBC::initializePi)" << endl;
-    }
-}
-
-
-void 
-FileIBC::initializeBed(RealVect& a_dx,
-                         suhmo_params Params,     
-                         LevelData<FArrayBox>& a_zbed,
-                         LevelData<FArrayBox>& a_bumpHeight,
-                         LevelData<FArrayBox>& a_bumpSpacing)
+                      suhmo_params Params,     
+                      LevelData<FArrayBox>& a_head,
+                      LevelData<FArrayBox>& a_gapHeight,
+                      LevelData<FArrayBox>& a_Pw,
+                      LevelData<FArrayBox>& a_zbed,
+                      LevelData<FArrayBox>& a_Pi,
+                      LevelData<FArrayBox>& a_iceHeight,
+                      LevelData<FArrayBox>& a_bumpHeight,
+                      LevelData<FArrayBox>& a_bumpSpacing)
 {
     // Do nothing 
 }
 
 
 void 
-FileIBC::resetCovered(suhmo_params Params,     
-                        LevelData<FArrayBox>& a_head,
-                        LevelData<FArrayBox>& a_Pi)
+FileIBC::initializeBed(RealVect& a_dx,
+                       suhmo_params Params,     
+                       LevelData<FArrayBox>& a_zbed,
+                       LevelData<FArrayBox>& a_bumpHeight,
+                       LevelData<FArrayBox>& a_bumpSpacing)
 {
-    // Clean neg h in unused covered zones
-    DataIterator dit = a_Pi.dataIterator();
-    for (dit.begin(); dit.ok(); ++dit) {
-        FArrayBox& thispi        = a_Pi[dit];
-        FArrayBox& thisHead      = a_head[dit];
-
-        BoxIterator bit(thisHead.box()); // Default .box() have ghostcells ?
-        for (bit.begin(); bit.ok(); ++bit) {
-            IntVect iv = bit();
-            if (thisHead(iv, 0) < 0.0) {
-                thisHead(iv, 0) = 0.0;
-            }
-        }
-    }
+    // Do nothing 
 }
 
 
@@ -255,24 +140,14 @@ FileIBC::initializeData(RealVect& a_dx,
     
     pout() << "FileIBC::initializeData" << endl;
 
-    // randomization
-    //const double mean2 = 0.0;
-    //const double stddev2 = 10;
-    //std::default_random_engine generator;
-    //std::normal_distribution<double> dist2(mean2, stddev2);
-
-
-    // initialize bed and ice thickness
     bool verbose = true;
+
+    /* initialize bed and ice thickness */
     const LevelData<FArrayBox>& topoRef = *(m_refTopography);
-    FillFromReference(a_zbed, topoRef, a_dx, m_refDx,verbose);
-
-    // one ring of ghost cells
-    LevelData<FArrayBox> iceThickness(a_zbed.getBoxes(), 1, IntVect::Unit);
     const LevelData<FArrayBox>& thickRef = *(m_refThickness);    
-    FillFromReference(iceThickness, thickRef, a_dx, m_refDx, verbose);
+    FillFromReference(a_zbed, topoRef, a_dx, m_refDx,verbose);
+    FillFromReference(a_iceHeight, thickRef, a_dx, m_refDx, verbose);
 
-    
     DataIterator dit = a_head.dataIterator();
     for (dit.begin(); dit.ok(); ++dit) {
         FArrayBox& thisHead      = a_head[dit];
@@ -287,47 +162,30 @@ FileIBC::initializeData(RealVect& a_dx,
         FArrayBox& thisbumpHeight    = a_bumpHeight[dit];
         FArrayBox& thisbumpSpacing   = a_bumpSpacing[dit];
 
-        FArrayBox& thisThickness = iceThickness[dit];
-
-        BoxIterator bit(thisHead.box()); // Default .box() have ghostcells ?
+        BoxIterator bit(thisHead.box()); 
         for (bit.begin(); bit.ok(); ++bit) {
             IntVect iv = bit();
             Real x_loc = (iv[0]+0.5)*a_dx[0];
-            Real y_loc = (iv[1]+0.5)*a_dx[1] - 750.0;
 
-            //Real smooth_Pi       = Params.m_rho_i * Params.m_gravity * std::max(thisiceHeight(iv, 0) - (fx + gy*hx), 0.0);
+            /* bed topography --> done  */
+            // add randomness
+            //thiszbed(iv, 0)      = std::max(thiszbed(iv, 0) + dist2(generator), 0.0);
+            /* Ice height  --> done*/
+            /* Ice overburden pressure : rho_i * g * H */
+            thispi(iv, 0)        = Params.m_rho_i * Params.m_gravity * std::max(thisiceHeight(iv, 0), 0.0);
+
             /* initial gap height */
             if (thispi(iv, 0) == 0.0) {
                 thisGapHeight(iv, 0) = 1.0e-16;
-                //thiszbed(iv, 0) = thisiceHeight(iv, 0);
-                //thisiceHeight(iv, 0) = 0.0;
             } else {
-                //thiszbed(iv, 0)      = std::max(fx + gy*hx + dist2(generator), 0.0);
-                //thispi(iv, 0)        = Params.m_rho_i * Params.m_gravity * std::max(thisiceHeight(iv, 0) - thiszbed(iv, 0), 0.0);
                 thisGapHeight(iv, 0) = Params.m_gapInit;
             }
 
-
-            /* bed topography */
-            /* Ice height = ICE from 0 (should be ice only, so surface - (bed + gap)) */
-            // parabolic profile
-            //thisiceHeight(iv, 0) = 100.0 * std::pow(x_loc + 200.0, 0.25) + x_loc/60.0 - std::pow(2.0e10, 0.25) + 1.0;
-
-            thisiceHeight(iv, 0) = thisThickness(iv,0) + thisGapHeight(iv, 0);
-
-            
-            /* Ice overburden pressure : rho_i * g * H WITH H = Ice height - (bed + gap)*/
-            thispi(iv, 0)        = Params.m_rho_i * Params.m_gravity * std::max(thisiceHeight(iv, 0) - thiszbed(iv, 0), 0.0);
-
-            
             /* option 1: guess Pw, find head */
             // Water press ?? No idea --> Pi/2.0
             thisPw(iv, 0)        = thispi(iv, 0) * 0.5;
             Real Fact            = 1./(Params.m_rho_w * Params.m_gravity);
             thisHead(iv, 0)      = thisPw(iv, 0) * Fact + thiszbed(iv, 0) ;
-            //if (thispi(iv, 0) == 0.0) {
-            //    thisHead(iv, 0)      = 0.0;
-            //}
 
             /* Bed randomization */
             // typical
@@ -354,7 +212,6 @@ FileIBC::initializeData(RealVect& a_dx,
         pout() << "(Done with FileIBC::initializeData)" << endl;
     }
 }
-
 
 /** Set up initial conditions 
  */

@@ -24,32 +24,6 @@
 
 #include "NamespaceHeader.H"
 
-
-//class VCPoissonParameters
-//{
-//public:
-//
-//  void getPoissonParameters (VCPoissonParameters&  a_params);
-//
-//  IntVect      nCells;
-//  int          maxGridSize;
-//  int          blockFactor;
-//  int          bufferSize;
-//  Real         fillRatio;
-//  Real         refineThresh;
-//  int          domBcType;
-//  int          maxLevel;
-//  int          numLevels;
-//  Vector<int>  refRatio;
-//  ProblemDomain coarsestDomain;
-//  Real         coarsestDx;
-//  RealVect     domainLength;
-//  RealVect     probLo;
-//  RealVect     probHi;
-//  Real         alpha;
-//  Real         beta;
-//};
-
 /// Physical/domain initial and boundary conditions
 /**
 
@@ -82,13 +56,10 @@ public:
      */
     virtual HydroIBC* new_hydroIBC();
 
-    /* set parameters */ 
-    void setParameters(const Real& a_gamma);
-
-  /// set up file input and names
-  void setup(std::string a_geomFile,
-             std::string a_thicknessName,
-             std::string a_topographyName);
+    /* set up file input and names */
+    void setup(std::string a_geomFile,
+               std::string a_thicknessName,
+               std::string a_topographyName);
   
     /// Set up initial conditions
     /**
@@ -130,22 +101,16 @@ public:
                                LevelData<FArrayBox>& a_bumpHeight,
                                LevelData<FArrayBox>& a_bumpSpacing);
 
-    virtual void resetCovered(suhmo_params Params,
-                              LevelData<FArrayBox>& a_head,
-                              LevelData<FArrayBox>& a_Pi);
-
-
 protected:
-  Real m_gamma;
+    /* reference ice thickness */
+    RefCountedPtr<LevelData<FArrayBox> > m_refThickness;
 
-  /// reference ice thickness
-  RefCountedPtr<LevelData<FArrayBox> > m_refThickness;
-  /// reference bedrock topography
-  RefCountedPtr<LevelData<FArrayBox> > m_refTopography;
+    /* reference bedrock topography */
+    RefCountedPtr<LevelData<FArrayBox> > m_refTopography;
 
-  /// cell spacing of reference data.
-  RealVect m_refDx;
-  
+    /* cell spacing of reference data */
+    RealVect m_refDx;
+
 private:
     // Disallowed for all the usual reasons
     void operator=(const FileIBC& a_input)
