@@ -54,12 +54,11 @@ Then, get the `master` branch of SUHMO:
 
 ```
 git clone https://github.com/EnnaDelfen/SUHMO.git
-git checkout -b GMD_release remotes/origin/GMD_release
 ```
 
 Set up the SUHMO environment variable:
 ```
-export SUHMO_HOME=path_to_your_SUHMO1.0_folder/lib/
+export SUHMO_HOME=path_to_your_SUHMO1.0_folder/
 ```
 
 ### Additional dependencies
