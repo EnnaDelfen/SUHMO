@@ -16,7 +16,7 @@ UNAMEM = $(shell uname -m)
 DIM=2
 USE_PETSC=FALSE
 MPI=TRUE
-DEBUG=TRUE
+DEBUG=FALSE
 OPT=FALSE
 
 ##
@@ -32,7 +32,7 @@ base_dir = .
 
 SRC_DIR = ../../src  
 
-BISICLES_SRC_DIR = ../../bisiclesSrc
+BISICLES_SRC_DIR = ../../util/bisiclesSrc
 
 UTIL_DIR = ../../util 
 

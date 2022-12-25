@@ -176,7 +176,7 @@ void FillFromReference(LevelData<FArrayBox>& a_destData,
        MayDay::Error("FillFromReference(LevelData<FarrayBox>& ,const LevelData<FarrayBox>&,... ::incompatible src and dest dx");
    }
 
-   const DisjointBoxLayout& srcGrids = a_srcData.disjointBoxLayout();
+   const DisjointBoxLayout& srcGrids  = a_srcData.disjointBoxLayout();
    const DisjointBoxLayout& destGrids = a_destData.disjointBoxLayout();
 
    if (a_verbose) {
@@ -267,7 +267,6 @@ void FillFromReference(LevelData<FArrayBox>& a_destData,
 
    a_destData.exchange();
 
-   // 
    if (a_verbose) {
        pout() << "Leaving FillFromReference" << endl;
    }

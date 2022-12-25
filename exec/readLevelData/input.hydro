@@ -1,5 +1,4 @@
 # main - driver.cpp
-#main.domain_size=800000 80000 # physical dimensions of full domain
 main.domain_size=400000 80000 # physical dimensions of half MISMIP+ domain
 main.problem_type=file
 main.maxTime = 90000000000.0

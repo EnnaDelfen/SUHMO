@@ -116,9 +116,7 @@ main(int argc, char* argv[])
           fpp.query("thicknessName", thicknessName);
           std::string topographyName = "topg";
           fpp.query("topographyName",topographyName);          
-
           ibcPtr->setup(geomFile, thicknessName, topographyName);
-          
           hydroIBCPtr = static_cast<HydroIBC*>(ibcPtr);          
         } else {
             MayDay::Error("bad problem_type !");
