@@ -1,0 +1,6 @@
+#SingleLevel
+python multi_runs.py 
+python launch_comparaison.py
+python postproc_convergence.py
+
+--> this produces files labelled convergence_data_*.dat that can be plotted to produce the left plot of Fig. 3 
