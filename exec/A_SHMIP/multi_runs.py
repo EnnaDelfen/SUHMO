@@ -21,7 +21,6 @@ for f in os.listdir(root_dir):
 os.chdir(root_dir)
 
 # Cases we want to run
-#patterns = ["A1", "A2"]
 patterns = ["A1", "A2", "A3", "A4", "A5", "A6"]
 # Process each runs -- run test case AND PostProc
 for i, pat in enumerate(patterns):
