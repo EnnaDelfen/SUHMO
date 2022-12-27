@@ -29,7 +29,8 @@ for i, pat in enumerate(patterns):
     os.chdir(exec_dir)
     os.system("mpirun -n 4 ../{} {}".format(executable, "input.hydro"))
     shutil.move(exec_dir+"pout.0", exec_dir+"{}".format("run1.output") )
-    print(".. restart with bigger dt ")
-    os.system("mpirun -n 4 ../{} {}".format(executable, "input.hydro_restart"))
-    shutil.move(exec_dir+"pout.0", exec_dir+"{}".format("run2.output") )
+    if (i>4): 
+        print(".. restart run ")
+        os.system("mpirun -n 4 ../{} {}".format(executable, "input.hydro_restart"))
+        shutil.move(exec_dir+"pout.0", exec_dir+"{}".format("run2.output") )
     #os.system("python ../dump_PP.py {} > postproc.dat".format(pat)) 

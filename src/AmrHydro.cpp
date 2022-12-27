@@ -4289,7 +4289,7 @@ AmrHydro::interpFinest() {
         BoxIterator bit(a_N_coarse_dit.box());
         for (bit.begin(); bit.ok(); ++bit) {
             IntVect iv = bit();
-            a_N_coarse_dit(iv,0)   = 0.8*Pi_coarse_dit(iv,0) - Pw_coarse_dit(iv,0);
+            a_N_coarse_dit(iv,0)   = Pi_coarse_dit(iv,0) - Pw_coarse_dit(iv,0);
             a_D_coarse_dit(iv,0)   = GH_coarse_dit(iv,0);
             a_tau_coarse_dit(iv,0) = 1e-6 * Cs * std::pow(vit, m_exp) 
                                      / std::pow( 1 + vit * std::pow( Cs/(Cmax * a_N_coarse_dit(iv,0)), n_exp) , m_exp);
@@ -4352,7 +4352,7 @@ AmrHydro::interpFinest() {
             BoxIterator bit(a_N_interm_dit.box());
             for (bit.begin(); bit.ok(); ++bit) {
                 IntVect iv = bit();
-                a_N_interm_dit(iv,0)   = 0.8*Pi_coarse_dit(iv,0) - Pw_coarse_dit(iv,0);
+                a_N_interm_dit(iv,0)   = Pi_coarse_dit(iv,0) - Pw_coarse_dit(iv,0);
                 a_D_interm_dit(iv,0)   = GH_coarse_dit(iv,0);
                 a_tau_interm_dit(iv,0) = 1e-6 * Cs * std::pow(vit, m_exp) 
                                          / std::pow( 1 + vit * std::pow( Cs/(Cmax * a_N_interm_dit(iv,0)), n_exp) , m_exp);
@@ -4394,8 +4394,8 @@ AmrHydro::interpFinest() {
     int nStuffToPlot = 2;
     Vector<std::string> vectName;
     vectName.resize(nStuffToPlot);
-    //vectName[0]="GH";
-    vectName[0]="Tau";
+    vectName[0]="gapHeight";
+    //vectName[0]="Tau";
     vectName[1]="N";
 
     Vector<Vector<LevelData<FArrayBox>*>> stuffToPlot;
@@ -4410,12 +4410,12 @@ AmrHydro::interpFinest() {
     stuffToPlot[1][0]  = new LevelData<FArrayBox>(m_amrGrids[0], 1, IntVect::Zero);  // a_N_coarse
     stuffToPlot[1][1]  = new LevelData<FArrayBox>(finestGrids, 1, IntVect::Zero);    // a_N fine
 
-    //LevelData<FArrayBox>& levelDummy      = *a_D_coarse;
-    LevelData<FArrayBox>& levelDummy      = *a_tau_coarse;
+    LevelData<FArrayBox>& levelDummy      = *a_D_coarse;
+    //LevelData<FArrayBox>& levelDummy      = *a_tau_coarse;
     LevelData<FArrayBox>& levelDummySTP   = *stuffToPlot[0][0];
 
-    //LevelData<FArrayBox>& levelDummyF     = *a_D;
-    LevelData<FArrayBox>& levelDummyF     = *a_tau;
+    LevelData<FArrayBox>& levelDummyF     = *a_D;
+    //LevelData<FArrayBox>& levelDummyF     = *a_tau;
     LevelData<FArrayBox>& levelDummyFSTP  = *stuffToPlot[0][1];
 
     LevelData<FArrayBox>& levelN      = *a_N_coarse;
