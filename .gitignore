@@ -5,6 +5,7 @@ chk*.2d.hdf5
 diff*.hdf5
 err*.hdf5
 
+A6_roughness/
 postproc_A*/
 postproc_B*/
 postproc_E*/
@@ -15,9 +16,13 @@ test/
 1_misc_scripts/
 save/
 OLD/
+w0p*/
+old_exec/
 
 visitlog.py
 multi_runs_mine.py
+runTests.py
+script_theoreticalLines.py
 
 *F_F.H
 
@@ -34,7 +39,19 @@ p/
 d/
 ramp_up.dat
 ramp.out
-postproc.dat
+Nhi_as_*.dat
+Nlo_as_*.dat
+Nmi_as_*.dat
+recharge_as_*.dat
+discharge_as_*.dat
+N_as_*.dat
+dischargeINEFF_as_*.dat
+dischargeEFF_as_*.dat
+*.par
+postproc_Paper.dat
+mw_*.dat
+Nb_Cells.dat
+list_TC
 
 *lev_tooLarge
 *convergence*.dat
@@ -55,3 +72,4 @@ Discharge.png
 Br*.png
 *P*png
 *.agr
+AMR_CR0000.png
