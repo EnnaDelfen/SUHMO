@@ -80,7 +80,6 @@ void FileIBC::setup(std::string a_geomFile,
   m_refDx         = dx*RealVect::Unit;
   m_refThickness  = levelThck;   // ice thickness
   m_refTopography = levelTopg;  // bed topography
-
 }
 
 /** Set up mask 
@@ -107,7 +106,6 @@ FileIBC::initializePi(RealVect& a_dx,
 {
     // Do nothing 
 }
-
 
 void 
 FileIBC::initializeBed(RealVect& a_dx,
@@ -143,7 +141,7 @@ FileIBC::initializeData(RealVect& a_dx,
     bool verbose = true;
 
     /* initialize bed and ice thickness */
-    const LevelData<FArrayBox>& topoRef = *(m_refTopography);
+    const LevelData<FArrayBox>& topoRef  = *(m_refTopography);
     const LevelData<FArrayBox>& thickRef = *(m_refThickness);    
     FillFromReference(a_zbed, topoRef, a_dx, m_refDx,verbose);
     FillFromReference(a_iceHeight, thickRef, a_dx, m_refDx, verbose);
@@ -212,6 +210,7 @@ FileIBC::initializeData(RealVect& a_dx,
         pout() << "(Done with FileIBC::initializeData)" << endl;
     }
 }
+
 
 /** Set up initial conditions 
  */

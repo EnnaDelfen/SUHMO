@@ -29,6 +29,7 @@ void readLevelData(Vector<RefCountedPtr<LevelData<FArrayBox> > >& a_data,
                    const Vector<std::string>& a_names, 
                    int a_nComp)
 {
+  pout() << "In readLevelData ..." << std::endl; 
   Vector<LevelData<FArrayBox>* > vectData;
   Vector<DisjointBoxLayout> vectGrids;
   Vector<int> vectRatio;
@@ -37,10 +38,18 @@ void readLevelData(Vector<RefCountedPtr<LevelData<FArrayBox> > >& a_data,
   Box domBox;
   int numLevels;
 
-  pout() << " attempting to open file  " << a_file << std::endl;
+  pout() << "   --> Open file  " << a_file << std::endl;
 #ifdef CH_USE_HDF5
-  int status = ReadAMRHierarchyHDF5(a_file,vectGrids,vectData,names,domBox,a_dx,dt,time,
-                                    vectRatio,numLevels);
+  int status = ReadAMRHierarchyHDF5(a_file,
+                                    vectGrids,
+                                    vectData,
+                                    names,
+                                    domBox,
+                                    a_dx,
+                                    dt,
+                                    time,
+                                    vectRatio,
+                                    numLevels);
   CH_assert(status == 0);
   if (status != 0)
       MayDay::Error("failed to read file");
@@ -65,10 +74,10 @@ void readLevelData(Vector<RefCountedPtr<LevelData<FArrayBox> > >& a_data,
   int read = 0;
 
   for (int j = 0; j < a_names.size(); j++) {
-      pout() << " looking for variable " << a_names[j] << std::endl;
+      pout() << "   --> ..looking for variable " << a_names[j] << std::endl;
       for (int i = 0; i < names.size(); i++) {
           if (names[i] == a_names[j]) {
-              pout() << " ... found ! (" << names[i] << ")" << std::endl;
+              pout() << "             found ! (" << names[i] << ")" << std::endl;
               vectData[0]->copyTo(Interval(i,i+a_nComp-1),*a_data[j],Interval(0,a_nComp-1));
               read++;
           }

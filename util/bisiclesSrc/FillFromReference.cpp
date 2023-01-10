@@ -163,12 +163,12 @@ void FillFromReference(LevelData<FArrayBox>& a_destData,
 {
 
    if (a_verbose) {
-       pout() << "in LDF FillFromReference" << endl;
+       pout() << "In FillFromReference ..." << endl;
    }
 
    // tolerance used when converting refinement ratio from Real -> integer 
    Real tolerance = 1.0e-4;
-   // refinement ratio
+   // refinement ratio -- how much coarser is the source data 
    Real refRatio = a_srcDx[0]/a_destDx[0];
    // reality check
    Real testDx = a_destDx[0]*refRatio;
@@ -180,14 +180,14 @@ void FillFromReference(LevelData<FArrayBox>& a_destData,
    const DisjointBoxLayout& destGrids = a_destData.disjointBoxLayout();
 
    if (a_verbose) {
-       pout() << "refRatio = " << refRatio << ", srcDx = " << a_srcDx[0]
+       pout() << "    refRatio (src/dest) = " << refRatio << ", srcDx = " << a_srcDx[0]
              << ", destDx = " << a_destDx[0] << endl;
    }
 
    if (refRatio > 1+tolerance) {
        //interpolate data
        if (a_verbose) {
-           pout() << "Interpolating data... " << endl;
+           pout() << "  - interpolating data... " << endl;
        }
 
        int nRef = (int)(refRatio + tolerance); 
@@ -196,7 +196,7 @@ void FillFromReference(LevelData<FArrayBox>& a_destData,
        // by interpolating coarse data in stages until nRef == block_factor
        if (coarsenable) {
            if (a_verbose) {
-              pout() << " ...interpolating data with refinement ratio = "  << nRef << endl;
+              pout() << "    ... with refinement ratio = "  << nRef << endl;
            }
 
            const ProblemDomain& fineDomain = destGrids.physDomain();
@@ -207,7 +207,7 @@ void FillFromReference(LevelData<FArrayBox>& a_destData,
            IntVect ghostVect = a_destData.ghostVect();
            if (ghostVect[0] != 0) {
                if (a_verbose) {
-                   pout() << " ...interpolating " << ghostVect[0] << " cells of ghost data along coarse-fine interfaces refinement ratio =  " << nRef << endl;
+                   pout() << "    ... interpolating " << ghostVect[0] << " cells of ghost data along coarse-fine interfaces refinement ratio =  " << nRef << endl;
                }
                ProblemDomain coarseDomain = fineDomain;
                coarseDomain.coarsen(nRef);
@@ -218,9 +218,9 @@ void FillFromReference(LevelData<FArrayBox>& a_destData,
            }
        } else if (nRef%2 == 0) {
            if (a_verbose) {
-               pout() << " ...interpolating data with refinement ratio = " 
-                      << nRef << endl
-                      << " ...recursively (potentially memory intensive as this refines entire coarse levels -  consider increasing amr.block_factor) " << endl;
+               pout() << "    ... interpolating data with refinement ratio = " 
+                      << nRef
+                      << " recursively (potentially memory intensive as this refines entire coarse levels -  consider increasing amr.block_factor) " << endl;
            }
 
            DisjointBoxLayout stepGrids;
@@ -233,16 +233,16 @@ void FillFromReference(LevelData<FArrayBox>& a_destData,
        } else {
            MayDay::Error("FillFromReference(LevelData<FarrayBox>& ,const LevelData<FarrayBox>&,... ) odd refinement ratio");
        }
-   } else if (refRatio < 1-tolerance) {
+   } else if (refRatio < 1-tolerance) { // source data is on finer mesh than destination
        if (a_verbose) {
-           pout() << "averaging data" << endl;
+           pout() << "  - averaging data" << endl;
        }
        // need to average data
        refRatio = 1.0/refRatio;
        int nRef = (int) (refRatio + tolerance);
        {
            if (a_verbose) {
-               pout() << " ...averaging data with refinement ratio = " 
+               pout() << "    ... averaging data with refinement ratio = " 
                       << nRef << endl;
            }
        }
@@ -260,7 +260,7 @@ void FillFromReference(LevelData<FArrayBox>& a_destData,
    } else {
        // same size
        if (a_verbose) {
-           pout() << " ...same-size copy of data" << endl;
+           pout() << "  - same-size copy of data" << endl;
        }
        a_srcData.copyTo(a_destData);
    }
