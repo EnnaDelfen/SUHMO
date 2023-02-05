@@ -1936,7 +1936,7 @@ AmrHydro::CalcRHS_gapHeightFAS(LevelData<FArrayBox>& levelRHS_b,
                    RHS_B(iv,0) = ub_norm * (BH(iv,0) - B(iv,0)) / BL(iv,0);
                }
                // second term ... assume  n = 3 !!
-               Real PimPw = (Pressi(iv,0) - Pw(iv,0));
+               Real PimPw = std::max(Pressi(iv,0) - Pw(iv,0), 0.0);
                Real AbsPimPw = std::abs(PimPw);
                if ( m_suhmoParm->m_cutOffbr > B(iv,0) ) {
                    RHS(iv,0)   -= m_suhmoParm->m_A * std::pow(AbsPimPw, 2) * PimPw * B(iv,0) * ( 1.0 - (m_suhmoParm->m_cutOffbr - B(iv,0)) / m_suhmoParm->m_cutOffbr );
@@ -3178,9 +3178,9 @@ AmrHydro::timeStepFAS(Real a_dt)
         vectName[9]="DiffusiveTerm";
         vectName[10]="Dcoef_x";
         vectName[11]="Dcoef_y";
-        vectName[12]="MRA";
-        vectName[13]="MRB";
-        vectName[14]="MRC";
+        vectName[12]="RHS_b_A"; //"MRA";    
+        vectName[13]="RHS_b_B"; //"MRB";
+        vectName[14]="RHS_b_C"; //"MRC"; 
 
         Vector<Vector<LevelData<FArrayBox>*>> stuffToPlot;
         stuffToPlot.resize(nStuffToPlot);
@@ -3239,11 +3239,11 @@ AmrHydro::timeStepFAS(Real a_dt)
             LevelData<FArrayBox>& levelDcXSTP     = *stuffToPlot[10][lev];
             LevelData<FArrayBox>& levelDcYSTP     = *stuffToPlot[11][lev];
 
-            LevelData<FArrayBox>& levelMRA        = *MR_A[lev];
+            LevelData<FArrayBox>& levelMRA        = *RHS_b_A[lev]; // *MR_A[lev];
             LevelData<FArrayBox>& levelMRASTP     = *stuffToPlot[12][lev];
-            LevelData<FArrayBox>& levelMRB        = *MR_B[lev];
+            LevelData<FArrayBox>& levelMRB        = *RHS_b_b[lev]; //*MR_B[lev];
             LevelData<FArrayBox>& levelMRBSTP     = *stuffToPlot[13][lev];
-            LevelData<FArrayBox>& levelMRC        = *MR_C[lev];
+            LevelData<FArrayBox>& levelMRC        = *RHS_b_C[lev]; //*MR_C[lev];
             LevelData<FArrayBox>& levelMRCSTP     = *stuffToPlot[14][lev];
 
             DataIterator dit = levelHead.dataIterator();
