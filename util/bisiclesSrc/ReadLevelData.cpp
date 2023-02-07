@@ -60,8 +60,8 @@ void readLevelData(Vector<RefCountedPtr<LevelData<FArrayBox> > >& a_data,
  
   // AF: is this only to get RefCountedPtr instead of star qties ?
   Vector<Box> boxes;
-  int max_box_size = 64;
-  int block_factor = 8;
+  int max_box_size = 10000;
+  int block_factor = 2;
   domainSplit(domBox, boxes, max_box_size, block_factor);
   Vector<int> procAssign(boxes.size());
   LoadBalance(procAssign,boxes);

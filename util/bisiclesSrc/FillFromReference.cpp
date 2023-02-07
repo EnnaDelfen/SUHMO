@@ -250,8 +250,10 @@ void FillFromReference(LevelData<FArrayBox>& a_destData,
                               nRef, a_destData.ghostVect());
 
        if (a_avgType == CoarseAverage::arithmetic) {
+           pout() << "      (arithmetic)" << endl;
            averager.averageToCoarse(a_destData, a_srcData);
        } else if (a_avgType == CoarseAverage::harmonic) {
+           pout() << "      (harmonic)" << endl;
            averager.averageToCoarseHarmonic(a_destData, a_srcData);
        } else {
            CH_assert( a_avgType >= 0 && a_avgType <  CoarseAverage::NUM_AVERAGE_TYPES);
