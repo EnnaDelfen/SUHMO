@@ -210,7 +210,8 @@ ValleyIBC::initializeData(RealVect& a_dx,
                          LevelData<FArrayBox>& a_Pi,
                          LevelData<FArrayBox>& a_iceHeight,
                          LevelData<FArrayBox>& a_bumpHeight,
-                         LevelData<FArrayBox>& a_bumpSpacing)
+                         LevelData<FArrayBox>& a_bumpSpacing,
+                         LevelData<FArrayBox>& a_levelmagVel)
 {
     
     pout() << "ValleyIBC::initializeData" << endl;

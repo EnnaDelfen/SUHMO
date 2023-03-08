@@ -75,7 +75,8 @@ public:
                                 LevelData<FArrayBox>& a_Pi,
                                 LevelData<FArrayBox>& a_iceHeight,
                                 LevelData<FArrayBox>& a_bumpHeight,
-                                LevelData<FArrayBox>& a_bumpSpacing);
+                                LevelData<FArrayBox>& a_bumpSpacing,
+                                LevelData<FArrayBox>& a_levelmagVel);
 
     virtual void initializePi(RealVect& a_dx,
                               suhmo_params Params,     

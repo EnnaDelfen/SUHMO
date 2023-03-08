@@ -59,7 +59,9 @@ public:
     /* set up file input and names */
     void setup(std::string a_geomFile,
                std::string a_thicknessName,
-               std::string a_topographyName);
+               std::string a_topographyName,
+               std::string a_velXFile,
+               std::string a_velYFile);
   
     /// Set up initial conditions
     /**
@@ -78,7 +80,8 @@ public:
                                 LevelData<FArrayBox>& a_Pi,
                                 LevelData<FArrayBox>& a_iceHeight,
                                 LevelData<FArrayBox>& a_bumpHeight,
-                                LevelData<FArrayBox>& a_bumpSpacing);
+                                LevelData<FArrayBox>& a_bumpSpacing,
+                                LevelData<FArrayBox>& a_levelmagVel);
 
     virtual void initializePi(RealVect& a_dx,
                               suhmo_params Params,     
@@ -101,6 +104,11 @@ public:
                                LevelData<FArrayBox>& a_bumpHeight,
                                LevelData<FArrayBox>& a_bumpSpacing);
 
+    virtual void resetCovered(suhmo_params Params,
+                              LevelData<FArrayBox>& a_head,
+                              LevelData<FArrayBox>& a_Pi);
+
+
 protected:
     /* reference ice thickness */
     RefCountedPtr<LevelData<FArrayBox> > m_refThickness;
@@ -108,8 +116,14 @@ protected:
     /* reference bedrock topography */
     RefCountedPtr<LevelData<FArrayBox> > m_refTopography;
 
-    /* cell spacing of reference data */
+    /* reference base (or not) velocity*/
+    RefCountedPtr<LevelData<FArrayBox> > m_velX;
+    RefCountedPtr<LevelData<FArrayBox> > m_velY;
+
+    /* cell spacing of reference data - ice thick and topg */
     RealVect m_refDx;
+    /* cell spacing of reference data - velo*/
+    RealVect m_refDxVel;
 
 private:
     // Disallowed for all the usual reasons

@@ -147,11 +147,15 @@ public:
                               LevelData<FArrayBox>& levelDT,
                               LevelData<FArrayBox>& levelBH, 
                               LevelData<FArrayBox>& levelBL,
+                              LevelData<FArrayBox>& levelmagVel,
                               LevelData<FArrayBox>& levelRHS_b_A,
                               LevelData<FArrayBox>& levelRHS_b_B,
                               LevelData<FArrayBox>& levelRHS_b_C,
                               LevelData<FArrayBox>& levelchanDegree,
                               Real a_dt);
+
+
+    void check_fluxes(Vector<RefCountedPtr<LevelData<FluxBox> > >&   a_bCoef);
 
 
     void SolveForHead_nl(const Vector<DisjointBoxLayout>&                a_grids,
@@ -186,7 +190,8 @@ private:
     void writeMetaDataHDF5(HDF5Handle& a_handle) const;
 
 public: 
-    void interpFinest();
+     void interpFinest();
+     void interpVelData();
 
      void writePltPP(DisjointBoxLayout& fineGrids, 
                      int numPlotComps, 
@@ -464,6 +469,8 @@ protected:
     Vector<RefCountedPtr<LevelData<FArrayBox>>> m_Re;                     // Reynolds number
     Vector<RefCountedPtr<LevelData<FArrayBox>>> m_meltRate;               // Melting rate
     Vector<RefCountedPtr<LevelData<FArrayBox>>> m_iceheight;              // Ice slab height
+
+    Vector<RefCountedPtr<LevelData<FArrayBox>> > m_magVel;                // basal velocity magniture
 
     /* Time-constant parameters */
     Vector<RefCountedPtr<LevelData<FArrayBox>>> m_bedelevation;           //
