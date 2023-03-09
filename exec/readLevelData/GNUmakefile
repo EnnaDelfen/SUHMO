@@ -26,9 +26,7 @@ LibNames :=  AMRElliptic AMRTimeDependent AMRTools BoxTools BaseTools
 
 base_dir = .
 
-#BASE_DIR = ../../
 
-#EXEC_DIR = .
 
 SRC_DIR = ../../src  
 

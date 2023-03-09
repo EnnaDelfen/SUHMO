@@ -16,8 +16,9 @@ UNAMEM = $(shell uname -m)
 DIM=2
 USE_PETSC=FALSE
 MPI=TRUE
+DEBUG=FALSE
+OPT=TRUE
 USE_MF=TRUE
-
 ##
 ## names of Chombo libraries needed by this program, in order of search.
 ##
@@ -29,9 +30,11 @@ base_dir = .
 
 SRC_DIR = ../../src  
 
+BISICLES_SRC_DIR = ../../util/bisiclesSrc
+
 UTIL_DIR = ../../util 
 
-src_dirs = $(SRC_DIR) $(UTIL_DIR)  
+src_dirs = $(SRC_DIR) $(UTIL_DIR)  $(BISICLES_SRC_DIR)
 
 # shared code for building example programs
 include $(CHOMBO_HOME)/mk/Make.example
