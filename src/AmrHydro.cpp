@@ -537,6 +537,8 @@ AmrHydro::SolveForGap_nl(const Vector<DisjointBoxLayout>&               a_grids,
         amrSolver->m_verbosity = 1;
     } 
 
+    amrSolver->m_iterMin = 2;
+
     // solve !
     bool zeroInitialGuess = false;
     amrSolver->solve(a_gapHeight, a_RHS, m_finest_level, 0, zeroInitialGuess);
@@ -637,6 +639,8 @@ AmrHydro::SolveForHead_nl(const Vector<DisjointBoxLayout>&               a_grids
     } else {
         amrSolver->m_verbosity = 1;
     } 
+
+    amrSolver->m_iterMin = 2;
 
     // solve !
     bool zeroInitialGuess = false;
