@@ -147,6 +147,7 @@ public:
                               LevelData<FArrayBox>& levelDT,
                               LevelData<FArrayBox>& levelBH, 
                               LevelData<FArrayBox>& levelBL,
+                              LevelData<FArrayBox>& levelmagVel,
                               LevelData<FArrayBox>& levelRHS_b_A,
                               LevelData<FArrayBox>& levelRHS_b_B,
                               LevelData<FArrayBox>& levelRHS_b_C,
@@ -467,6 +468,8 @@ protected:
     Vector<RefCountedPtr<LevelData<FArrayBox>>> m_Re;                     // Reynolds number
     Vector<RefCountedPtr<LevelData<FArrayBox>>> m_meltRate;               // Melting rate
     Vector<RefCountedPtr<LevelData<FArrayBox>>> m_iceheight;              // Ice slab height
+
+    Vector<RefCountedPtr<LevelData<FArrayBox>> > m_magVel;                // basal velocity magniture
 
     /* Time-constant parameters */
     Vector<RefCountedPtr<LevelData<FArrayBox>>> m_bedelevation;           //
