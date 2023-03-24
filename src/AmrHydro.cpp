@@ -474,6 +474,115 @@ void NullBCFill(FArrayBox& a_state,
 
 
 /* AmrHydro class functions */
+void
+AmrHydro::check_fluxes(Vector<RefCountedPtr<LevelData<FluxBox> > >&   a_bCoef)
+{
+    CH_TIME("check_fluxes");
+    for (int lev = 0; lev <= m_finest_level; lev++) {
+        Box domain_box = (m_amrGrids[lev]).physDomain().domainBox();
+
+        LevelData<FArrayBox>& levelB      = *m_gapheight[lev];
+        LevelData<FArrayBox>& leveloldB   = *m_old_gapheight[lev];    
+        LevelData<FArrayBox>& levelH      = *m_head[lev];
+        LevelData<FluxBox>& levelTrans_ec = *a_bCoef[lev];
+
+        const DisjointBoxLayout& levelGrids = levelB.getBoxes();
+
+        LevelData<FluxBox>    fluxes(levelGrids, 1, IntVect::Zero);
+        Vector<Real> sumLo(SpaceDim, 0.0); 
+        Vector<Real> sumHi(SpaceDim, 0.0); 
+        Real Btot;
+        Real BtotOld;
+
+        DataIterator levelDit = levelGrids.dataIterator();
+        for (levelDit.begin(); levelDit.ok(); ++levelDit) {
+            FArrayBox& thisH      = levelH[levelDit];
+            FluxBox&   thisTrans  = levelTrans_ec[levelDit];
+            FluxBox&   thisFluxes = fluxes[levelDit];
+
+            FArrayBox& thisB      = levelB[levelDit];
+            FArrayBox& thisBold   = leveloldB[levelDit];
+            
+            for (int dir=0; dir<SpaceDim; dir++) {
+                Box face_box = domain_box;
+                IntVect toto = IntVect::Zero;
+                toto[dir] +=1;
+                face_box.convert(toto);
+
+                FArrayBox& thisK_dir       = thisTrans[dir];
+                FArrayBox& thisFluxes_dir  = thisFluxes[dir];
+                BoxIterator bit(thisFluxes_dir.box());
+                for (bit.begin(); bit.ok(); ++bit) {
+                    IntVect iv=bit();
+                    IntVect shiftiv = BASISV(dir);
+                    IntVect ivlo = iv - shiftiv;
+                    IntVect ivhi = iv;
+                    Real area = 0.0;
+                    if ( dir == 0 ) {
+                        area = m_amrDx[lev][1];
+                    } else {
+                        area = m_amrDx[lev][0]; 
+                    } 
+                    Real phihi = thisH(ivhi,0);
+                    Real philo = thisH(ivlo,0);
+                    Real gradphi = (phihi - philo ) * (-1.0) / m_amrDx[lev][dir];
+                    thisFluxes_dir(iv,0) = -thisK_dir(iv, 0) * gradphi;
+                    if ( iv[dir] == face_box.smallEnd(dir) ) {
+                        sumLo[dir] += thisFluxes_dir(iv,0) * area;
+                    } else if ( iv[dir] == face_box.bigEnd(dir) ) {
+                        sumHi[dir] += thisFluxes_dir(iv,0) * area;    
+                    }
+                }
+            }
+
+            BoxIterator bit(thisB.box());
+            for (bit.begin(); bit.ok(); ++bit) {
+                IntVect iv=bit();
+                Btot    += thisB(iv,0) * m_amrDx[lev][0] * m_amrDx[lev][1];
+                BtotOld += thisBold(iv,0) * m_amrDx[lev][0] * m_amrDx[lev][1];
+            }
+        }
+#ifdef CH_MPI
+        Vector<Real> recv(SpaceDim);
+        int result = MPI_Allreduce(&sumLo[0], &recv[0], SpaceDim, MPI_CH_REAL,
+                                    MPI_SUM, Chombo_MPI::comm);
+        if (result != MPI_SUCCESS) {
+            MayDay::Error("communication error on MPI_SUM");
+        }
+        sumLo = recv;
+
+        Vector<Real> recvHi(SpaceDim);
+        result = MPI_Allreduce(&sumHi[0], &recvHi[0], SpaceDim, MPI_CH_REAL,
+                                MPI_SUM, Chombo_MPI::comm);
+        if (result != MPI_SUCCESS) {
+            MayDay::Error("communication error on MPI_SUM");
+        }
+        sumHi = recvHi;
+
+        Vector<Real> recvBtot(1);
+        result = MPI_Allreduce(&Btot, &recvBtot[0], SpaceDim, MPI_CH_REAL,
+                                    MPI_SUM, Chombo_MPI::comm);
+        if (result != MPI_SUCCESS) {
+            MayDay::Error("communication error on MPI_SUM");
+        }
+        Btot = recvBtot[0];
+
+        Vector<Real> recvBtotOld(1);
+        result = MPI_Allreduce(&BtotOld, &recvBtotOld[0], SpaceDim, MPI_CH_REAL,
+                                    MPI_SUM, Chombo_MPI::comm);
+        if (result != MPI_SUCCESS) {
+            MayDay::Error("communication error on MPI_SUM");
+        }
+        BtotOld = recvBtotOld[0];
+  
+#endif
+        pout() << " Flux loX " << sumLo[0] << ", hiX " << sumHi[0] << endl;
+        pout() << " Flux loY " << sumLo[1] << ", hiY " << sumHi[1] << endl;
+        pout() << " Total: " << sumLo[0] + sumLo[1] - sumHi[0] - sumHi[1] << endl;
+        pout() << " B/Bold: " << Btot << ", " << BtotOld << endl;
+    } 
+}
+
 /* Solve for gap height with a VC operator of operator provided as ext func */
 void
 AmrHydro::SolveForGap_nl(const Vector<DisjointBoxLayout>&               a_grids,
@@ -1383,7 +1492,6 @@ void AmrHydro::WFlx_level(LevelData<FluxBox>&          a_bcoef,
                                 CHF_FRA(bC[dir]),
                                 CHF_CONST_REAL(m_suhmoParm->m_omega),
                                 CHF_CONST_REAL(m_suhmoParm->m_nu) );
-
         }
     }
 
@@ -3035,11 +3143,11 @@ AmrHydro::timeStepFAS(Real a_dt)
         // Qw gradZb
         EdgeToCell(leveltmp2_ec, leveltmp2_cc);
 
-        LevelData<FArrayBox>& levelPw    = *m_Pw[lev];
-        LevelData<FArrayBox>& levelPi    = *m_overburdenpress[lev];
-        LevelData<FArrayBox>& levelZb    = *m_bedelevation[lev];
-        LevelData<FArrayBox>& levelmR    = *m_meltRate[lev];
-        LevelData<FArrayBox>& levelB     = *m_gapheight[lev];    
+        LevelData<FArrayBox>& levelPw     = *m_Pw[lev];
+        LevelData<FArrayBox>& levelPi     = *m_overburdenpress[lev];
+        LevelData<FArrayBox>& levelZb     = *m_bedelevation[lev];
+        LevelData<FArrayBox>& levelmR     = *m_meltRate[lev];
+        LevelData<FArrayBox>& levelB      = *m_gapheight[lev];    
         // DEBUG
         LevelData<FArrayBox>& levelMR_A = *MR_A[lev];
         LevelData<FArrayBox>& levelMR_B = *MR_B[lev];
@@ -3305,6 +3413,8 @@ AmrHydro::timeStepFAS(Real a_dt)
         if (m_post_proc_comparisons) {
             interpFinest();
         }
+
+        check_fluxes(bCoef);
         
         int DomSize = m_amrDomains[0].domainBox().size(0); 
         int DomSizeY = m_amrDomains[0].domainBox().size(1); 
@@ -3656,7 +3766,7 @@ AmrHydro::timeStepFAS(Real a_dt)
         //if (m_suhmoParm->m_ramp) {
             Real sec_1month      = 2635200.0;  // s
             int time_tmp = (int) m_time + a_dt;
-            pout() << "Time(months) recharge ramp = " <<  m_time/sec_1month  << " " << out_recharge[1] << " " << ramp << endl; 
+            pout() << "Time(months) recharge ramp = " <<  m_time/sec_1month  << " " << out_recharge[0]+out_recharge_tot[0]  << " " << ramp << endl; 
         //}
         if (m_post_proc_shmip_temporal) {
             if (time_tmp % 86400 == 0) {
@@ -3713,7 +3823,7 @@ AmrHydro::timeStepFAS(Real a_dt)
                 Real x_loc = (xi+0.5)*m_amrDx[0][0];    
                         pout() << " " << x_loc/1e3 << " " << Ylength[xi] 
                        << " " << -out_water_flux_x_tot[xi] << " " << -out_water_flux_x_chan[xi] << " " << -out_water_flux_x_distrib[xi] 
-                       << " " << out_recharge[xi] << " " << out_recharge_tot[xi] << " " << avPressure[xi]/dom_sizeY[xi]/1e6  
+                       << " " << out_recharge[xi] << " " << out_recharge_tot[xi] << " " << avPressure[xi]/std::max(dom_sizeY[xi], 1.0)/1e6  
                        << endl;
             }
         }
@@ -5164,7 +5274,7 @@ AmrHydro::writePlotFile()
         const LevelData<FArrayBox>& levelqw        = *m_qw[lev];
         const LevelData<FArrayBox>& levelRe        = *m_Re[lev];
         const LevelData<FArrayBox>& levelmR        = *m_meltRate[lev];
-        const LevelData<FArrayBox>& levelBH      = *m_iceheight[lev];
+        const LevelData<FArrayBox>& levelBH        = *m_iceheight[lev];
         //LevelData<FArrayBox> levelGradPhi;
         //if (m_write_gradPhi)
         //{
@@ -5365,7 +5475,6 @@ AmrHydro::writeCheckpointFile() const
     string bumpHeightName("bumpHeight"); 
     string bumpSpacingName("bumpSpacing"); 
     string meltRateName("meltRate"); 
-    string MSName("moulinSourceTerm"); 
 
     int nComp = 0;
     char compStr[30];
@@ -5404,10 +5513,6 @@ AmrHydro::writeCheckpointFile() const
     // meltRate
     sprintf(compStr, "component_%04d", nComp);
     header.m_string[compStr] = meltRateName;
-    nComp++;
-    // MS
-    sprintf(compStr, "component_%04d", nComp);
-    header.m_string[compStr] = MSName;
 
     header.writeToFile(handle);
 
@@ -5450,7 +5555,6 @@ AmrHydro::writeCheckpointFile() const
             write(handle, *m_bumpHeight[lev], "bumpHeightData", m_bumpHeight[lev]->ghostVect());
             write(handle, *m_bumpSpacing[lev], "bumpSpacingData", m_bumpSpacing[lev]->ghostVect());
             write(handle, *m_meltRate[lev], "meltRateData", m_meltRate[lev]->ghostVect());
-            write(handle, *m_moulin_source_term[lev], "moulinSourceTermData", m_moulin_source_term[lev]->ghostVect());
         } // end loop over levels
     }
 
@@ -5794,16 +5898,6 @@ AmrHydro::readCheckpointFile(HDF5Handle& a_handle)
             for (DataIterator dit(levelDBL); dit.ok(); ++dit) {
                 (*m_meltRate[lev])[dit].copy(tmpmeltRate[dit]);
             }
-            /* MS */
-            //LevelData<FArrayBox> tmpMS;
-            //tmpMS.define(old_head);
-            //dataStatus = read<FArrayBox>(a_handle, tmpMS, "moulinSourceTermData", levelDBL);
-            //if (dataStatus != 0) {
-            //    MayDay::Error("checkpoint file does not contain MS data");
-            //}
-            //for (DataIterator dit(levelDBL); dit.ok(); ++dit) {
-            //    (*m_moulin_source_term[lev])[dit].copy(tmpMS[dit]);
-            //}
 
         } // end if this level is defined
     }     // end loop over levels

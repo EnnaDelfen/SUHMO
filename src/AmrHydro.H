@@ -154,6 +154,9 @@ public:
                               Real a_dt);
 
 
+    void check_fluxes(Vector<RefCountedPtr<LevelData<FluxBox> > >&   a_bCoef);
+
+
     void SolveForHead_nl(const Vector<DisjointBoxLayout>&                a_grids,
                           Vector<RefCountedPtr<LevelData<FArrayBox> > >& a_aCoef,
                           Vector<RefCountedPtr<LevelData<FluxBox> > >&   a_bCoef,
