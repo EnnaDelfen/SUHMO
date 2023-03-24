@@ -2043,7 +2043,7 @@ AmrHydro::CalcRHS_gapHeightFAS(LevelData<FArrayBox>& levelRHS_b,
 
            Real ub_norm = MV(iv,0);
            
-           if (Pressi(iv,0) == 0.0 ) {
+           if (Pressi(iv,0) < 1e-18 ) {
                RHS(iv,0) =  0.0;
                CD(iv,0) = 0.0;
            } else {
@@ -2885,7 +2885,7 @@ AmrHydro::timeStepFAS(Real a_dt)
                     // Diffusive term
                     RHSh(iv,0) -= m_suhmoParm->m_DiffFactor * DiffusiveTerm(iv,0);
 
-                    if (Pressi(iv,0) == 0.0 ) {
+                    if (Pressi(iv,0) < 1e-18 ) {
                         RHSh(iv,0) = 0.0;
                     }
                 }
@@ -3199,12 +3199,12 @@ AmrHydro::timeStepFAS(Real a_dt)
                 mR(iv,0)   = mR(iv,0) / m_suhmoParm->m_L;
 
                 //DEBUG
-                mMR_A(iv,0) = - m_suhmoParm->m_rho_w * m_suhmoParm->m_gravity * (tmp_cc(iv, 0) + tmp_cc(iv, 1)) / m_suhmoParm->m_L;
-                mMR_B(iv,0) = m_suhmoParm->m_ct * m_suhmoParm->m_cw * m_suhmoParm->m_rho_w * m_suhmoParm->m_rho_w * m_suhmoParm->m_gravity * (tmp_cc(iv, 0) + tmp_cc(iv, 1)) / m_suhmoParm->m_L;
-                mMR_C(iv,0) = -m_suhmoParm->m_ct * m_suhmoParm->m_cw * m_suhmoParm->m_rho_w * m_suhmoParm->m_rho_w * m_suhmoParm->m_gravity * (tmp2_cc(iv, 0) + tmp2_cc(iv, 1)) / m_suhmoParm->m_L; //+ tmp2_cc(iv, 1)) / m_suhmoParm->m_L;
+                mMR_A(iv,0) = (m_suhmoParm->m_G + sca_prod)/m_suhmoParm->m_L;
+                mMR_B(iv,0) = - m_suhmoParm->m_rho_w * m_suhmoParm->m_gravity * (tmp_cc(iv, 0) + tmp_cc(iv, 1)) / m_suhmoParm->m_L;
+                mMR_C(iv,0) = m_suhmoParm->m_ct * m_suhmoParm->m_cw * m_suhmoParm->m_rho_w * m_suhmoParm->m_rho_w * m_suhmoParm->m_gravity * abs_QPw / m_suhmoParm->m_L; 
 
                 mR(iv,0)   = std::max(mR(iv,0), 0.0);
-                if (Pressi(iv, 0) == 0.0) {
+                if (Pressi(iv,0) < 1e-18 ) {
                     mR(iv,0)   = 0.0;
                 }
 
