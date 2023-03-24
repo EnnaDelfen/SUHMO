@@ -23,30 +23,6 @@
 
 #include "NamespaceHeader.H"
 
-//class VCPoissonParameters
-//{
-//public:
-//
-//  void getPoissonParameters (VCPoissonParameters&  a_params);
-//
-//  IntVect      nCells;
-//  int          maxGridSize;
-//  int          blockFactor;
-//  int          bufferSize;
-//  Real         fillRatio;
-//  Real         refineThresh;
-//  int          domBcType;
-//  int          maxLevel;
-//  int          numLevels;
-//  Vector<int>  refRatio;
-//  ProblemDomain coarsestDomain;
-//  Real         coarsestDx;
-//  RealVect     domainLength;
-//  RealVect     probLo;
-//  RealVect     probHi;
-//  Real         alpha;
-//  Real         beta;
-//};
 
 /// Physical/domain initial and boundary conditions
 /**
