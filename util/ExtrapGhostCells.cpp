@@ -54,6 +54,18 @@ ExtrapGhostCells(LevelData<FArrayBox>& a_phi,
     }
 }
 
+void 
+CopyGhostCells(LevelData<FArrayBox>& a_phi,
+                 const ProblemDomain& a_domain)
+{
+    DataIterator dit = a_phi.dataIterator();
+    for (dit.begin(); dit.ok(); ++dit) {
+          CopyGhostCells(a_phi[dit], a_domain, 
+                         a_phi.ghostVect(), -1);
+    }
+}
+
+
 
 void 
 ExtrapGhostCellsEC(FluxBox& a_phi,

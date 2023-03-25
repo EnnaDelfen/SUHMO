@@ -25,6 +25,7 @@
 
 #include "NamespaceHeader.H"
 
+/* Higher level */
 void 
 ExtrapGhostCellsEC(LevelData<FluxBox>& a_phi,
                    const ProblemDomain& a_domain);
@@ -32,6 +33,16 @@ ExtrapGhostCellsEC(LevelData<FluxBox>& a_phi,
 void 
 ExtrapGhostCells(LevelData<FArrayBox>& a_phi,
                  const ProblemDomain& a_domain);
+
+void 
+CopyGhostCellsEC(LevelData<FluxBox>& a_phi,
+                 const ProblemDomain& a_domain);
+
+void 
+CopyGhostCells(LevelData<FArrayBox>& a_phi,
+               const ProblemDomain& a_domain);
+
+
 
 void 
 ExtrapGhostCellsEC(FluxBox& a_phi,
@@ -43,10 +54,6 @@ ExtrapGhostCells(FArrayBox& a_phi,
                  const ProblemDomain& a_domain,
                  const IntVect& a_ghostVect,
                  int dir_edges);
-
-void 
-CopyGhostCellsEC(LevelData<FluxBox>& a_phi,
-                 const ProblemDomain& a_domain);
 
 void 
 CopyGhostCells(FArrayBox& a_phi,
