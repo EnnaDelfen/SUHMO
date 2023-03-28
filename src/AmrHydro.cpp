@@ -435,44 +435,6 @@ void FixedNeumBCFill(FArrayBox& a_state,
 }
 
 
-/* This function forces the ghost cells on the domain boundaries of a_state to be 0 -- no linear interpolation */ 
-void NullBCFill(FArrayBox& a_state,
-                const Box& a_valid,
-                const ProblemDomain& a_domain,
-                RealVect a_dx)
-{
-  // If box is outside of domain bounds ?
-  if(!a_domain.domainBox().contains(a_state.box())) {
-      for(int dir=0; dir<CH_SPACEDIM; ++dir) {
-          // don't do anything if periodic -- should be perio in y dir 1
-          if (!a_domain.isPeriodic(dir)) {
-
-              Box ghostBoxLo = adjCellBox(a_valid, dir, Side::Lo, 1);
-              Box ghostBoxHi = adjCellBox(a_valid, dir, Side::Hi, 1);
-
-              if ((!a_domain.domainBox().contains(ghostBoxLo)) && (a_state.box().contains(ghostBoxLo)) ) {
-                  ghostBoxLo &= a_state.box();
-                  for (BoxIterator bit(ghostBoxLo); bit.ok(); ++bit) {
-                      IntVect ivTo = bit();
-                      a_state(ivTo, 0) = 0.0;
-                  }
-              } // End ghostBoxLo in dir
-
-              if ((!a_domain.domainBox().contains(ghostBoxHi)) && (a_state.box().contains(ghostBoxHi)) ) {
-                  ghostBoxHi &= a_state.box();
-                  for (BoxIterator bit(ghostBoxHi); bit.ok(); ++bit) {
-                      IntVect ivTo = bit();
-                      a_state(ivTo, 0) = 0.0;
-                  }
-              } // End ghostBoxHi in dir
-
-          } // end if is not periodic in ith direction
-      } // end dir loop
-  }
-}
-
-
-
 /* AmrHydro class functions */
 void
 AmrHydro::check_fluxes(Vector<RefCountedPtr<LevelData<FluxBox> > >&   a_bCoef)
@@ -2268,13 +2230,13 @@ AmrHydro::timeStepFAS(Real a_dt)
 
             // Fill BC ghost cells of h and b
             mixBCValues(currentH[dit], validBox, m_amrDomains[lev], m_amrDx[lev], false);
-            FixedNeumBCFill(currentB[dit], validBox, m_amrDomains[lev], m_amrDx[lev], false);
 
             // Copy curr into old -- copy ghost cells too 
             oldH[dit].copy(currentH[dit], 0, 0, 1);
             oldB[dit].copy(currentB[dit], 0, 0, 1);
         }
         ExtrapGhostCells( currentRe, m_amrDomains[lev]);
+        CopyGhostCells( currentB, m_amrDomains[lev]);
 
         LevelData<FluxBox>&   levelPi_ec   = *a_Pi_ec[lev];
         CellToEdge(levelcurPi, levelPi_ec);
@@ -2358,11 +2320,11 @@ AmrHydro::timeStepFAS(Real a_dt)
                 // get the validBox & fill BC ghost cells
                 const Box& validBox = levelGrids.get(dit);
                 mixBCValues(levelcurH[dit], validBox, m_amrDomains[lev], m_amrDx[lev], false);
-                FixedNeumBCFill(levelcurB[dit], validBox, m_amrDomains[lev], m_amrDx[lev], false);
 
                 levelnewH_lag[dit].copy(levelcurH[dit], 0, 0, 1); // should copy ghost cells too !
                 levelnewB_lag[dit].copy(levelcurB[dit], 0, 0, 1); // should copy ghost cells too !
             }
+            CopyGhostCells( levelcurB, m_amrDomains[lev]);
             ExtrapGhostCells( levelcurRe, m_amrDomains[lev]);
             ExtrapGhostCells( levelmR, m_amrDomains[lev]);
 
@@ -4897,13 +4859,7 @@ AmrHydro::initData(Vector<RefCountedPtr<LevelData<FArrayBox>> >& a_head)
         levelHead.copyTo(*m_old_head[lev]);
         levelGapHeight.copyTo(*m_old_gapheight[lev]);
 
-        const DisjointBoxLayout& levelGrids = m_amrGrids[lev];
-        DataIterator dit                    = levelzBed.dataIterator();
-        for (dit.begin(); dit.ok(); ++dit) {
-            // get the validBox
-            const Box& validBox = levelGrids.get(dit);
-            FixedNeumBCFill(levelzBed[dit], validBox, m_amrDomains[lev], m_amrDx[lev], false);
-        }
+        CopyGhostCells( levelzBed, m_amrDomains[lev]);
     }
 
     //writePlotFile();
