@@ -63,6 +63,36 @@ c ----------------------------------------------------
       end
 
 
+c ----------------------------------------------------
+c  nullify data into ghost cells
+c ----------------------------------------------------
+      subroutine NULLBC(CHF_FRA[phi],
+     &                  CHF_BOX[bcbox],
+     &                  CHF_INT[dir],
+     &                  CHF_INT[hiLo])
+
+      integer CHF_AUTODECL[i]
+      integer CHF_AUTODECL[ii]
+      integer n
+      integer offset
+
+      offset = 1
+      if (hiLo.eq.0) offset = -1
+
+      CHF_DTERM[ii0 = offset*CHF_ID(0,dir);
+                ii1 = offset*CHF_ID(1,dir);
+                ii2 = offset*CHF_ID(2,dir)]
+
+      do n  = 0, CHF_NCOMP[phi]-1
+         CHF_AUTOMULTIDO[bcbox; i]
+            phi(CHF_AUTOIX[i],n) = 0.0
+         CHF_ENDDO
+      enddo
+
+      return
+      end
+
+
 
 
 c ----------------------------------------------------
