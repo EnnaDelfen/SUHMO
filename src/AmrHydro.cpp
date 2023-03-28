@@ -1500,7 +1500,7 @@ AmrHydro::compute_grad_zb_ec(int                 lev,
                              LevelData<FluxBox>& a_levelgradZb_ec)
 {
     // Compute grad(zb) -EC only - 
-    LevelData<FArrayBox>& levelZb       = *m_bedelevation[lev];
+    LevelData<FArrayBox>& levelZb    = *m_bedelevation[lev];
     LevelData<FArrayBox>* crsePsiPtr = NULL;
     LevelData<FArrayBox>* finePsiPtr = NULL;
     int nRefCrse=-1;
@@ -1526,8 +1526,8 @@ AmrHydro::compute_grad_head(int lev)
 {
     // Compute grad(h) -EC and CC- 
     LevelData<FArrayBox>& levelcurrentH = *m_head[lev];
-    LevelData<FArrayBox>& levelgradH    = *m_gradhead[lev];
-    LevelData<FluxBox>&   levelgradH_ec = *m_gradhead_ec[lev];
+    LevelData<FArrayBox>& levelgradH    = *m_gradhead[lev];    // GC
+    LevelData<FluxBox>&   levelgradH_ec = *m_gradhead_ec[lev]; // No GC
 
     // TEST
     LevelData<FArrayBox>& levelPi       = *m_overburdenpress[lev];
@@ -1567,6 +1567,7 @@ AmrHydro::compute_grad_head(int lev)
                              crsePsiPtr, finePsiPtr,
                              dx, nRefCrse, nRefFine,
                              m_amrDomains[lev], &levelPi);
+    /* Need to perform some checks */
 }
 
 
@@ -1686,7 +1687,7 @@ AmrHydro::aCoeff_bCoeff(LevelData<FArrayBox>&  levelacoef,
         FArrayBox& aC     = levelacoef[dit];
         FluxBox& bC       = levelbcoef[dit];
         FluxBox& Re       = levelRe[dit];
-        FluxBox& Pressi   = levelPi[dit];
+        FluxBox& Pressi   = levelPi[dit];   // this is not actually used -- remnant of fake EB
 
         aC.setVal(0.0);
 
@@ -2160,13 +2161,12 @@ AmrHydro::timeStepFAS(Real a_dt)
         LevelData<FArrayBox>& oldB       = *m_old_gapheight[lev];
         LevelData<FArrayBox>& currentB   = *m_gapheight[lev];
 
-        LevelData<FArrayBox>& currentRe  = *m_Re[lev];
         LevelData<FArrayBox>& levelcurPi = *m_overburdenpress[lev];
 
         // handle ghost cells on the coarse-fine interface
         // Linear interp better
         if (lev > 0) {
-            int nGhost = currentRe.ghostVect()[0];
+            int nGhost = currentB.ghostVect()[0];
             PiecewiseLinearFillPatch headFiller(m_amrGrids[lev],
                                                 m_amrGrids[lev - 1],
                                                 1, // ncomps
@@ -2175,14 +2175,11 @@ AmrHydro::timeStepFAS(Real a_dt)
                                                 nGhost);
             headFiller.fillInterp(*m_head[lev], *m_head[lev-1], *m_head[lev-1], 0.0, 0, 0, 1);
             headFiller.fillInterp(*m_gapheight[lev], *m_gapheight[lev-1], *m_gapheight[lev-1], 0.0, 0, 0, 1);
-            headFiller.fillInterp(*m_Re[lev], *m_Re[lev-1], *m_Re[lev-1], 0.0, 0, 0, 1);
         }
 
         // fill perio boundaries
         currentH.exchange();
         currentB.exchange();
-        currentRe.exchange();
-
 
         // Head and b RHS
         RHS_h[lev]                = new LevelData<FArrayBox>(m_amrGrids[lev], 1, IntVect::Zero);
@@ -2224,6 +2221,7 @@ AmrHydro::timeStepFAS(Real a_dt)
         // Get the valid boxes
         const DisjointBoxLayout& levelGrids = m_amrGrids[lev];
         DataIterator dit                    = currentH.dataIterator();
+        CopyGhostCells( currentB, m_amrDomains[lev]);
         for (dit.begin(); dit.ok(); ++dit) {
             // get the validBox
             const Box& validBox = levelGrids.get(dit);
@@ -2235,8 +2233,6 @@ AmrHydro::timeStepFAS(Real a_dt)
             oldH[dit].copy(currentH[dit], 0, 0, 1);
             oldB[dit].copy(currentB[dit], 0, 0, 1);
         }
-        ExtrapGhostCells( currentRe, m_amrDomains[lev]);
-        CopyGhostCells( currentB, m_amrDomains[lev]);
 
         LevelData<FluxBox>&   levelPi_ec   = *a_Pi_ec[lev];
         CellToEdge(levelcurPi, levelPi_ec);
@@ -2287,7 +2283,6 @@ AmrHydro::timeStepFAS(Real a_dt)
             LevelData<FluxBox>&   levelnewB_ec   = *a_GapHeight_ec[lev];
             LevelData<FluxBox>&   levelmR_ec     = *a_meltRate_ec[lev];
 
-            LevelData<FArrayBox>& levelcurRe     = *m_Re[lev];
             LevelData<FArrayBox>& levelmR        = *m_meltRate[lev];
 
             // Get the valid boxes
@@ -2304,18 +2299,17 @@ AmrHydro::timeStepFAS(Real a_dt)
                                                     nGhost);
                 headFiller.fillInterp(*m_head[lev], *m_head[lev-1], *m_head[lev-1], 0.0, 0, 0, 1);
                 headFiller.fillInterp(*m_gapheight[lev], *m_gapheight[lev-1], *m_gapheight[lev-1], 0.0, 0, 0, 1);
-                headFiller.fillInterp(*m_Re[lev], *m_Re[lev-1], *m_Re[lev-1], 0.0, 0, 0, 1);
                 headFiller.fillInterp(*m_meltRate[lev], *m_meltRate[lev-1], *m_meltRate[lev-1], 0.0, 0, 0, 1);
             }
 
             // fill perio boundaries
             levelcurH.exchange();
             levelcurB.exchange();
-            levelcurRe.exchange();
             levelmR.exchange();
 
             // Fill BC and put h into h_lag
             DataIterator dit = levelnewH_lag.dataIterator();
+            CopyGhostCells( levelcurB, m_amrDomains[lev]);
             for (dit.begin(); dit.ok(); ++dit) {
                 // get the validBox & fill BC ghost cells
                 const Box& validBox = levelGrids.get(dit);
@@ -2324,18 +2318,16 @@ AmrHydro::timeStepFAS(Real a_dt)
                 levelnewH_lag[dit].copy(levelcurH[dit], 0, 0, 1); // should copy ghost cells too !
                 levelnewB_lag[dit].copy(levelcurB[dit], 0, 0, 1); // should copy ghost cells too !
             }
-            CopyGhostCells( levelcurB, m_amrDomains[lev]);
-            ExtrapGhostCells( levelcurRe, m_amrDomains[lev]);
             ExtrapGhostCells( levelmR, m_amrDomains[lev]);
 
             // Interpolate b to edges
             CellToEdge(levelcurB, levelnewB_ec);
-            CellToEdge(levelmR, levelmR_ec);
+            CellToEdge(levelmR, levelmR_ec);   // only used for the melting Diff coeff
 
         }  // loop on levs -- same thing, we should start with consistent b and h GC/BC and all
 
 
-        //         Compute grad(h) and grad(zb)
+        //         Compute grad(h) and grad(zb) and lazy diff coef
         if (m_verbosity > 3) {
             pout() <<"        Compute grad(h) and grad(Zb) "<< endl;
         }
@@ -2344,7 +2336,7 @@ AmrHydro::timeStepFAS(Real a_dt)
             compute_grad_head(lev);
 
             // Compute grad(Zb) -EC-
-            LevelData<FluxBox>& levelgradZb_ec  = *a_gradZb_ec[lev];
+            LevelData<FluxBox>& levelgradZb_ec  = *a_gradZb_ec[lev]; // No GC for this variable
             compute_grad_zb_ec(lev, levelgradZb_ec);
 
             // Compute dCoeff -- LAZY version using all of the mR  
@@ -2503,7 +2495,23 @@ AmrHydro::timeStepFAS(Real a_dt)
                 }
                 // Need to fill the ghost cells of Re -- extrapolate on perio boundaries   
                 levelRe.exchange();
-                ExtrapGhostCells( levelRe, m_amrDomains[lev]);
+                //CopyGhostCells( levelRe, m_amrDomains[lev]);
+
+                /* DEBUG */
+                //DisjointBoxLayout& levelGrids       = m_amrGrids[lev];
+                //DataIterator dit                    = levelGrids.dataIterator();
+                //for (dit.begin(); dit.ok(); ++dit) {
+                //    FArrayBox& levelRetmp   = levelRe[dit];
+                //    BoxIterator bit(levelRetmp.box());
+                //    for (bit.begin(); bit.ok(); ++bit) {
+                //        IntVect iv = bit();
+                //        if (iv[1] == 4) {
+                //            pout() << "Re after ExtrapGhostCells (iv, Re) = "<< iv << " " << levelRetmp(iv,0) << endl;  
+                //        }
+                //    }
+                //}
+                /*DEBUG*/
+
                 CellToEdge(levelRe, levelRe_ec);
 
                 // For Qw
@@ -2527,7 +2535,21 @@ AmrHydro::timeStepFAS(Real a_dt)
                 }
                 // Need to fill the ghost cells -- extrapolate on boundaries   
                 levelQw.exchange();
-                ExtrapGhostCells( levelQw, m_amrDomains[lev]);
+                //ExtrapGhostCells( levelQw, m_amrDomains[lev]);
+
+                /* DEBUG */
+                //for (dit.begin(); dit.ok(); ++dit) {
+                //    FArrayBox& levelQtmp   = levelQw[dit];
+                //    BoxIterator bit(levelQtmp.box());
+                //    for (bit.begin(); bit.ok(); ++bit) {
+                //        IntVect iv = bit();
+                //        if (iv[1] == 4) {
+                //            pout() << "Qw after ExtrapGhostCells (iv, QwX) = "<< iv << " " << levelQtmp(iv,0) << endl;  
+                //        }
+                //    }
+                //}
+                /*DEBUG*/
+
             } // end loop on levs
         }
         // Just in case the quad resolution gives funky results
@@ -3044,7 +3066,7 @@ AmrHydro::timeStepFAS(Real a_dt)
         }
         // Need to fill the ghost cells of Re -- extrapolate on boundaries   
         levelRe.exchange();
-        ExtrapGhostCells( levelRe, m_amrDomains[lev]);
+        //CopyGhostCells( levelRe, m_amrDomains[lev]);
         CellToEdge(levelRe, levelRe_ec);
 
         /* Update Qw */
@@ -3068,7 +3090,7 @@ AmrHydro::timeStepFAS(Real a_dt)
         }
         // Need to fill the ghost cells -- extrapolate on boundaries   
         levelQw.exchange();
-        ExtrapGhostCells( levelQw, m_amrDomains[lev]);
+        //ExtrapGhostCells( levelQw, m_amrDomains[lev]);
 
         /* Compute grad(Zb) -EC- */ 
         // NOTE does not change right now so useless
