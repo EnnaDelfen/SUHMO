@@ -222,8 +222,8 @@ SqrtIBC::initializeData(RealVect& a_dx,
                 thiszbed(iv, 0)      = Params.m_slope*x_loc;
             }
             /* initial gap height */
-            //thisGapHeight(iv, 0) = Params.m_gapInit;
-            thisGapHeight(iv, 0) = std::max(Params.m_gapInit + dist2(generator2), 0.0001);
+            thisGapHeight(iv, 0) = Params.m_gapInit;
+            //thisGapHeight(iv, 0) = std::max(Params.m_gapInit + dist2(generator2), 0.0001);
             /* Ice height (should be ice only, so surface - (bed + gap)) */
             // parabolic profile
             thisiceHeight(iv, 0) = 6.0 * (std::sqrt(x_loc + Params.m_H) - std::sqrt(Params.m_H)) + 1.0;
