@@ -1545,11 +1545,13 @@ AmrHydro::compute_grad_head(int lev)
         nRefFine = m_refinement_ratios[lev];
     }
     RealVect dx = m_amrDx[lev];  
-    // CC version
-    Gradient::compGradientCC(levelgradH, levelcurrentH,
+    // EC version
+    Gradient::compGradientMAC(levelgradH_ec, levelcurrentH,
                              crsePsiPtr, finePsiPtr,
                              dx, nRefCrse, nRefFine,
                              m_amrDomains[lev], &levelPi);
+    // CC version
+    EdgeToCell(levelgradH_ec, levelgradH); 
     // handle ghost cells on the coarse-fine interface
     if (lev > 0) {
         QuadCFInterp qcfi(m_amrGrids[lev], &m_amrGrids[lev-1],
@@ -1560,14 +1562,21 @@ AmrHydro::compute_grad_head(int lev)
     }
     // Need to fill the ghost cells of gradH -- extrapolate on the no perio boundaries   
     levelgradH.exchange();
-    ExtrapGhostCells( levelgradH, m_amrDomains[lev]);
+    ExtrapGhostCells( levelgradH, m_amrDomains[lev]); // need this otherwise GC of gradH is crap
 
-    // EC version
-    Gradient::compGradientMAC(levelgradH_ec, levelcurrentH,
-                             crsePsiPtr, finePsiPtr,
-                             dx, nRefCrse, nRefFine,
-                             m_amrDomains[lev], &levelPi);
     /* Need to perform some checks */
+    //DisjointBoxLayout& levelGrids       = m_amrGrids[lev];
+    //DataIterator dit                    = levelGrids.dataIterator();
+    //for (dit.begin(); dit.ok(); ++dit) {
+    //    FArrayBox& tmpvar   = levelgradH[dit];
+    //    BoxIterator bit(tmpvar.box());
+    //    for (bit.begin(); bit.ok(); ++bit) {
+    //        IntVect iv = bit();
+    //        if (iv[1] == 4) {
+    //            pout() << "iv, GradX, GradY = "<< iv << " " << tmpvar(iv,0) << " " << tmpvar(iv,1) << endl;  
+    //        }
+    //    }
+    //}
 }
 
 
@@ -1632,11 +1641,12 @@ AmrHydro::evaluate_Re_quadratic(int lev, bool computeGrad)
             nRefFine = m_refinement_ratios[lev];
         }
         RealVect dx = m_amrDx[lev];  
-        // CC version
-        Gradient::compGradientCC(levelgradH, levelcurrentH,
+        // EC version
+        Gradient::compGradientMAC(levelgradH_ec, levelcurrentH,
                                  crsePsiPtr, finePsiPtr,
                                  dx, nRefCrse, nRefFine,
                                  m_amrDomains[lev], &levelPi);
+        EdgeToCell(levelgradH_ec, levelgradH); 
         // handle ghost cells on the coarse-fine interface
         if (lev > 0) {
             QuadCFInterp qcfi(m_amrGrids[lev], &m_amrGrids[lev-1],
@@ -1648,12 +1658,6 @@ AmrHydro::evaluate_Re_quadratic(int lev, bool computeGrad)
         // Need to fill the ghost cells of gradH -- extrapolate on the no perio boundaries   
         levelgradH.exchange();
         ExtrapGhostCells( levelgradH, m_amrDomains[lev]);
-
-        // EC version
-        Gradient::compGradientMAC(levelgradH_ec, levelcurrentH,
-                                 crsePsiPtr, finePsiPtr,
-                                 dx, nRefCrse, nRefFine,
-                                 m_amrDomains[lev], &levelPi);
     }
 
     // Compute Re at CC
@@ -3090,7 +3094,6 @@ AmrHydro::timeStepFAS(Real a_dt)
         }
         // Need to fill the ghost cells -- extrapolate on boundaries   
         levelQw.exchange();
-        //ExtrapGhostCells( levelQw, m_amrDomains[lev]);
 
         /* Compute grad(Zb) -EC- */ 
         // NOTE does not change right now so useless
