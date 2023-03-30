@@ -249,7 +249,6 @@ CopyGhostCells(FArrayBox& a_phi,
               ghostBoxHi = adjCellHi(domainBox, 
                                      dir, rad);
           }
-          //pout() << "triphi " << ghostBoxHi << endl;
           // do this to try to catch corner cells
           ghostBoxHi.grow(1);
           ghostBoxHi.grow(dir,-1);
@@ -340,7 +339,6 @@ NullGhostCells(FArrayBox& a_phi,
               ghostBoxHi = adjCellHi(domainBox, 
                                      dir, rad);
           }
-          //pout() << "triphi " << ghostBoxHi << endl;
           // do this to try to catch corner cells
           ghostBoxHi.grow(1);
           ghostBoxHi.grow(dir,-1);
