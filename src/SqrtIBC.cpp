@@ -228,7 +228,7 @@ SqrtIBC::initializeData(RealVect& a_dx,
             // parabolic profile
             thisiceHeight(iv, 0) = 6.0 * (std::sqrt(x_loc + Params.m_H) - std::sqrt(Params.m_H)) + 1.0;
             /* Ice overburden pressure : rho_i * g * H */
-            thispi(iv, 0)        = Params.m_rho_i * Params.m_gravity * thisiceHeight(iv, 0);
+            thispi(iv, 0)        = std::max(Params.m_rho_i * Params.m_gravity * thisiceHeight(iv, 0), 0.0);
             
             /* option 1: guess Pw, find head */
             // Water press ?? No idea --> Pi/2.0
