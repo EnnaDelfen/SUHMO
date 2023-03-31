@@ -115,6 +115,28 @@ HydroIBC::resetCovered(suhmo_params Params,
     // Do nothing 
 }
 
+void 
+HydroIBC::setup_iceMask(RealVect& a_dx,
+                        suhmo_params Params,
+                        LevelData<FArrayBox>& a_Pi,
+                        LevelData<FArrayBox>& a_iceMask)
+{
+    DataIterator dit = a_iceMask.dataIterator();
+    for (dit.begin(); dit.ok(); ++dit) {
+        FArrayBox& thispi        = a_Pi[dit];
+        FArrayBox& thisiceMask   = a_iceMask[dit];
+        
+        BoxIterator bit(thisiceMask.box()); 
+        for (bit.begin(); bit.ok(); ++bit) {
+            IntVect iv = bit();
+
+            /* Where do we disable the gradient computations */
+            thisiceMask(iv, 0)        = 1.0;
+            
+        } // end loop over cells
+    }     // end loop over boxes
+}
+
 /** Set up initial conditions 
  */
 void

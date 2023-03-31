@@ -112,6 +112,11 @@ public:
                               LevelData<FArrayBox>& a_head,
                               LevelData<FArrayBox>& a_Pi);
 
+    virtual void setup_iceMask(RealVect& a_dx,
+                               suhmo_params Params,
+                               LevelData<FArrayBox>& a_Pi,
+                               LevelData<FArrayBox>& a_iceMask);
+
     /// Set boundary fluxes
     /**
      */
