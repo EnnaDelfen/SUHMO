@@ -226,7 +226,7 @@ SqrtIBC::initializeData(RealVect& a_dx,
             //thisGapHeight(iv, 0) = std::max(Params.m_gapInit + dist2(generator2), 0.0001);
             /* Ice height (should be ice only, so surface - (bed + gap)) */
             // parabolic profile
-            thisiceHeight(iv, 0) = 6.0 * (std::sqrt(x_loc + Params.m_H) - std::sqrt(Params.m_H)) + 1.0;
+            thisiceHeight(iv, 0) = std::max(6.0 * (std::sqrt(x_loc + Params.m_H) - std::sqrt(Params.m_H)) + 1.0, 0.0);  
             /* Ice overburden pressure : rho_i * g * H */
             thispi(iv, 0)        = std::max(Params.m_rho_i * Params.m_gravity * thisiceHeight(iv, 0), 0.0);
             
