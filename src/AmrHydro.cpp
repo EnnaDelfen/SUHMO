@@ -634,6 +634,7 @@ AmrHydro::SolveForHead_nl(const Vector<DisjointBoxLayout>&               a_grids
     Vector<RefCountedPtr<LevelData<FArrayBox> > > B(m_finest_level + 1);
     Vector<RefCountedPtr<LevelData<FArrayBox> > > Pri(m_finest_level + 1);
     Vector<RefCountedPtr<LevelData<FArrayBox> > > zb(m_finest_level + 1);
+    Vector<RefCountedPtr<LevelData<FArrayBox> > > mask(m_finest_level + 1);
 
     IntVect nGhost  = m_num_head_ghost * IntVect::Unit;
 
@@ -641,15 +642,18 @@ AmrHydro::SolveForHead_nl(const Vector<DisjointBoxLayout>&               a_grids
         B[lev]   = RefCountedPtr<LevelData<FArrayBox> >(new LevelData<FArrayBox>(m_amrGrids[lev], 1, nGhost));
         Pri[lev] = RefCountedPtr<LevelData<FArrayBox> >(new LevelData<FArrayBox>(m_amrGrids[lev], 1, nGhost));
         zb[lev]  = RefCountedPtr<LevelData<FArrayBox> >(new LevelData<FArrayBox>(m_amrGrids[lev], 1, nGhost));
+        mask[lev]  = RefCountedPtr<LevelData<FArrayBox> >(new LevelData<FArrayBox>(m_amrGrids[lev], 1, nGhost));
 
         LevelData<FArrayBox>& levelGapHeight    = *m_gapheight[lev];
         LevelData<FArrayBox>& levelPressi       = *m_overburdenpress[lev];
         LevelData<FArrayBox>& levelBedElevation = *m_bedelevation[lev];
+        LevelData<FArrayBox>& levelIceMask      = *m_iceMask[lev];
         DataIterator dit = levelGapHeight.dataIterator();
         for (dit.begin(); dit.ok(); ++dit) {
             (*B[lev])[dit].copy(  levelGapHeight[dit], 0, 0, 1);
             (*Pri[lev])[dit].copy(levelPressi[dit], 0, 0, 1);
             (*zb[lev])[dit].copy( levelBedElevation[dit], 0, 0, 1);
+            (*mask[lev])[dit].copy(levelIceMask[dit], 0, 0, 1);
         }
     }
 
@@ -666,7 +670,7 @@ AmrHydro::SolveForHead_nl(const Vector<DisjointBoxLayout>&               a_grids
                            - 1.0, a_bCoef,
                           this, NLfunctTmp, wFfunctTmp,
                           PDfunctTmp,
-                          B, Pri, zb, m_compute_Bcoeff);
+                          B, Pri, zb, mask, m_compute_Bcoeff);
 
     AMRLevelOpFactory<LevelData<FArrayBox> >& opFactoryPtr = (AMRLevelOpFactory<LevelData<FArrayBox> >& ) poissonOpF_head;
 
@@ -1102,6 +1106,9 @@ AmrHydro::initialize()
         // Bed randomization
         m_bumpHeight.resize(m_max_level + 1);
         m_bumpSpacing.resize(m_max_level + 1);
+ 
+        // Misc
+        m_iceMask.resize(m_max_level + 1);
 
         //-------------------------------------------------
         // For each level, define a collection of FArray/FluxBox
@@ -1129,6 +1136,8 @@ AmrHydro::initialize()
 
             m_bumpHeight[lev]  = RefCountedPtr<LevelData<FArrayBox>>  (new LevelData<FArrayBox>);
             m_bumpSpacing[lev] = RefCountedPtr<LevelData<FArrayBox>>  (new LevelData<FArrayBox>);
+
+            m_iceMask[lev] = RefCountedPtr<LevelData<FArrayBox>>  (new LevelData<FArrayBox>);
         }
 
 
@@ -1355,7 +1364,7 @@ void AmrHydro::WFlx_level(LevelData<FluxBox>&          a_bcoef,
                           const LevelData<FArrayBox>&  a_u,
                           const LevelData<FArrayBox>*  a_ucoarse,
                           LevelData<FArrayBox>&        a_B,
-                          LevelData<FArrayBox>&        a_Pi,
+                          LevelData<FArrayBox>&        a_mask,
                           RealVect                     a_dx,
                           bool                         a_print_WFX,
                           int                          a_smooth,
@@ -1381,7 +1390,7 @@ void AmrHydro::WFlx_level(LevelData<FluxBox>&          a_bcoef,
     Gradient::compGradientCC(lvlgradH, lcl_u,
                              crsePsiPtr, finePsiPtr,
                              a_dx, nRefCrse, nRefFine,
-                             levelDomain, &a_Pi);
+                             levelDomain, &a_mask);
 
     // handle ghost cells on the coarse-fine interface
     if ( a_ucoarse != NULL) {
@@ -1401,7 +1410,7 @@ void AmrHydro::WFlx_level(LevelData<FluxBox>&          a_bcoef,
         Gradient::compGradientCC(lvlgradHcoarse, lcl_ucoarse,
                                  crsePsiPtr, finePsiPtr,
                                  a_dxcoarse, nRefCrse, nRefFine,
-                                 levelDomaincoarse, m_overburdenpress[a_depth-1]);
+                                 levelDomaincoarse, m_iceMask[a_depth-1]);
         lvlgradHcoarse.exchange();
         ExtrapGhostCells( lvlgradHcoarse, levelDomaincoarse);
 
@@ -1433,10 +1442,8 @@ void AmrHydro::WFlx_level(LevelData<FluxBox>&          a_bcoef,
     // CC -> EC
     LevelData<FluxBox>   lvlB_ec(levelGrids, 1, IntVect::Zero);
     LevelData<FluxBox>   lvlRe_ec(levelGrids, 1, IntVect::Zero);
-    LevelData<FluxBox>   lvlPi_ec(levelGrids, 1, IntVect::Zero);
     CellToEdge(lvlRe, lvlRe_ec);
     CellToEdge(a_B, lvlB_ec);
-    CellToEdge(a_Pi, lvlPi_ec);
 
     // Update Bcoef
     dit = a_bcoef.dataIterator();
@@ -1444,7 +1451,6 @@ void AmrHydro::WFlx_level(LevelData<FluxBox>&          a_bcoef,
         FluxBox& bC        = a_bcoef[dit];
         FluxBox& B_ec      = lvlB_ec[dit];
         FluxBox& Re_ec     = lvlRe_ec[dit];
-        FluxBox& Pressi    = lvlPi_ec[dit];
         // loop over directions
         for (int dir = 0; dir<SpaceDim; dir++) {
 
@@ -1452,7 +1458,6 @@ void AmrHydro::WFlx_level(LevelData<FluxBox>&          a_bcoef,
 
             FORT_COMPUTEBCOEFF( CHF_FRA(B_ec[dir]),
                                 CHF_FRA(Re_ec[dir]),
-                                CHF_FRA(Pressi[dir]),
                                 CHF_BOX(region),
                                 CHF_FRA(bC[dir]),
                                 CHF_CONST_REAL(m_suhmoParm->m_omega),
@@ -1519,7 +1524,7 @@ AmrHydro::compute_grad_zb_ec(int                 lev,
     Gradient::compGradientMAC(a_levelgradZb_ec, levelZb,
                               crsePsiPtr, finePsiPtr,
                               dx, nRefCrse, nRefFine,
-                              m_amrDomains[lev], m_overburdenpress[lev]);
+                              m_amrDomains[lev], m_iceMask[lev]);
 }
 
 void
@@ -1531,7 +1536,7 @@ AmrHydro::compute_grad_head(int lev)
     LevelData<FluxBox>&   levelgradH_ec = *m_gradhead_ec[lev]; // No GC
 
     // TEST
-    LevelData<FArrayBox>& levelPi       = *m_overburdenpress[lev];
+    LevelData<FArrayBox>& levelIceMask  = *m_iceMask[lev];    
 
     LevelData<FArrayBox>* crsePsiPtr = NULL;
     LevelData<FArrayBox>* finePsiPtr = NULL;
@@ -1550,7 +1555,7 @@ AmrHydro::compute_grad_head(int lev)
     Gradient::compGradientMAC(levelgradH_ec, levelcurrentH,
                              crsePsiPtr, finePsiPtr,
                              dx, nRefCrse, nRefFine,
-                             m_amrDomains[lev], &levelPi);
+                             m_amrDomains[lev], &levelIceMask);
     // CC version
     EdgeToCell(levelgradH_ec, levelgradH); 
     // handle ghost cells on the coarse-fine interface
@@ -1623,7 +1628,7 @@ AmrHydro::evaluate_Re_quadratic(int lev, bool computeGrad)
     LevelData<FArrayBox>& levelRe       = *m_Re[lev]; 
     LevelData<FArrayBox>& levelgradH    = *m_gradhead[lev];
     LevelData<FArrayBox>& levelB        = *m_gapheight[lev];    
-    LevelData<FArrayBox>& levelPi       = *m_overburdenpress[lev];    
+    LevelData<FArrayBox>& levelIceMask  = *m_iceMask[lev];    
 
     if (computeGrad) {
         // Compute grad(h) -EC and CC- 
@@ -1647,7 +1652,7 @@ AmrHydro::evaluate_Re_quadratic(int lev, bool computeGrad)
         Gradient::compGradientMAC(levelgradH_ec, levelcurrentH,
                                  crsePsiPtr, finePsiPtr,
                                  dx, nRefCrse, nRefFine,
-                                 m_amrDomains[lev], &levelPi);
+                                 m_amrDomains[lev], &levelIceMask);
         EdgeToCell(levelgradH_ec, levelgradH); 
         // handle ghost cells on the coarse-fine interface
         if (lev > 0) {
@@ -1693,7 +1698,6 @@ AmrHydro::aCoeff_bCoeff(LevelData<FArrayBox>&  levelacoef,
         FArrayBox& aC     = levelacoef[dit];
         FluxBox& bC       = levelbcoef[dit];
         FluxBox& Re       = levelRe[dit];
-        FluxBox& Pressi   = levelPi[dit];   // this is not actually used -- remnant of fake EB
 
         aC.setVal(0.0);
 
@@ -1704,7 +1708,6 @@ AmrHydro::aCoeff_bCoeff(LevelData<FArrayBox>&  levelacoef,
 
             FORT_COMPUTEBCOEFF( CHF_FRA(B[dir]),
                                 CHF_FRA(Re[dir]),
-                                CHF_FRA(Pressi[dir]),
                                 CHF_BOX(region),
                                 CHF_FRA(bC[dir]),
                                 CHF_CONST_REAL(m_suhmoParm->m_omega),
@@ -4169,6 +4172,7 @@ AmrHydro::regrid()
             m_meltRate[lev]        = destructiveRegrid(m_meltRate[lev], newDBL, m_meltRate[lev-1], m_refinement_ratios[lev-1]);
             // other reason
             m_Pw[lev]              = destructiveRegrid(m_Pw[lev], newDBL, m_Pw[lev-1], m_refinement_ratios[lev-1]);
+            m_iceMask[lev]         = destructiveRegrid(m_iceMask[lev], newDBL, m_iceMask[lev-1], m_refinement_ratios[lev-1]);
 
             // GC
             ExtrapGhostCells( *m_bumpHeight[lev], m_amrDomains[lev]);
@@ -4179,8 +4183,9 @@ AmrHydro::regrid()
             ExtrapGhostCells( *m_magVel[lev], m_amrDomains[lev]);
             ExtrapGhostCells( *m_meltRate[lev], m_amrDomains[lev]);
             ExtrapGhostCells( *m_Pw[lev], m_amrDomains[lev]);
+            ExtrapGhostCells( *m_iceMask[lev], m_amrDomains[lev]);
        
-            // need special treatment for read vars -m_magVel and m_bedelevation and m_iceheight 
+            // need special treatment for read vars -m_magVel and m_bedelevation and m_iceheight.. also m_iceMask ! 
 
             // Special treatment for Pi ?
             RealVect levelDx = m_amrDx[lev] * RealVect::Unit;
@@ -4189,6 +4194,8 @@ AmrHydro::regrid()
                                     *m_bedelevation[lev],
                                     *m_bumpHeight[lev],
                                     *m_bumpSpacing[lev]);
+
+            m_IBCPtr->setup_iceMask(levelDx, *m_suhmoParm, *m_overburdenpress[lev], *m_iceMask[lev]);
 
             //m_IBCPtr->initializePi(levelDx, 
             //                       *m_suhmoParm,       
@@ -4847,6 +4854,7 @@ AmrHydro::levelSetup(int a_level, const DisjointBoxLayout& a_grids)
     m_magVel[a_level]          = RefCountedPtr<LevelData<FArrayBox>> (new LevelData<FArrayBox>(a_grids, nPhiComp, HeadGhostVect));
     m_bumpHeight[a_level]      = RefCountedPtr<LevelData<FArrayBox>> (new LevelData<FArrayBox>(a_grids, nPhiComp, HeadGhostVect));
     m_bumpSpacing[a_level]     = RefCountedPtr<LevelData<FArrayBox>> (new LevelData<FArrayBox>(a_grids, nPhiComp, HeadGhostVect));
+    m_iceMask[a_level]         = RefCountedPtr<LevelData<FArrayBox>> (new LevelData<FArrayBox>(a_grids, nPhiComp, HeadGhostVect));
 }
 
 void
@@ -4872,35 +4880,10 @@ AmrHydro::initData(Vector<RefCountedPtr<LevelData<FArrayBox>> >& a_head)
         LevelData<FArrayBox>& levelbumpHeight   = *m_bumpHeight[lev];
         LevelData<FArrayBox>& levelbumpSpacing  = *m_bumpSpacing[lev];
         LevelData<FArrayBox>& levelmagVel       = *m_magVel[lev];
-
-        //if (lev > 0) {
-        //    // fill the ghost cells of a_vectCoordSys[lev]->getH();
-        //    // m_head
-        //    LevelData<FArrayBox>& coarseHead = *m_head[lev - 1];
-        //    int nGhost = levelHead.ghostVect()[0];
-        //    PiecewiseLinearFillPatch headFiller(m_amrGrids[lev],
-        //                                       m_amrGrids[lev - 1],
-        //                                       levelHead.nComp(),
-        //                                       m_amrDomains[lev - 1],
-        //                                       m_refinement_ratios[lev - 1],
-        //                                       nGhost);
-        //    headFiller.fillInterp(levelHead, coarseHead, coarseHead, 0.0, 0, 0, 1);
-
-        //    // m_gapheight
-        //    LevelData<FArrayBox>& coarseGapHeight = *m_gapheight[lev - 1];
-        //    //int nGhost = levelGapHeight.ghostVect()[0]; Same number of ghost cells ?
-        //    PiecewiseLinearFillPatch gapHeightFiller(m_amrGrids[lev],
-        //                                       m_amrGrids[lev - 1],
-        //                                       levelGapHeight.nComp(),
-        //                                       m_amrDomains[lev - 1],
-        //                                       m_refinement_ratios[lev - 1],
-        //                                       nGhost);
-        //    gapHeightFiller.fillInterp(levelGapHeight, coarseGapHeight, coarseGapHeight, 0.0, 0, 0, 1);
-        //}
+        LevelData<FArrayBox>& levelIceMask      = *m_iceMask[lev];
 
         RealVect levelDx = m_amrDx[lev] ;
         m_IBCPtr->define(m_amrDomains[lev], levelDx[0]);
-        // int refRatio = (lev > 0)?m_refinement_ratios[lev-1]:0;
 
         m_IBCPtr->initializeData(levelDx, 
                                  *m_suhmoParm,       
@@ -4917,6 +4900,8 @@ AmrHydro::initData(Vector<RefCountedPtr<LevelData<FArrayBox>> >& a_head)
         levelGapHeight.copyTo(*m_old_gapheight[lev]);
 
         CopyGhostCells( levelzBed, m_amrDomains[lev]);
+
+        m_IBCPtr->setup_iceMask(levelDx, *m_suhmoParm, levelPi, levelIceMask);
     }
 
     //writePlotFile();
@@ -5249,7 +5234,7 @@ AmrHydro::writePlotFile()
     }
 
     // plot comps: head + gapHeight + bedelevation + overburdenPress
-    int numPlotComps = 12;
+    int numPlotComps = 13;
 
     // generate data names
     string headName("head");
@@ -5264,6 +5249,7 @@ AmrHydro::writePlotFile()
     string xGradName("GradHead_x");
     string yGradName("GradHead_y");
     string BumpHeight("iceHeight");
+    string iceMask("iceMask");
 
     Vector<string> vectName(numPlotComps);
     vectName[0] = headName;
@@ -5278,6 +5264,7 @@ AmrHydro::writePlotFile()
     vectName[9] = xGradName;
     vectName[10] = yGradName;
     vectName[11] = BumpHeight;
+    vectName[12] = iceMask;
 
     Box domain = m_amrDomains[0].domainBox();
     Real dt = 1.;
@@ -5307,6 +5294,7 @@ AmrHydro::writePlotFile()
         const LevelData<FArrayBox>& levelRe        = *m_Re[lev];
         const LevelData<FArrayBox>& levelmR        = *m_meltRate[lev];
         const LevelData<FArrayBox>& levelBH        = *m_iceheight[lev];
+        const LevelData<FArrayBox>& levelIM        = *m_iceMask[lev];
         //LevelData<FArrayBox> levelGradPhi;
         //if (m_write_gradPhi)
         //{
@@ -5347,6 +5335,7 @@ AmrHydro::writePlotFile()
             const FArrayBox& thisRe         = levelRe[dit];
             const FArrayBox& thismR         = levelmR[dit];
             const FArrayBox& thisBH         = levelBH[dit];
+            const FArrayBox& thisIM         = levelIM[dit];
 
             thisPlotData.copy(thisHead, 0, comp, 1);
             comp++;
@@ -5371,6 +5360,8 @@ AmrHydro::writePlotFile()
             thisPlotData.copy(thisGradHead, 1, comp, 1);
             comp++;
             thisPlotData.copy(thisBH, 0, comp, 1);
+            comp++;
+            thisPlotData.copy(thisIM, 0, comp, 1);
 
         } // end loop over boxes on this level
 
@@ -5508,6 +5499,7 @@ AmrHydro::writeCheckpointFile() const
     string bumpHeightName("bumpHeight"); 
     string bumpSpacingName("bumpSpacing"); 
     string meltRateName("meltRate"); 
+    string iceMaskName("iceMask"); 
 
     int nComp = 0;
     char compStr[30];
@@ -5550,6 +5542,10 @@ AmrHydro::writeCheckpointFile() const
     // meltRate
     sprintf(compStr, "component_%04d", nComp);
     header.m_string[compStr] = meltRateName;
+    nComp++;
+    // iceMask
+    sprintf(compStr, "component_%04d", nComp);
+    header.m_string[compStr] = iceMaskName;
 
     header.writeToFile(handle);
 
@@ -5593,6 +5589,7 @@ AmrHydro::writeCheckpointFile() const
             write(handle, *m_bumpHeight[lev], "bumpHeightData", m_bumpHeight[lev]->ghostVect());
             write(handle, *m_bumpSpacing[lev], "bumpSpacingData", m_bumpSpacing[lev]->ghostVect());
             write(handle, *m_meltRate[lev], "meltRateData", m_meltRate[lev]->ghostVect());
+            write(handle, *m_iceMask[lev], "iceMaskData", m_iceMask[lev]->ghostVect());
         } // end loop over levels
     }
 
@@ -5747,6 +5744,7 @@ AmrHydro::readCheckpointFile(HDF5Handle& a_handle)
     m_magVel.resize(m_max_level + 1);
     m_bumpHeight.resize(m_max_level + 1);
     m_bumpSpacing.resize(m_max_level + 1);
+    m_iceMask.resize(m_max_level + 1);
 
     // now read in level-by-level data -- go to Max lev of checkfile
     for (int lev = 0; lev <= max_level_check; lev++) {
@@ -5846,6 +5844,7 @@ AmrHydro::readCheckpointFile(HDF5Handle& a_handle)
             m_magVel[lev]            = RefCountedPtr<LevelData<FArrayBox>> (new LevelData<FArrayBox>(levelDBL, nPhiComp, nGhost));
             m_bumpHeight[lev]        = RefCountedPtr<LevelData<FArrayBox>> (new LevelData<FArrayBox>(levelDBL, nPhiComp, nGhost)); 
             m_bumpSpacing[lev]       = RefCountedPtr<LevelData<FArrayBox>> (new LevelData<FArrayBox>(levelDBL, nPhiComp, nGhost)); 
+            m_iceMask[lev]       = RefCountedPtr<LevelData<FArrayBox>> (new LevelData<FArrayBox>(levelDBL, nPhiComp, nGhost)); 
 
             // read this level's data
             /* HEAD */
@@ -5948,6 +5947,7 @@ AmrHydro::readCheckpointFile(HDF5Handle& a_handle)
             for (DataIterator dit(levelDBL); dit.ok(); ++dit) {
                 (*m_meltRate[lev])[dit].copy(tmpmeltRate[dit]);
             }
+            /* iceMask */
 
         } // end if this level is defined
     }     // end loop over levels
@@ -5982,6 +5982,7 @@ AmrHydro::restart(string& a_restart_file)
         //                       *m_bumpHeight[lev],
         //                       *m_bumpSpacing[lev]);
         m_IBCPtr->resetCovered(*m_suhmoParm, *m_head[lev], *m_overburdenpress[lev]);
+        //m_IBCPtr->setup_iceMask(levelDx, *m_suhmoParm, *m_overburdenpress[lev], *m_iceMask[lev]);
     }
 }
 

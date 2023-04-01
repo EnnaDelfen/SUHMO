@@ -1865,6 +1865,7 @@ void AMRNonLinearPoissonOpFactory::define(const ProblemDomain&             a_coa
                                           Vector<RefCountedPtr<LevelData<FArrayBox> > >& a_B,
                                           Vector<RefCountedPtr<LevelData<FArrayBox> > >& a_Pi,
                                           Vector<RefCountedPtr<LevelData<FArrayBox> > >& a_zb,
+                                          Vector<RefCountedPtr<LevelData<FArrayBox> > >& a_IM,
                                           Real                             a_alpha,
                                           Real                             a_beta)
 {
@@ -1922,6 +1923,7 @@ void AMRNonLinearPoissonOpFactory::define(const ProblemDomain&             a_coa
   m_B  = a_B;  // Gap Height
   m_Pi = a_Pi; // Overb Press  
   m_zb = a_zb; // Bed Elevation
+  m_iceMask = a_IM; // Ice Mask
 }
 
 // ---------------------------------------------------------
@@ -1944,6 +1946,7 @@ void AMRNonLinearPoissonOpFactory::define(const ProblemDomain&     a_domain,
   Vector<RefCountedPtr<LevelData<FArrayBox> > >  B(grids.size());  // Gap Height
   Vector<RefCountedPtr<LevelData<FArrayBox> > >  Pri(grids.size());// Overb Press  
   Vector<RefCountedPtr<LevelData<FArrayBox> > >  zb(grids.size()); // Bed Elevation
+  Vector<RefCountedPtr<LevelData<FArrayBox> > >  iceMask(grids.size()); // Ice Mask
   for (int i = 0; i < grids.size(); ++i) {
       B[i]   = RefCountedPtr<LevelData<FArrayBox> >(
                    new LevelData<FArrayBox>(grids[i], 1, IntVect::Unit));
@@ -1951,16 +1954,19 @@ void AMRNonLinearPoissonOpFactory::define(const ProblemDomain&     a_domain,
                    new LevelData<FArrayBox>(grids[i], 1, IntVect::Unit));
       zb[i]  = RefCountedPtr<LevelData<FArrayBox> >(
                    new LevelData<FArrayBox>(grids[i], 1, IntVect::Unit));
+      iceMask[i]  = RefCountedPtr<LevelData<FArrayBox> >(
+                       new LevelData<FArrayBox>(grids[i], 1, IntVect::Unit));
 
       for (DataIterator dit = B[i]->dataIterator(); dit.ok(); ++dit) {
           (*B[i])[dit()].setVal(1.0);
           (*Pri[i])[dit()].setVal(1.0);
           (*zb[i])[dit()].setVal(1.0);
+          (*iceMask[i])[dit()].setVal(1.0);
       }
   }
 
   define(a_domain, grids, refRatio, a_dx, a_bc, 
-         amrHydro, nllevel, B, Pri, zb, a_alpha, a_beta);
+         amrHydro, nllevel, B, Pri, zb, iceMask, a_alpha, a_beta);
 }
 
 // ---------------------------------------------------------
@@ -2032,14 +2038,17 @@ MGLevelOp<LevelData<FArrayBox> >* AMRNonLinearPoissonOpFactory::MGnewOp(const Pr
       newOp->m_B  = m_B[ref];  // Gap Height
       newOp->m_Pi = m_Pi[ref]; // Overb Press  
       newOp->m_zb = m_zb[ref]; // Bed Elevation
+      newOp->m_iceMask = m_iceMask[ref]; // Ice Mask
   } else {
       // Problem SPECIFIC
       RefCountedPtr<LevelData<FArrayBox> > B( new LevelData<FArrayBox> );
       RefCountedPtr<LevelData<FArrayBox> > Pri( new LevelData<FArrayBox> );
       RefCountedPtr<LevelData<FArrayBox> > zb( new LevelData<FArrayBox> );
+      RefCountedPtr<LevelData<FArrayBox> > iceMask( new LevelData<FArrayBox> );
       B->define(layout,   m_B[ref]->nComp(),  m_B[ref]->ghostVect());
       Pri->define(layout, m_Pi[ref]->nComp(), m_Pi[ref]->ghostVect());
       zb->define(layout,  m_zb[ref]->nComp(), m_zb[ref]->ghostVect());
+      iceMask->define(layout, m_iceMask[ref]->nComp(), m_iceMask[ref]->ghostVect());
 
       // average coefficients to coarser level
       // for now, do this with a CoarseAverage --
@@ -2050,14 +2059,18 @@ MGLevelOp<LevelData<FArrayBox> >* AMRNonLinearPoissonOpFactory::MGnewOp(const Pr
                              layout, Pri->nComp(), coarsening);
       CoarseAverage averagerZb(m_zb[ref]->getBoxes(),
                              layout, zb->nComp(), coarsening);
+      CoarseAverage averagerIM(m_iceMask[ref]->getBoxes(),
+                             layout, iceMask->nComp(), coarsening);
 
       averagerB.averageToCoarse(*B,   *(m_B[ref]));
       averagerPi.averageToCoarse(*Pri, *(m_Pi[ref]));
       averagerZb.averageToCoarse(*zb,  *(m_zb[ref]));
+      averagerIM.averageToCoarse(*iceMask,  *(m_iceMask[ref]));
 
       newOp->m_B  = B;   // Gap Height
       newOp->m_Pi = Pri; // Overb Press  
       newOp->m_zb = zb;  // Bed Elevation
+      newOp->m_iceMask = iceMask;  // Bed Elevation
     }
 
   newOp->m_dxCrse      = dxCrse[0];
@@ -2139,6 +2152,7 @@ AMRLevelOp<LevelData<FArrayBox> >* AMRNonLinearPoissonOpFactory::AMRnewOp(const 
   newOp->m_B  = m_B[ref];  // Gap Height
   newOp->m_Pi = m_Pi[ref]; // Overb Press  
   newOp->m_zb = m_zb[ref]; // Bed Elevation
+  newOp->m_iceMask = m_iceMask[ref]; // Ice Mask
 
   return (AMRLevelOp<LevelData<FArrayBox> >*)newOp;
 }
@@ -2155,11 +2169,13 @@ AMRNonLinearPoissonOp::finerOperatorChanged(const MGLevelOp<LevelData<FArrayBox>
   LevelData<FArrayBox>& BCoar     = *m_B;  // Gap Height
   LevelData<FArrayBox>& PiCoar    = *m_Pi; // Overb Press
   LevelData<FArrayBox>& zbCoar    = *m_zb; // Bed Elevation
+  LevelData<FArrayBox>& IMCoar    = *m_iceMask; // Bed Elevation
 
   // Problem SPECIFIC
   const LevelData<FArrayBox>& BFine  = *(op.m_B);
   const LevelData<FArrayBox>& PiFine = *(op.m_Pi);
   const LevelData<FArrayBox>& zbFine = *(op.m_zb);
+  const LevelData<FArrayBox>& IMFine = *(op.m_iceMask);
 
   if (a_coarseningFactor != 1) {
       // B
@@ -2183,12 +2199,20 @@ AMRNonLinearPoissonOp::finerOperatorChanged(const MGLevelOp<LevelData<FArrayBox>
       for (DataIterator dit = zbCoar.disjointBoxLayout().dataIterator(); dit.ok(); ++dit)
         zbCoar[dit()].setVal(0.);
       cellAverageZb.averageToCoarse(zbCoar, zbFine);
+      // IM
+      CoarseAverage cellAverageIM(IMFine.disjointBoxLayout(),
+                                  IMCoar.disjointBoxLayout(),
+                                  1, a_coarseningFactor);
+      for (DataIterator dit = IMCoar.disjointBoxLayout().dataIterator(); dit.ok(); ++dit)
+        IMCoar[dit()].setVal(0.);
+      cellAverageIM.averageToCoarse(IMCoar, IMFine);
   }
 
   // Handle inter-box ghost cells.
   BCoar.exchange();
   PiCoar.exchange();
   zbCoar.exchange();
+  IMCoar.exchange();
 
   // Notify any observers of this change.
   notifyObserversOfChange();

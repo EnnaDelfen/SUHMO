@@ -472,13 +472,16 @@ protected:
     Vector<RefCountedPtr<LevelData<FArrayBox>> > m_magVel;                // basal velocity magniture
 
     /* Time-constant parameters */
-    Vector<RefCountedPtr<LevelData<FArrayBox>>> m_bedelevation;           //
+    Vector<RefCountedPtr<LevelData<FArrayBox>>> m_bedelevation;           // height of bed
     Vector<RefCountedPtr<LevelData<FArrayBox>>> m_overburdenpress;        // rhoi*g*H
+    Vector<RefCountedPtr<LevelData<FArrayBox>>> m_moulin_source_term;     // external water source term
 
     /* Bed randomization */
     Vector<RefCountedPtr<LevelData<FArrayBox>> > m_bumpHeight;            // typical ground bump height
     Vector<RefCountedPtr<LevelData<FArrayBox>> > m_bumpSpacing;           // typical ground bump spacing
-    Vector<RefCountedPtr<LevelData<FArrayBox>>> m_moulin_source_term;                     // Reynolds number
+
+    /* Misc */
+    Vector<RefCountedPtr<LevelData<FArrayBox>> > m_iceMask;    // fake EB mask
    
 
     //Vector<LevelData<FArrayBox>*> m_gradZb;      

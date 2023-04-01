@@ -54,7 +54,7 @@ void VCAMRNonLinearPoissonOp::UpdateOperator(const LevelData<FArrayBox>&   a_phi
 
    //test for updating the Re
    MEMBER_FUNC_PTR(*m_amrHydro, m_waterFluxlevel)(*m_bCoef, a_phi, a_phicoarsePtr,
-                                                  *m_B, *m_Pi, m_dx_vect, 
+                                                  *m_B, *m_iceMask, m_dx_vect, 
                                                    false, a_AMRFASMGiter, a_depth);
 
   // Recompute the relaxation coef after updating m_bCoef
@@ -477,12 +477,14 @@ void VCAMRNonLinearPoissonOp::computeCoeffsOTF(bool a_update_operator)
 
 void VCAMRNonLinearPoissonOp::setSpecificParams(const RefCountedPtr<LevelData<FArrayBox> >& a_B,
                                                 const RefCountedPtr<LevelData<FArrayBox> >& a_Pi,
-                                                const RefCountedPtr<LevelData<FArrayBox> >& a_zb)
+                                                const RefCountedPtr<LevelData<FArrayBox> >& a_zb,
+                                                const RefCountedPtr<LevelData<FArrayBox> >& a_iceMask)
 {
   // Problem SPECIFIC
   m_B  = a_B;  // Gap Height
   m_Pi = a_Pi; // Overb Press
   m_zb = a_zb; // Bed Elevation
+  m_iceMask = a_iceMask; // Ice Mask
 }
 
 void VCAMRNonLinearPoissonOp::setCoefs(const RefCountedPtr<LevelData<FArrayBox> >& a_aCoef,
@@ -887,6 +889,7 @@ void VCAMRNonLinearPoissonOpFactory::define(const ProblemDomain&         a_coars
                                             Vector<RefCountedPtr<LevelData<FArrayBox> > >& a_B,
                                             Vector<RefCountedPtr<LevelData<FArrayBox> > >& a_Pi,
                                             Vector<RefCountedPtr<LevelData<FArrayBox> > >& a_zb,
+                                            Vector<RefCountedPtr<LevelData<FArrayBox> > >& a_iceMask,
                                             bool a_update_operator)
 {
   CH_TIME("VCAMRNonLinearPoissonOpFactory::define");
@@ -945,6 +948,7 @@ void VCAMRNonLinearPoissonOpFactory::define(const ProblemDomain&         a_coars
   m_B  = a_B;  // Gap Height
   m_Pi = a_Pi; // Overb Press  
   m_zb = a_zb; // Bed Elevation
+  m_iceMask = a_iceMask; // Ice Mask
 
 }
 //-----------------------------------------------------------------------
@@ -967,6 +971,7 @@ VCAMRNonLinearPoissonOpFactory::define(const ProblemDomain&   a_coarseDomain,
   Vector<RefCountedPtr<LevelData<FArrayBox> > >  B(a_grids.size());  // Gap Height
   Vector<RefCountedPtr<LevelData<FArrayBox> > >  Pri(a_grids.size());// Overb Press  
   Vector<RefCountedPtr<LevelData<FArrayBox> > >  zb(a_grids.size()); // Bed Elevation
+  Vector<RefCountedPtr<LevelData<FArrayBox> > >  iceMask(a_grids.size()); // Ice Mask
   AmrHydro* amrHydro;
   NL_level  nllevel; 
   waterFlux_level wFlevel;
@@ -984,6 +989,8 @@ VCAMRNonLinearPoissonOpFactory::define(const ProblemDomain&   a_coarseDomain,
                  new LevelData<FArrayBox>(a_grids[i], 1, a_ghostVect));
     zb[i]  = RefCountedPtr<LevelData<FArrayBox> >(
                  new LevelData<FArrayBox>(a_grids[i], 1, a_ghostVect));
+    iceMask[i]  = RefCountedPtr<LevelData<FArrayBox> >(
+                 new LevelData<FArrayBox>(a_grids[i], 1, a_ghostVect));
 
     // Initialize the a and b coefficients to 1 for starters.
     for (DataIterator dit = aCoef[i]->dataIterator(); dit.ok(); ++dit)
@@ -995,13 +1002,14 @@ VCAMRNonLinearPoissonOpFactory::define(const ProblemDomain&   a_coarseDomain,
       (*B[i])[dit()].setVal(1.0);
       (*Pri[i])[dit()].setVal(1.0);
       (*zb[i])[dit()].setVal(1.0);
+      (*iceMask[i])[dit()].setVal(1.0);
     }
   }
   // these choices are weird and not in accordance with the default Lapl
   Real alpha = 1.0, beta = 1.0;
   define(a_coarseDomain, a_grids, a_refRatios, a_coarsedx, a_bc,
          alpha, aCoef, beta, bCoef, amrHydro, nllevel, wFlevel, PDfunc,
-         B, Pri, zb, true);
+         B, Pri, zb, iceMask, true);
 }
 
 //-----------------------------------------------------------------------
@@ -1084,6 +1092,7 @@ MGLevelOp<LevelData<FArrayBox> >* VCAMRNonLinearPoissonOpFactory::MGnewOp(const 
       newOp->m_B  = m_B[ref];  // Gap Height
       newOp->m_Pi = m_Pi[ref]; // Overb Press  
       newOp->m_zb = m_zb[ref]; // Bed Elevation
+      newOp->m_iceMask = m_iceMask[ref]; // Ice Mask
   } else {
       // need to coarsen coefficients
       RefCountedPtr<LevelData<FArrayBox> > aCoef( new LevelData<FArrayBox> );
@@ -1095,9 +1104,11 @@ MGLevelOp<LevelData<FArrayBox> >* VCAMRNonLinearPoissonOpFactory::MGnewOp(const 
       RefCountedPtr<LevelData<FArrayBox> > B( new LevelData<FArrayBox> );
       RefCountedPtr<LevelData<FArrayBox> > Pri( new LevelData<FArrayBox> );
       RefCountedPtr<LevelData<FArrayBox> > zb( new LevelData<FArrayBox> );
+      RefCountedPtr<LevelData<FArrayBox> > IM( new LevelData<FArrayBox> );
       B->define(layout,   m_B[ref]->nComp(),  m_B[ref]->ghostVect());
       Pri->define(layout, m_Pi[ref]->nComp(), m_Pi[ref]->ghostVect());
       zb->define(layout,  m_zb[ref]->nComp(), m_zb[ref]->ghostVect());
+      IM->define(layout,  m_iceMask[ref]->nComp(), m_iceMask[ref]->ghostVect());
 
       // average coefficients to coarser level
       // for now, do this with a CoarseAverage --
@@ -1113,6 +1124,8 @@ MGLevelOp<LevelData<FArrayBox> >* VCAMRNonLinearPoissonOpFactory::MGnewOp(const 
                              layout, Pri->nComp(), coarsening, m_Pi[ref]->ghostVect());
       CoarseAverage averagerZb(m_zb[ref]->getBoxes(),
                              layout, zb->nComp(), coarsening, m_zb[ref]->ghostVect());
+      CoarseAverage averagerIM(m_iceMask[ref]->getBoxes(),
+                             layout, IM->nComp(), coarsening, m_iceMask[ref]->ghostVect());
 
       if (m_coefficient_average_type == CoarseAverage::arithmetic)
         {
@@ -1122,6 +1135,7 @@ MGLevelOp<LevelData<FArrayBox> >* VCAMRNonLinearPoissonOpFactory::MGnewOp(const 
           averagerB.averageToCoarse(*B,   *(m_B[ref]));
           averagerPi.averageToCoarse(*Pri, *(m_Pi[ref]));
           averagerZb.averageToCoarse(*zb,  *(m_zb[ref]));
+          averagerIM.averageToCoarse(*IM,  *(m_iceMask[ref]));
 
           // freakin boundaries and ghost cells
           // exchange ? Right now no bec we added the last arg to CoarseAverage def and it seems to do the perio fine
@@ -1141,6 +1155,7 @@ MGLevelOp<LevelData<FArrayBox> >* VCAMRNonLinearPoissonOpFactory::MGnewOp(const 
           averagerB.averageToCoarseHarmonic(*B,   *(m_B[ref]));
           averagerPi.averageToCoarseHarmonic(*Pri, *(m_Pi[ref]));
           averagerZb.averageToCoarseHarmonic(*zb,  *(m_zb[ref]));
+          averagerZb.averageToCoarseHarmonic(*IM,  *(m_iceMask[ref]));
         }
       else
         {
@@ -1154,6 +1169,7 @@ MGLevelOp<LevelData<FArrayBox> >* VCAMRNonLinearPoissonOpFactory::MGnewOp(const 
       newOp->m_B  = B;   // Gap Height
       newOp->m_Pi = Pri; // Overb Press  
       newOp->m_zb = zb;  // Bed Elevation
+      newOp->m_iceMask = IM;  // Ice Mask
   }
 
   newOp->computeLambda();
@@ -1257,6 +1273,7 @@ AMRLevelOp<LevelData<FArrayBox> >* VCAMRNonLinearPoissonOpFactory::AMRnewOp(cons
   newOp->m_B  = m_B[ref];  // Gap Height
   newOp->m_Pi = m_Pi[ref]; // Overb Press  
   newOp->m_zb = m_zb[ref]; // Bed Elevation
+  newOp->m_iceMask = m_iceMask[ref]; // Ice Mask
 
   if (newOp->m_aCoef != NULL) {
       newOp->computeLambda();
@@ -1349,6 +1366,7 @@ VCAMRNonLinearPoissonOp::finerOperatorChanged(const MGLevelOp<LevelData<FArrayBo
   LevelData<FArrayBox>& BCoar     = *m_B;  // Gap Height
   LevelData<FArrayBox>& PiCoar    = *m_Pi; // Overb Press
   LevelData<FArrayBox>& zbCoar    = *m_zb; // Bed Elevation
+  LevelData<FArrayBox>& IMCoar    = *m_iceMask; // Ice Mask
 
   const LevelData<FArrayBox>& acoefFine = *(op.m_aCoef);
   const LevelData<FluxBox>&   bcoefFine = *(op.m_bCoef);
@@ -1356,6 +1374,7 @@ VCAMRNonLinearPoissonOp::finerOperatorChanged(const MGLevelOp<LevelData<FArrayBo
   const LevelData<FArrayBox>& BFine  = *(op.m_B);
   const LevelData<FArrayBox>& PiFine = *(op.m_Pi);
   const LevelData<FArrayBox>& zbFine = *(op.m_zb);
+  const LevelData<FArrayBox>& IMFine = *(op.m_iceMask);
 
   if (a_coarseningFactor != 1) {
       // aCoef
@@ -1386,6 +1405,13 @@ VCAMRNonLinearPoissonOp::finerOperatorChanged(const MGLevelOp<LevelData<FArrayBo
       for (DataIterator dit = zbCoar.disjointBoxLayout().dataIterator(); dit.ok(); ++dit)
         zbCoar[dit()].setVal(0.);
       cellAverageZb.averageToCoarse(zbCoar, zbFine);
+      // IM
+      CoarseAverage cellAverageIM(IMFine.disjointBoxLayout(),
+                                  IMCoar.disjointBoxLayout(),
+                                  1, a_coarseningFactor);
+      for (DataIterator dit = IMCoar.disjointBoxLayout().dataIterator(); dit.ok(); ++dit)
+        IMCoar[dit()].setVal(0.);
+      cellAverageIM.averageToCoarse(IMCoar, IMFine);
       // bCoef
       CoarseAverageFace faceAverage(bcoefFine.disjointBoxLayout(),
                                     1, a_coarseningFactor);
@@ -1403,6 +1429,7 @@ VCAMRNonLinearPoissonOp::finerOperatorChanged(const MGLevelOp<LevelData<FArrayBo
   //ExtrapGhostCells( BCoar, BCoar.disjointBoxLayout().physDomain());
   PiCoar.exchange();
   zbCoar.exchange();
+  IMCoar.exchange();
 
   // Mark the relaxation coefficient dirty.
   m_lambdaNeedsResetting = true;
