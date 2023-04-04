@@ -95,7 +95,7 @@ AmrHydro.plot_time_interval=0.0 # If we want to plot at a given time interval (r
 AmrHydro.plot_prefix = plot
 AmrHydro.write_gradPhi=false
 # Typically -1 for never, 0 for last step only, or interval
-AmrHydro.check_interval=5000
+AmrHydro.check_interval=-5000
 AmrHydro.check_prefix=chk
 AmrHydro.check_overwrite=false # if true, rewrite old checkpoints with new ones.
 AmrHydro.check_exit=false # if true, exit immediately after writing a checkpoint
