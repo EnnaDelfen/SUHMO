@@ -2062,6 +2062,84 @@ AmrHydro::CalcRHS_gapHeightFAS(LevelData<FArrayBox>& levelRHS_b,
 
 
 void
+AmrHydro::Calc_meltingRate(int                   lev, 
+                           LevelData<FArrayBox>& leveltmp_cc, 
+                           LevelData<FArrayBox>& leveltmp2_cc) 
+{
+    DisjointBoxLayout& levelGrids     = m_amrGrids[lev];
+
+    LevelData<FArrayBox>& levelH      = *m_head[lev];
+    LevelData<FArrayBox>& levelZb     = *m_bedelevation[lev];
+    LevelData<FArrayBox>& levelPw     = *m_Pw[lev];
+    LevelData<FArrayBox>& levelPi     = *m_overburdenpress[lev];
+    LevelData<FArrayBox>& levelmR     = *m_meltRate[lev];
+    LevelData<FArrayBox>& levelB      = *m_gapheight[lev];    
+    LevelData<FArrayBox>& levelmagVel = *m_magVel[lev];
+    // DEBUG
+    //LevelData<FArrayBox>& levelMR_A = *MR_A[lev];
+    //LevelData<FArrayBox>& levelMR_B = *MR_B[lev];
+    //LevelData<FArrayBox>& levelMR_C = *MR_C[lev];
+
+    DataIterator dit                = levelGrids.dataIterator();
+    for (dit.begin(); dit.ok(); ++dit) {
+        FArrayBox& newH    = levelH[dit];
+        FArrayBox& zb      = levelZb[dit];
+        FArrayBox& Pressw  = levelPw[dit];
+        FArrayBox& Pressi  = levelPi[dit];
+        FArrayBox& tmp_cc  = leveltmp_cc[dit];
+        FArrayBox& tmp2_cc = leveltmp2_cc[dit];
+        FArrayBox& B       = levelB[dit];
+        FArrayBox& mR      = levelmR[dit];
+        FArrayBox& MV      = levelmagVel[dit];
+        // DEBUG
+        //FArrayBox& mMR_A    = levelMR_A[dit];
+        //FArrayBox& mMR_B    = levelMR_B[dit];
+        //FArrayBox& mMR_C    = levelMR_C[dit];
+
+        BoxIterator bit(Pressw.box()); 
+        for (bit.begin(); bit.ok(); ++bit) {
+            IntVect iv = bit(); 
+
+            //Pw = rho_w g (h - zb) 
+            Pressw(iv,0) = m_suhmoParm->m_gravity * m_suhmoParm->m_rho_w * (newH(iv,0) - zb(iv,0));
+
+            Real ub_norm = MV(iv,0);
+            Real sca_prod = 0.0; 
+            if (m_suhmoParm->m_basal_friction) {
+                sca_prod = 20. * 20. * m_suhmoParm->m_ub[0] * std::abs(Pressi(iv,0) - Pressw(iv,0)) * m_suhmoParm->m_ub[0];
+            }
+
+            // Pw = rho_w g (h - zb) -- Q*grad(Pw) = rho_w g (Q*grad(h) - Q*grad(zb))  
+            // tmp_cc = Q*grad(h) and tmp2_cc = Q*grad(zb) -- * is for sca prod 
+            Real abs_QPw = tmp_cc(iv, 0) + tmp_cc(iv, 1) - (tmp2_cc(iv, 0) + tmp2_cc(iv, 1));
+            if ((abs_QPw < 0) && (B(iv,0) < 1e-6)) {
+                abs_QPw = 0.0;
+            } 
+
+            // mR
+            mR(iv,0)   = m_suhmoParm->m_G
+                         + sca_prod
+                         - m_suhmoParm->m_rho_w * m_suhmoParm->m_gravity * (tmp_cc(iv, 0) + tmp_cc(iv, 1))
+                         + m_suhmoParm->m_ct * m_suhmoParm->m_cw * m_suhmoParm->m_rho_w * m_suhmoParm->m_rho_w * m_suhmoParm->m_gravity * abs_QPw;
+            mR(iv,0)   = mR(iv,0) / m_suhmoParm->m_L;
+            //if (mR(iv,0) < 0) {
+            //    pout() << "(calc_mR) melt rate is negative at " << iv  << std::endl;
+            //}
+
+            mR(iv,0)   = std::max(mR(iv,0), 0.0);
+            if (Pressi(iv,0) < 1e-18 ) {
+                mR(iv,0)   = 0.0;
+            }
+
+            //DEBUG
+            //mMR_A(iv,0) = (m_suhmoParm->m_G + sca_prod)/m_suhmoParm->m_L;
+            //mMR_B(iv,0) = - m_suhmoParm->m_rho_w * m_suhmoParm->m_gravity * (tmp_cc(iv, 0) + tmp_cc(iv, 1)) / m_suhmoParm->m_L;
+            //mMR_C(iv,0) = m_suhmoParm->m_ct * m_suhmoParm->m_cw * m_suhmoParm->m_rho_w * m_suhmoParm->m_rho_w * m_suhmoParm->m_gravity * abs_QPw / m_suhmoParm->m_L; 
+        }
+    }
+}
+
+void
 AmrHydro::timeStepFAS(Real a_dt)
 {
     CH_TIME("AmrHydro::timestepFAS");
@@ -2828,18 +2906,6 @@ AmrHydro::timeStepFAS(Real a_dt)
 
                     Real ub_norm = MV(iv,0);
 
-                    // Actual RHS
-                    /* mR */
-                    //RHSh(iv,0) = rho_coef / m_suhmoParm->m_L * 
-                    //             (  m_suhmoParm->m_G 
-                    //              + m_suhmoParm->m_ct * m_suhmoParm->m_cw * m_suhmoParm->m_rho_w * m_suhmoParm->m_rho_w * m_suhmoParm->m_gravity * 
-                    //             (tmp2_cc(iv, 0) + tmp2_cc(iv, 1)) ); 
-
-                    // Adv term right now in RHS
-                    //RHSh(iv,0) -= rho_coef / m_suhmoParm->m_L * m_suhmoParm->m_rho_w * m_suhmoParm->m_gravity * (1.0 
-                    //              + m_suhmoParm->m_ct * m_suhmoParm->m_cw * m_suhmoParm->m_rho_w) * 
-                    //              (tmp_cc(iv, 0) + tmp_cc(iv, 1));
-
 
                     // Pw = rho_w g (h - zb) --  tmp_cc = Q*h tmp2_cc = Q*zb 
                     //Real abs_QPw = std::abs(tmp_cc(iv, 0) + tmp_cc(iv, 1) - (tmp2_cc(iv, 0) + tmp2_cc(iv, 1)));
@@ -2851,7 +2917,7 @@ AmrHydro::timeStepFAS(Real a_dt)
                     } 
                     //Real abs_QPw = (tmp_cc(iv, 0) + tmp_cc(iv, 1));
 
-                    RHSh(iv,0) = rho_coef / m_suhmoParm->m_L *
+                    RHSh(iv,0) = 1.0 / m_suhmoParm->m_L *
                                  (  m_suhmoParm->m_G -  m_suhmoParm->m_rho_w * m_suhmoParm->m_gravity* (tmp_cc(iv, 0) + tmp_cc(iv, 1))
                                   + m_suhmoParm->m_ct * m_suhmoParm->m_cw * m_suhmoParm->m_rho_w * m_suhmoParm->m_rho_w * m_suhmoParm->m_gravity * abs_QPw);
 
@@ -2862,12 +2928,13 @@ AmrHydro::timeStepFAS(Real a_dt)
                     if (m_suhmoParm->m_basal_friction) {
                         sca_prod = 20. * 20. * m_suhmoParm->m_ub[0] * std::abs(Pressi(iv,0) - Pressw(iv,0)) * m_suhmoParm->m_ub[0];
                     }
-                    RHSh(iv,0) += sca_prod * rho_coef / m_suhmoParm->m_L ;
+                    RHSh(iv,0) += sca_prod / m_suhmoParm->m_L ;
 
-                    RHSh(iv,0) = std::max(RHSh(iv,0), 0.0);
                     //if (RHSh(iv,0) < 0) {
-                    //    pout() << "melt rate in h RHS is negative " << iv << std::endl;
+                    //    pout() << "melt rate TERM in h RHS is negative at " << iv << " " << RHSh(iv,0) << std::endl;
                     //}
+                    RHSh(iv,0) = std::max(RHSh(iv,0), 0.0);
+                    RHSh(iv,0) = RHSh(iv,0) * rho_coef;
                                  
                     // sliding  
                     if ( B(iv,0) < bumpHeight(iv,0)) {
@@ -2890,6 +2957,7 @@ AmrHydro::timeStepFAS(Real a_dt)
                     // Diffusive term
                     RHSh(iv,0) -= m_suhmoParm->m_DiffFactor * DiffusiveTerm(iv,0);
 
+                    /* shut off if no ice */
                     if (Pressi(iv,0) < 1e-18 ) {
                         RHSh(iv,0) = 0.0;
                     }
@@ -3146,70 +3214,18 @@ AmrHydro::timeStepFAS(Real a_dt)
         // Qw gradZb
         EdgeToCell(leveltmp2_ec, leveltmp2_cc);
 
-        LevelData<FArrayBox>& levelH      = *m_head[lev];
-        LevelData<FArrayBox>& levelPw     = *m_Pw[lev];
-        LevelData<FArrayBox>& levelPi     = *m_overburdenpress[lev];
-        LevelData<FArrayBox>& levelZb     = *m_bedelevation[lev];
-        LevelData<FArrayBox>& levelmR     = *m_meltRate[lev];
-        LevelData<FArrayBox>& levelB      = *m_gapheight[lev];    
-        LevelData<FArrayBox>& levelmagVel = *m_magVel[lev]; 
         // DEBUG
-        LevelData<FArrayBox>& levelMR_A = *MR_A[lev];
-        LevelData<FArrayBox>& levelMR_B = *MR_B[lev];
-        LevelData<FArrayBox>& levelMR_C = *MR_C[lev];
-        for (dit.begin(); dit.ok(); ++dit) {
-            FArrayBox& B       = levelB[dit];
-            FArrayBox& newH    = levelH[dit];
-            FArrayBox& Pressw  = levelPw[dit];
-            FArrayBox& Pressi  = levelPi[dit];
-            FArrayBox& zb      = levelZb[dit];
-            FArrayBox& mR      = levelmR[dit];
-            FArrayBox& MV      = levelmagVel[dit];
-            FArrayBox& mMR_A    = levelMR_A[dit];
-            FArrayBox& mMR_B    = levelMR_B[dit];
-            FArrayBox& mMR_C    = levelMR_C[dit];
-            FArrayBox& tmp_cc  = leveltmp_cc[dit];
-            FArrayBox& tmp2_cc = leveltmp2_cc[dit];
-
-            BoxIterator bit(Pressw.box()); 
-            for (bit.begin(); bit.ok(); ++bit) {
-                IntVect iv = bit(); 
-                Real ub_norm = MV(iv,0);
-                //Pw
-                Pressw(iv,0) = m_suhmoParm->m_gravity * m_suhmoParm->m_rho_w * (newH(iv,0) - zb(iv,0));
-                // mR -- turn off fric heat and geot heat
-                Real sca_prod = 0.0; 
-                if (m_suhmoParm->m_basal_friction) {
-                    sca_prod = 20. * 20. * m_suhmoParm->m_ub[0] * std::abs(Pressi(iv,0) - Pressw(iv,0)) * m_suhmoParm->m_ub[0];
-                }
-                //Real abs_QPw = std::abs(tmp_cc(iv, 0) + tmp_cc(iv, 1) - (tmp2_cc(iv, 0) + tmp2_cc(iv, 1)));
-                Real abs_QPw = (tmp_cc(iv, 0) + tmp_cc(iv, 1) - (tmp2_cc(iv, 0) + tmp2_cc(iv, 1)));
-                if ((abs_QPw < 0) && (B(iv,0) < 1e-6)) {
-                //if (B(iv,0) < 1e-6) {
-                    abs_QPw = 0.0;
-                } 
-                //Real abs_QPw = (tmp_cc(iv, 0) + tmp_cc(iv, 1));
-                mR(iv,0)   = m_suhmoParm->m_G + 
-                             sca_prod
-                             - m_suhmoParm->m_rho_w * m_suhmoParm->m_gravity * (tmp_cc(iv, 0) + tmp_cc(iv, 1))
-                             + m_suhmoParm->m_ct * m_suhmoParm->m_cw * m_suhmoParm->m_rho_w * m_suhmoParm->m_rho_w * m_suhmoParm->m_gravity * abs_QPw;
-                mR(iv,0)   = mR(iv,0) / m_suhmoParm->m_L;
-
-                //DEBUG
-                mMR_A(iv,0) = (m_suhmoParm->m_G + sca_prod)/m_suhmoParm->m_L;
-                mMR_B(iv,0) = - m_suhmoParm->m_rho_w * m_suhmoParm->m_gravity * (tmp_cc(iv, 0) + tmp_cc(iv, 1)) / m_suhmoParm->m_L;
-                mMR_C(iv,0) = m_suhmoParm->m_ct * m_suhmoParm->m_cw * m_suhmoParm->m_rho_w * m_suhmoParm->m_rho_w * m_suhmoParm->m_gravity * abs_QPw / m_suhmoParm->m_L; 
-
-                mR(iv,0)   = std::max(mR(iv,0), 0.0);
-                if (Pressi(iv,0) < 1e-18 ) {
-                    mR(iv,0)   = 0.0;
-                }
-
-            }
-        }
+        //LevelData<FArrayBox>& levelMR_A = *MR_A[lev];
+        //LevelData<FArrayBox>& levelMR_B = *MR_B[lev];
+        //LevelData<FArrayBox>& levelMR_C = *MR_C[lev];
+        Calc_meltingRate(lev, leveltmp_cc, leveltmp2_cc); 
 
         // 2. a : Get the RHS of gh eqs:
         LevelData<FArrayBox>& levelRHS_b = *RHS_b[lev];
+        LevelData<FArrayBox>& levelPi    = *m_overburdenpress[lev];
+        LevelData<FArrayBox>& levelPw    = *m_Pw[lev];
+        LevelData<FArrayBox>& levelmR    = *m_meltRate[lev];
+        LevelData<FArrayBox>& levelB     = *m_gapheight[lev];    
         LevelData<FArrayBox>& levelBH    = *m_bumpHeight[lev];    
         LevelData<FArrayBox>& levelBL    = *m_bumpSpacing[lev];    
         LevelData<FArrayBox>& levelDT    = *a_diffusiveTerm[lev];    
@@ -5973,6 +5989,15 @@ AmrHydro::readCheckpointFile(HDF5Handle& a_handle)
                 (*m_meltRate[lev])[dit].copy(tmpmeltRate[dit]);
             }
             /* iceMask */
+            LevelData<FArrayBox> tmpIM;
+            tmpIM.define(old_head);
+            dataStatus = read<FArrayBox>(a_handle, tmpIM, "iceMaskData", levelDBL);
+            if (dataStatus != 0) {
+                MayDay::Error("checkpoint file does not contain IM data");
+            }
+            for (DataIterator dit(levelDBL); dit.ok(); ++dit) {
+                (*m_iceMask[lev])[dit].copy(tmpIM[dit]);
+            }
 
         } // end if this level is defined
     }     // end loop over levels

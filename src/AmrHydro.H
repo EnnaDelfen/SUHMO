@@ -154,6 +154,10 @@ public:
                               LevelData<FArrayBox>& levelchanDegree,
                               Real a_dt);
 
+    void Calc_meltingRate(int                   lev, 
+                           LevelData<FArrayBox>& leveltmp_cc, 
+                           LevelData<FArrayBox>& leveltmp2_cc);
+
 
     void check_fluxes(Vector<RefCountedPtr<LevelData<FluxBox> > >&   a_bCoef);
 
