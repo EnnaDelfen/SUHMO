@@ -453,8 +453,8 @@ AmrHydro::check_fluxes(Vector<RefCountedPtr<LevelData<FluxBox> > >&   a_bCoef)
         LevelData<FluxBox>    fluxes(levelGrids, 1, IntVect::Zero);
         Vector<Real> sumLo(SpaceDim, 0.0); 
         Vector<Real> sumHi(SpaceDim, 0.0); 
-        Real Btot;
-        Real BtotOld;
+        Real Btot = 0.0;
+        Real BtotOld = 0.0;
 
         DataIterator levelDit = levelGrids.dataIterator();
         for (levelDit.begin(); levelDit.ok(); ++levelDit) {
@@ -497,7 +497,8 @@ AmrHydro::check_fluxes(Vector<RefCountedPtr<LevelData<FluxBox> > >&   a_bCoef)
                 }
             }
 
-            BoxIterator bit(thisB.box());
+            const Box& validBox = levelGrids.get(levelDit);
+            BoxIterator bit(validBox);
             for (bit.begin(); bit.ok(); ++bit) {
                 IntVect iv=bit();
                 Btot    += thisB(iv,0) * m_amrDx[lev][0] * m_amrDx[lev][1];
@@ -3455,11 +3456,12 @@ AmrHydro::timeStepFAS(Real a_dt)
         // mass balance
  
         // DISCHARGE -- Q
-        Vector<Real> out_water_flux_x_tot(DomSize , 0.0);
-        Vector<Real> out_water_flux_x_distrib(DomSize, 0.0);        // INEFFICIENT 
-        Vector<Real> out_water_flux_x_chan(DomSize, 0.0);           // EFFICIENT
+        Vector<Real> out_water_flux_x_tot(DomSize+1 , 0.0);
+        Vector<Real> out_water_flux_x_distrib(DomSize+1, 0.0);        // INEFFICIENT 
+        Vector<Real> out_water_flux_x_chan(DomSize+1, 0.0);           // EFFICIENT
         Vector<Real> out_water_flux_x_chan_Bands(3, 0.0);
         Vector<Real> out_water_flux_x_distrib_Bands(3, 0.0);
+        Vector<Real> out_water_flux_y_tot(DomSizeY+1 , 0.0);
         int idx_bandMin_lo = 0;
         int idx_bandMin_hi = 0;
         int idx_bandMed_lo = 0;
@@ -3507,11 +3509,10 @@ AmrHydro::timeStepFAS(Real a_dt)
 
         for (dit.begin(); dit.ok(); ++dit) {
             FluxBox&   Qwater_ec    = levelQw_ec[dit];
-            FArrayBox& Qwater_ecFab = Qwater_ec[0];
+            FArrayBox& Qwater_ecFab  = Qwater_ec[0];
+            FArrayBox& QwaterY_ecFab = Qwater_ec[1];
             FluxBox&   CD_ec        = levelCD_ec[dit];
             FArrayBox& CD_ecFab     = CD_ec[0];
-
-            //FArrayBox& QW           = levelQw[dit];
 
             FArrayBox&  MS          = levelMoulinSrc[dit];
             FArrayBox&  MR          = levelmR[dit];
@@ -3521,18 +3522,29 @@ AmrHydro::timeStepFAS(Real a_dt)
 
             const Box& validBox = levelGrids.get(dit);
 
-            BoxIterator bitEC(validBox); 
+            /* EC */
+            BoxIterator bitEC(Qwater_ecFab.box());
             for (bitEC.begin(); bitEC.ok(); ++bitEC) {
                 IntVect iv = bitEC();
-                // DISCHARGE -- Q
-                if (Pressi(iv,0) > 0.0) {
-                    out_water_flux_x_tot[iv[0]]     += Qwater_ecFab(iv, 0) * m_amrDx[0][1];                          //QW(iv,0) * m_amrDx[0][0];                            
-                    out_water_flux_x_chan[iv[0]]    += Qwater_ecFab(iv, 0) * m_amrDx[0][1] * CD_ecFab(iv, 0);        //QW(iv,0) * m_amrDx[0][0] * CD_ecFab(iv, 0);          
-                    out_water_flux_x_distrib[iv[0]] += Qwater_ecFab(iv, 0) * m_amrDx[0][1] * (1.0 - CD_ecFab(iv, 0));//QW(iv,0) * m_amrDx[0][0] * (1.0 - CD_ecFab(iv, 0));  
-                }
+                // DISCHARGE -- QwX
+                out_water_flux_x_tot[iv[0]]     += Qwater_ecFab(iv, 0) * m_amrDx[0][1];                          //QW(iv,0) * m_amrDx[0][0];                            
+                out_water_flux_x_chan[iv[0]]    += Qwater_ecFab(iv, 0) * m_amrDx[0][1] * CD_ecFab(iv, 0);        //QW(iv,0) * m_amrDx[0][0] * CD_ecFab(iv, 0);          
+                out_water_flux_x_distrib[iv[0]] += Qwater_ecFab(iv, 0) * m_amrDx[0][1] * (1.0 - CD_ecFab(iv, 0));//QW(iv,0) * m_amrDx[0][0] * (1.0 - CD_ecFab(iv, 0));  
+            }
+            BoxIterator bitECY(QwaterY_ecFab.box());
+            for (bitECY.begin(); bitECY.ok(); ++bitECY) {
+                IntVect iv = bitECY();
+                // DISCHARGE -- QwY
+                //if (Pressi(iv,0) > 0.0) {
+                    out_water_flux_y_tot[iv[1]]     += QwaterY_ecFab(iv, 0) * m_amrDx[0][0];                           
+                //}
+            }
 
+            /* CC */
+            BoxIterator bit(validBox); 
+            for (bit.begin(); bit.ok(); ++bit) {
+                IntVect iv = bit();
                 // RHS B -- Moulins and mRate
-                //CC
                 Real xloc = (iv[0]+0.5)*m_amrDx[0][0];    
                 // Because of mass conservation eq -basically recharge = RHS of this eq in my head.
                 // If I only use the MS, then for run B its sum of A1 and A5 which in this case does NOT equal total discharge !!
@@ -3587,8 +3599,8 @@ AmrHydro::timeStepFAS(Real a_dt)
 
 #ifdef CH_MPI
        // DISCHARGE -- Q
-       Vector<Real> recv(DomSize);
-       int result = MPI_Allreduce(&out_water_flux_x_tot[0], &recv[0], DomSize, MPI_CH_REAL,
+       Vector<Real> recv(DomSize+1);
+       int result = MPI_Allreduce(&out_water_flux_x_tot[0], &recv[0], DomSize+1, MPI_CH_REAL,
                                   MPI_SUM, Chombo_MPI::comm);
        if (result != MPI_SUCCESS)
        {
@@ -3596,8 +3608,8 @@ AmrHydro::timeStepFAS(Real a_dt)
        }
        out_water_flux_x_tot = recv;
 
-       Vector<Real> recvChan(DomSize);
-       result = MPI_Allreduce(&out_water_flux_x_chan[0], &recvChan[0], DomSize, MPI_CH_REAL,
+       Vector<Real> recvChan(DomSize+1);
+       result = MPI_Allreduce(&out_water_flux_x_chan[0], &recvChan[0], DomSize+1, MPI_CH_REAL,
                                   MPI_SUM, Chombo_MPI::comm);
        if (result != MPI_SUCCESS)
        {
@@ -3605,14 +3617,23 @@ AmrHydro::timeStepFAS(Real a_dt)
        }
        out_water_flux_x_chan = recvChan;
 
-       Vector<Real> recvDist(DomSize);
-       result = MPI_Allreduce(&out_water_flux_x_distrib[0], &recvDist[0], DomSize, MPI_CH_REAL,
+       Vector<Real> recvDist(DomSize+1);
+       result = MPI_Allreduce(&out_water_flux_x_distrib[0], &recvDist[0], DomSize+1, MPI_CH_REAL,
                                   MPI_SUM, Chombo_MPI::comm);
        if (result != MPI_SUCCESS)
        {
            MayDay::Error("communication error on MPI_SUM");
        }
        out_water_flux_x_distrib = recvDist;
+
+       Vector<Real> recvY(DomSizeY+1);
+       result = MPI_Allreduce(&out_water_flux_y_tot[0], &recvY[0], DomSizeY+1, MPI_CH_REAL,
+                                  MPI_SUM, Chombo_MPI::comm);
+       if (result != MPI_SUCCESS)
+       {
+           MayDay::Error("communication error on MPI_SUM");
+       }
+       out_water_flux_y_tot = recvY;
 
        Vector<Real> recvYlength(DomSize);
        result = MPI_Allreduce(&Ylength[0], &recvYlength[0], DomSize, MPI_CH_REAL,
@@ -3799,7 +3820,7 @@ AmrHydro::timeStepFAS(Real a_dt)
         //if (m_suhmoParm->m_ramp) {
             Real sec_1month      = 2635200.0;  // s
             int time_tmp = (int) m_time + a_dt;
-            pout() << "Time(months) recharge ramp = " <<  m_time/sec_1month  << " " << out_recharge[0]+out_recharge_tot[0]  << " " << ramp << endl; 
+            pout() << "Time(months) VOL_waterTot recharge ramp = " <<  m_time/sec_1month  << " " << water_vol[0] << " " << out_recharge[0]+out_recharge_tot[0]  << " " << ramp << endl; 
         //}
         if (m_post_proc_shmip_temporal) {
             if (time_tmp % 86400 == 0) {
@@ -3859,6 +3880,10 @@ AmrHydro::timeStepFAS(Real a_dt)
                        << " " << out_recharge[xi] << " " << out_recharge_tot[xi] << " " << avPressure[xi]/std::max(dom_sizeY[xi], 1.0)/1e6  
                        << endl;
             }
+            pout() << "Flux loX = " << -out_water_flux_x_tot[DomSize] << endl;
+            pout() << "Flux hiX = " << -out_water_flux_x_tot[0] << endl;
+            pout() << "Flux loY = " << out_water_flux_y_tot[DomSizeY] << endl;
+            pout() << "Flux hiY = " << out_water_flux_y_tot[0] << endl;
         }
 
     }
