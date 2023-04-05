@@ -34,5 +34,4 @@ for i, pat in enumerate(patterns):
     print(".. running pp too ")
     os.system("../{} {}".format(executable, "input.hydro_pp"))
     shutil.move(exec_dir+"pout.0", exec_dir+"{}".format("postproc.output") )
-
-
+    os.system("rm pout.1 pout.2 pout.3 plot000000.2d.hdf5 plot003000.2d.hdf5 plot001500.2d.hdf5")
