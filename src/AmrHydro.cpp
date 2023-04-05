@@ -1738,8 +1738,8 @@ AmrHydro::dCoeff(LevelData<FluxBox>&    leveldcoef,
     DataIterator dit = leveldcoef.dataIterator();
     for (dit.begin(); dit.ok(); ++dit) {
 
-        FluxBox& bC       = leveldcoef[dit];
-        FluxBox& MRec     = a_mRec[dit];
+        FluxBox& bC      = leveldcoef[dit];
+        FluxBox& MRec    = a_mRec[dit];
         FluxBox& Bec     = a_Bec[dit];
 
         // loop over directions
@@ -2432,6 +2432,26 @@ AmrHydro::timeStepFAS(Real a_dt)
             LevelData<FluxBox>&   levelmR_ec    = *a_meltRate_ec[lev];
             LevelData<FluxBox>&   levelB_ec     = *a_GapHeight_ec[lev];
             dCoeff(levelDcoef, levelmR_ec, levelB_ec, lev);
+
+                /* 
+                DisjointBoxLayout& levelGrids       = m_amrGrids[lev];
+                DataIterator dit                    = levelGrids.dataIterator();
+                for (dit.begin(); dit.ok(); ++dit) {
+                    FluxBox& mR_ec_fb  = levelmR_ec[dit];
+                    FluxBox& D_ec_fb   = levelDcoef[dit];
+                    for (int dir = 0; dir<1; dir++) {
+                        FArrayBox& mR_ec_FAB    = mR_ec_fb[dir];
+                        FArrayBox& D_ec_FAB     = D_ec_fb[dir];
+                        BoxIterator bitEC(mR_ec_FAB.box());
+                        for (bitEC.begin(); bitEC.ok(); ++bitEC) {
+                            IntVect iv = bitEC();
+                            if (iv[1] == 4) {
+                                pout() << "iv, mR_ec, D_ec = "<< iv << " " << mR_ec_FAB(iv,0) << " " << D_ec_FAB(iv,0) << endl;  
+                            }
+                        }
+                    } 
+                }
+                DEBUG*/
         } // end loop levels
 
 
@@ -2884,16 +2904,13 @@ AmrHydro::timeStepFAS(Real a_dt)
 
             Real rho_coef = (1.0 /  m_suhmoParm->m_rho_w - 1.0 / m_suhmoParm->m_rho_i);
 
+            Calc_meltingRate(lev, leveltmp_cc, leveltmp2_cc); 
+
             for (dit.begin(); dit.ok(); ++dit) {
                 // CC
                 FArrayBox& B       = levelB[dit];
                 FArrayBox& RHSh    = levelRHSh[dit];
-                FArrayBox& tmp_cc  = leveltmp_cc[dit];
-                FArrayBox& tmp2_cc = leveltmp2_cc[dit];
                 FArrayBox& Pressi  = levelPi[dit];
-                FArrayBox& Pressw  = levelPw[dit];
-                FArrayBox& zb      = levelZb[dit];
-                FArrayBox& currH   = levelH[dit];
                 FArrayBox& bumpHeight    = levelBH[dit];
                 FArrayBox& bumpSpacing   = levelBL[dit];
                 FArrayBox& DiffusiveTerm = levelDterm[dit];
@@ -2906,37 +2923,11 @@ AmrHydro::timeStepFAS(Real a_dt)
                 for (bit.begin(); bit.ok(); ++bit) {
                     IntVect iv = bit();
 
-                    //Pw = rho_w g (h - zb) 
-                    Pressw(iv,0) = m_suhmoParm->m_gravity * m_suhmoParm->m_rho_w * (currH(iv,0) - zb(iv,0));
+                    // mR
+                    RHSh(iv,0) = mR(iv,0) *rho_coef;
 
-                    Real ub_norm = MV(iv,0);
-                    Real sca_prod = 0.0; 
-                    if (m_suhmoParm->m_basal_friction) {
-                        sca_prod = 20. * 20. * m_suhmoParm->m_ub[0] * std::abs(Pressi(iv,0) - Pressw(iv,0)) * m_suhmoParm->m_ub[0];
-                    }
-
-                    // Pw = rho_w g (h - zb) --  tmp_cc = Q*h tmp2_cc = Q*zb 
-                    //Real abs_QPw = std::abs(tmp_cc(iv, 0) + tmp_cc(iv, 1) - (tmp2_cc(iv, 0) + tmp2_cc(iv, 1)));
-                    Real abs_QPw = tmp_cc(iv, 0) + tmp_cc(iv, 1) - (tmp2_cc(iv, 0) + tmp2_cc(iv, 1));
-                    if ((abs_QPw < 0) && (B(iv,0) < 1e-6)) {
-                    //if (B(iv,0) < 1e-6) {
-                        //pout() << "neg Q*PW "<< iv << " " << abs_QPw << endl;
-                        abs_QPw = 0.0;
-                    } 
-
-                    RHSh(iv,0) =( m_suhmoParm->m_G 
-                                  + sca_prod
-                                  -  m_suhmoParm->m_rho_w * m_suhmoParm->m_gravity* (tmp_cc(iv, 0) + tmp_cc(iv, 1))
-                                  + m_suhmoParm->m_ct * m_suhmoParm->m_cw * m_suhmoParm->m_rho_w * m_suhmoParm->m_rho_w * m_suhmoParm->m_gravity * abs_QPw);
-
-                    RHSh(iv,0) = RHSh(iv,0)/m_suhmoParm->m_L;
-                    RHSh(iv,0) = std::max(RHSh(iv,0), 0.0);
-                    RHSh(iv,0) = RHSh(iv,0) * rho_coef;
-
-                    // fill out the mR
-                    mR(iv,0) = RHSh(iv,0);
-                                 
                     // sliding  
+                    Real ub_norm = MV(iv,0);
                     if ( B(iv,0) < bumpHeight(iv,0)) {
                         RHSh(iv,0) -= ub_norm * (bumpHeight(iv,0) - B(iv,0)) / bumpSpacing(iv,0);
                     }
@@ -3078,7 +3069,17 @@ AmrHydro::timeStepFAS(Real a_dt)
             }
             MayDay::Error("Abort");
         } else {
-            if (m_cur_step < 50) {
+            if (m_cur_step < 2) { // precaution for screwed up initialization
+                if ( (max_resH < 0.05) && (m_cur_PicardIte > 2) ) {
+                    if (m_verbosity > 0) {
+                        pout() <<"        converged( it = "<< ite_idx+1 << ", x(h) = " <<max_resH<< ")."<< endl;
+                    }
+                    if (m_verbosity > 3) {
+                        pout() <<"        Check h (max = "<< maxHead<<", min = " << minHead << ")"<<endl;
+                    }
+                    converged_h = true;
+                }
+            } else if (m_cur_step < 50) {
                 if (max_resH < 0.05){
                     if (m_verbosity > 0) {
                         pout() <<"        converged( it = "<< ite_idx+1 << ", x(h) = " <<max_resH<< ")."<< endl;
