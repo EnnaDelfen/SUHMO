@@ -257,7 +257,7 @@ SqrtIBC::initializeData(RealVect& a_dx,
             thispi(iv, 0)        = std::max(Params.m_rho_i * Params.m_gravity * thisiceHeight(iv, 0), 0.0);
             
             /* option 1: guess Pw, find head */
-            thisPw(iv, 0)        = thispi(iv, 0) * 0.5;
+            thisPw(iv, 0)        = 101325;
             Real Fact            = 1./(Params.m_rho_w * Params.m_gravity);
             thisHead(iv, 0)      = thisPw(iv, 0) * Fact + thiszbed(iv, 0) ;
 
