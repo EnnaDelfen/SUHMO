@@ -57,6 +57,7 @@ solver.use_ImplDiff=true
 # misc
 AmrHydro.PrintCustom=true
 AmrHydro.post_proc=true
+AmrHydro.post_proc_shmip=true
 AmrHydro.verbosity=5
 # mesh and refinement
 AmrHydro.num_cells=32 8  # number of cells on coarsest domain
