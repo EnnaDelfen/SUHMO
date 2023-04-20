@@ -143,6 +143,32 @@ SqrtIBC::initializeBed(RealVect& a_dx,
 
 }
 
+void 
+SqrtIBC::setup_iceMask(RealVect& a_dx,
+                       suhmo_params Params,
+                       LevelData<FArrayBox>& a_Pi,
+                       LevelData<FArrayBox>& a_iceMask)
+{
+    DataIterator dit = a_iceMask.dataIterator();
+    for (dit.begin(); dit.ok(); ++dit) {
+        FArrayBox& thispi        = a_Pi[dit];
+        FArrayBox& thisiceMask   = a_iceMask[dit];
+        
+        BoxIterator bit(thisiceMask.box()); 
+        for (bit.begin(); bit.ok(); ++bit) {
+            IntVect iv = bit();
+
+            /* Where do we disable the gradient computations */
+            if (thispi(iv, 0) > 0.0) {
+                thisiceMask(iv, 0)        = 1.0;
+            } else {
+                thisiceMask(iv, 0)        = -1.0;
+            }
+            
+        } // end loop over cells
+    }     // end loop over boxes
+}
+
 /** Set up initial conditions 
  */
 void
@@ -231,7 +257,6 @@ SqrtIBC::initializeData(RealVect& a_dx,
             thispi(iv, 0)        = std::max(Params.m_rho_i * Params.m_gravity * thisiceHeight(iv, 0), 0.0);
             
             /* option 1: guess Pw, find head */
-            // Water press ?? No idea --> Pi/2.0
             thisPw(iv, 0)        = thispi(iv, 0) * 0.5;
             Real Fact            = 1./(Params.m_rho_w * Params.m_gravity);
             thisHead(iv, 0)      = thisPw(iv, 0) * Fact + thiszbed(iv, 0) ;
