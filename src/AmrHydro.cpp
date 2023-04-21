@@ -38,6 +38,7 @@ using std::string;
 #include "BRMeshRefine.H"
 #include "LoadBalance.H"
 #include "PiecewiseLinearFillPatch.H"
+#include "PiecewiseLinearFillPatchFace.H"
 #include "QuadCFInterp.H"
 #include "CoarseAverageFace.H"
 #include "CoarseAverage.H"
@@ -3484,15 +3485,24 @@ AmrHydro::timeStepFAS(Real a_dt)
         averagerEC.averageToCoarse(*a_Qw_ec_GC[lev - 1], *a_Qw_ec_GC[lev]);
     }
     // handle ghost cells on the coarse-fine interface -- average down shouldn't touch the GC though ...
-    //for (int lev = 1; lev <= m_finest_level; lev++) {
-    //    PiecewiseLinearFillPatch headFiller(m_amrGrids[lev],
-    //                                        m_amrGrids[lev - 1],
-    //                                        1, // ncomps
-    //                                        m_amrDomains[lev - 1],
-    //                                        m_refinement_ratios[lev - 1],
-    //                                        1);
-    //    headFiller.fillInterp(*m_gapheight[lev], *m_gapheight[lev-1], *m_gapheight[lev-1], 0.0, 0, 0, 1);
-    //}
+    for (int lev = 0; lev <= m_finest_level; lev++) {
+        LevelData<FluxBox>&   levelQw_ec       = *a_Qw_ec_GC[lev]; 
+        LevelData<FluxBox>&   levelbCoef_ec    = *bCoef_fluxes[lev]; 
+
+        //if (lev > 0) {
+        //    PiecewiseLinearFillPatchFace FaceFiller(m_amrGrids[lev],
+        //                                            m_amrGrids[lev - 1],
+        //                                            1, // ncomps
+        //                                            m_amrDomains[lev - 1],
+        //                                            m_refinement_ratios[lev - 1],
+        //                                            2);
+        //    FaceFiller.fillInterp(levelQw_ec, *a_Qw_ec_GC[lev-1], *a_Qw_ec_GC[lev-1], 0.0, 0, 0, 1);
+        //    FaceFiller.fillInterp(levelbCoef_ec, *bCoef_fluxes[lev-1], *bCoef_fluxes[lev-1], 0.0, 0, 0, 1);
+        //}
+
+        levelQw_ec.exchange();
+        levelbCoef_ec.exchange();
+    }
 
     /* CONVERGENCE TESTS with LAGGED quantities */
     Real maxGap = computeMax(m_gapheight, m_refinement_ratios, Interval(0,0), 0, m_finest_level+1);
