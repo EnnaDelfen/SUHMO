@@ -97,9 +97,7 @@ public:
                                LevelData<FArrayBox>& a_bumpHeight,
                                LevelData<FArrayBox>& a_bumpSpacing);
 
-    virtual void setup_iceMask(RealVect& a_dx,
-                               suhmo_params Params,
-                               LevelData<FArrayBox>& a_Pi,
+    virtual void setup_iceMask(LevelData<FArrayBox>& a_Pi,
                                LevelData<FArrayBox>& a_iceMask);
 protected:
 

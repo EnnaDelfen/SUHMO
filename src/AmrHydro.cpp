@@ -447,20 +447,25 @@ AmrHydro::check_fluxes(Vector<RefCountedPtr<LevelData<FluxBox> > >&   a_bCoef)
         LevelData<FArrayBox>& levelB      = *m_gapheight[lev];
         LevelData<FArrayBox>& leveloldB   = *m_old_gapheight[lev];    
         LevelData<FArrayBox>& levelH      = *m_head[lev];
-        LevelData<FluxBox>& levelTrans_ec = *a_bCoef[lev];
+        LevelData<FArrayBox>& levelIM     = *m_iceMask[lev];
+        LevelData<FluxBox>& levelK_ec     = *a_bCoef[lev];
+        LevelData<FluxBox>& levelIMEC     = *m_iceMask_ec[lev];
 
         const DisjointBoxLayout& levelGrids = levelB.getBoxes();
 
         LevelData<FluxBox>    fluxes(levelGrids, 1, IntVect::Zero);
         Vector<Real> sumLo(SpaceDim, 0.0); 
         Vector<Real> sumHi(SpaceDim, 0.0); 
+        Vector<Real> sumDir(SpaceDim, 0.0); 
         Real Btot = 0.0;
         Real BtotOld = 0.0;
 
         DataIterator levelDit = levelGrids.dataIterator();
         for (levelDit.begin(); levelDit.ok(); ++levelDit) {
             FArrayBox& thisH      = levelH[levelDit];
-            FluxBox&   thisTrans  = levelTrans_ec[levelDit];
+            FArrayBox& thisIM     = levelIM[levelDit];
+            FluxBox&   thisK      = levelK_ec[levelDit];
+            FluxBox&   thisIMEC   = levelIMEC[levelDit];
             FluxBox&   thisFluxes = fluxes[levelDit];
 
             FArrayBox& thisB      = levelB[levelDit];
@@ -472,7 +477,8 @@ AmrHydro::check_fluxes(Vector<RefCountedPtr<LevelData<FluxBox> > >&   a_bCoef)
                 toto[dir] +=1;
                 face_box.convert(toto);
 
-                FArrayBox& thisK_dir       = thisTrans[dir];
+                FArrayBox& thisK_dir       = thisK[dir];
+                FArrayBox& thisIMEC_dir    = thisIMEC[dir];
                 FArrayBox& thisFluxes_dir  = thisFluxes[dir];
                 BoxIterator bit(thisFluxes_dir.box());
                 for (bit.begin(); bit.ok(); ++bit) {
@@ -490,6 +496,27 @@ AmrHydro::check_fluxes(Vector<RefCountedPtr<LevelData<FluxBox> > >&   a_bCoef)
                     Real philo = thisH(ivlo,0);
                     Real gradphi = (phihi - philo ) * (-1.0) / m_amrDx[lev][dir];
                     thisFluxes_dir(iv,0) = -thisK_dir(iv, 0) * gradphi;
+
+                    // fake EB attempt
+                    Real IMhi = thisIM(ivhi,0);
+                    Real IMlo = thisIM(ivlo,0);
+                    if (thisIMEC_dir(iv,0) > 0.0) {
+                        if ((IMhi - IMlo) > 0.0) { // will be 2, lower boundary
+                            sumDir[dir] += thisFluxes_dir(iv,0) * area;
+                        } else if ((IMhi - IMlo) < 0.0) { // will be -2, upper boundary
+                            sumDir[dir] -= thisFluxes_dir(iv,0) * area;
+                        } else { // no fake EB, domain boundary
+                            if ( iv[dir] == face_box.smallEnd(dir) ) {
+                                sumDir[dir] += thisFluxes_dir(iv,0) * area;
+                            } else if ( iv[dir] == face_box.bigEnd(dir) ) {
+                                sumDir[dir] -= thisFluxes_dir(iv,0) * area;
+                            }
+                        }
+                    }
+
+                    // simple, rectangular geom
+                    // hi end: if pos, then going out. If neg, going in
+                    // lo end: if neg, going out. If pos, going in.
                     if ( iv[dir] == face_box.smallEnd(dir) ) {
                         sumLo[dir] += thisFluxes_dir(iv,0) * area;
                     } else if ( iv[dir] == face_box.bigEnd(dir) ) {
@@ -502,8 +529,10 @@ AmrHydro::check_fluxes(Vector<RefCountedPtr<LevelData<FluxBox> > >&   a_bCoef)
             BoxIterator bit(validBox);
             for (bit.begin(); bit.ok(); ++bit) {
                 IntVect iv=bit();
-                Btot    += thisB(iv,0) * m_amrDx[lev][0] * m_amrDx[lev][1];
-                BtotOld += thisBold(iv,0) * m_amrDx[lev][0] * m_amrDx[lev][1];
+                if (thisIM(iv,0) > 0.0) {
+                    Btot    += thisB(iv,0) * m_amrDx[lev][0] * m_amrDx[lev][1];
+                    BtotOld += thisBold(iv,0) * m_amrDx[lev][0] * m_amrDx[lev][1];
+                }
             }
         }
 #ifdef CH_MPI
@@ -523,6 +552,14 @@ AmrHydro::check_fluxes(Vector<RefCountedPtr<LevelData<FluxBox> > >&   a_bCoef)
         }
         sumHi = recvHi;
 
+        Vector<Real> recvDir(SpaceDim);
+        result = MPI_Allreduce(&sumDir[0], &recvDir[0], SpaceDim, MPI_CH_REAL,
+                                MPI_SUM, Chombo_MPI::comm);
+        if (result != MPI_SUCCESS) {
+            MayDay::Error("communication error on MPI_SUM");
+        }
+        sumDir = recvDir;
+
         Vector<Real> recvBtot(1);
         result = MPI_Allreduce(&Btot, &recvBtot[0], SpaceDim, MPI_CH_REAL,
                                     MPI_SUM, Chombo_MPI::comm);
@@ -540,9 +577,12 @@ AmrHydro::check_fluxes(Vector<RefCountedPtr<LevelData<FluxBox> > >&   a_bCoef)
         BtotOld = recvBtotOld[0];
   
 #endif
-        pout() << " Flux loX " << sumLo[0] << ", hiX " << sumHi[0] << endl;
-        pout() << " Flux loY " << sumLo[1] << ", hiY " << sumHi[1] << endl;
+        pout() << " Flux loX "  << sumLo[0]  << ", hiX "  << sumHi[0] << endl;
+        pout() << " Flux loY "  << sumLo[1]  << ", hiY "  << sumHi[1] << endl;
         pout() << " Total: " << sumLo[0] + sumLo[1] - sumHi[0] - sumHi[1] << endl;
+        pout() << " Flux dirX " << sumDir[0] <<  endl;
+        pout() << " Flux dirY " << sumDir[1] <<  endl;
+        pout() << " Total: " << sumDir[0] + sumDir[1] << endl;
         pout() << " B/Bold: " << Btot << ", " << BtotOld << endl;
     } 
 }
@@ -1111,6 +1151,7 @@ AmrHydro::initialize()
  
         // Misc
         m_iceMask.resize(m_max_level + 1);
+        m_iceMask_ec.resize(m_max_level + 1);
 
         //-------------------------------------------------
         // For each level, define a collection of FArray/FluxBox
@@ -1139,7 +1180,8 @@ AmrHydro::initialize()
             m_bumpHeight[lev]  = RefCountedPtr<LevelData<FArrayBox>>  (new LevelData<FArrayBox>);
             m_bumpSpacing[lev] = RefCountedPtr<LevelData<FArrayBox>>  (new LevelData<FArrayBox>);
 
-            m_iceMask[lev] = RefCountedPtr<LevelData<FArrayBox>>  (new LevelData<FArrayBox>);
+            m_iceMask[lev]     = RefCountedPtr<LevelData<FArrayBox>>  (new LevelData<FArrayBox>);
+            m_iceMask_ec[lev]  = RefCountedPtr<LevelData<FluxBox>>  (new LevelData<FluxBox>);
         }
 
 
@@ -3548,7 +3590,7 @@ AmrHydro::timeStepFAS(Real a_dt)
         Vector<Real> out_water_flux_x_chan(DomSize+1, 0.0);           // EFFICIENT
         Vector<Real> out_water_flux_x_chan_Bands(3, 0.0);
         Vector<Real> out_water_flux_x_distrib_Bands(3, 0.0);
-        Vector<Real> out_water_flux_y_tot(DomSizeY+3 , 0.0);
+        Vector<Real> out_water_flux_y_tot(DomSizeY+1 , 0.0);
         int idx_bandMin_lo = 0;
         int idx_bandMin_hi = 0;
         int idx_bandMed_lo = 0;
@@ -3588,6 +3630,7 @@ AmrHydro::timeStepFAS(Real a_dt)
         LevelData<FArrayBox>& levelPw         = *m_Pw[0];
         LevelData<FArrayBox>& levelB          = *m_gapheight[0];    
         LevelData<FArrayBox>& levelIM         = *m_iceMask[0];    
+        LevelData<FluxBox>&   levelIMEC       = *m_iceMask_ec[0];
 
 
         LevelData<FArrayBox>& levelQw       = *m_qw[0]; 
@@ -3601,6 +3644,7 @@ AmrHydro::timeStepFAS(Real a_dt)
             FArrayBox& QwaterY_ecFab = Qwater_ec[1];   // has GC
             FluxBox&   CD_ec         = levelCD_ec[dit];
             FArrayBox& CD_ecFab      = CD_ec[0];
+            FArrayBox& CDY_ecFab     = CD_ec[1];
 
             FArrayBox& MS           = levelMoulinSrc[dit];
             FArrayBox& MR           = levelmR[dit];
@@ -3608,6 +3652,10 @@ AmrHydro::timeStepFAS(Real a_dt)
             FArrayBox& Pw           = levelPw[dit];
             FArrayBox& GH           = levelB[dit];
             FArrayBox& IM           = levelIM[dit];
+
+            FluxBox&   IMEC         = levelIMEC[dit];
+            FArrayBox& IMEC_X       = IMEC[0];
+            FArrayBox& IMEC_Y       = IMEC[1];
 
             const Box& validBox = levelGrids.get(dit);
 
@@ -3622,7 +3670,8 @@ AmrHydro::timeStepFAS(Real a_dt)
                     out_water_flux_x_distrib[iv[0]] += Qwater_ecFab(iv, 0) * m_amrDx[0][1] * (1.0 - CD_ecFab(iv, 0));
                 //}
             }
-            BoxIterator bitECY(QwaterY_ecFab.box());
+            //BoxIterator bitECY(QwaterY_ecFab.box());
+            BoxIterator bitECY(CDY_ecFab.box());
             for (bitECY.begin(); bitECY.ok(); ++bitECY) {
                 IntVect iv = bitECY();
                 // DISCHARGE -- QwY
@@ -3630,7 +3679,7 @@ AmrHydro::timeStepFAS(Real a_dt)
                     if ( QwaterY_ecFab(iv, 0) > 1e10) {
                         pout() << "Qw_Y is crap at iv = " << iv << " " << QwaterY_ecFab(iv, 0) << endl;
                     }
-                    out_water_flux_y_tot[iv[1]+1]     += QwaterY_ecFab(iv, 0) * m_amrDx[0][0]; 
+                    out_water_flux_y_tot[iv[1]]     += QwaterY_ecFab(iv, 0) * m_amrDx[0][0]; 
                 //}
             }
 
@@ -3720,8 +3769,8 @@ AmrHydro::timeStepFAS(Real a_dt)
        }
        out_water_flux_x_distrib = recvDist;
 
-       Vector<Real> recvY(DomSizeY+3);
-       result = MPI_Allreduce(&out_water_flux_y_tot[0], &recvY[0], DomSizeY+3, MPI_CH_REAL,
+       Vector<Real> recvY(DomSizeY+1);
+       result = MPI_Allreduce(&out_water_flux_y_tot[0], &recvY[0], DomSizeY+1, MPI_CH_REAL,
                                   MPI_SUM, Chombo_MPI::comm);
        if (result != MPI_SUCCESS)
        {
@@ -3914,7 +3963,7 @@ AmrHydro::timeStepFAS(Real a_dt)
         //if (m_suhmoParm->m_ramp) {
             Real sec_1month      = 2635200.0;  // s
             int time_tmp = (int) m_time + a_dt;
-            pout() << "Time(months) VOL_waterTot recharge ramp = " <<  m_time/sec_1month  << " " << water_vol[0] << " " << out_recharge_ext[0]+out_recharge_MR[0]  << " " << ramp << endl; 
+            pout() << "Time(months) VOL_waterTot rechargeTOT ramp = " <<  m_time/sec_1month  << " " << water_vol[0] << " " << out_recharge_ext[0]+out_recharge_MR[0]  << " " << ramp << endl; 
         //}
         if (m_post_proc_shmip_temporal) {
             if (time_tmp % 86400 == 0) {
@@ -3976,7 +4025,7 @@ AmrHydro::timeStepFAS(Real a_dt)
             }
             pout() << "Flux loX = " << -out_water_flux_x_tot[DomSize] << endl;
             pout() << "Flux hiX = " << -out_water_flux_x_tot[0] << endl;
-            pout() << "Flux loY = " << out_water_flux_y_tot[DomSizeY+2] << endl;
+            pout() << "Flux loY = " << out_water_flux_y_tot[DomSizeY] << endl;
             pout() << "Flux hiY = " << out_water_flux_y_tot[0] << endl;
         }
 
@@ -4256,8 +4305,6 @@ AmrHydro::regrid()
             // GC
             ExtrapGhostCells( *m_bumpHeight[lev], m_amrDomains[lev]);
             ExtrapGhostCells( *m_bumpSpacing[lev], m_amrDomains[lev]);
-            ExtrapGhostCells( *m_iceheight[lev], m_amrDomains[lev]);
-            ExtrapGhostCells( *m_overburdenpress[lev], m_amrDomains[lev]);
             ExtrapGhostCells( *m_magVel[lev], m_amrDomains[lev]);
             ExtrapGhostCells( *m_meltRate[lev], m_amrDomains[lev]);
             ExtrapGhostCells( *m_Pw[lev], m_amrDomains[lev]);
@@ -4266,10 +4313,19 @@ AmrHydro::regrid()
             RealVect levelDx = m_amrDx[lev] * RealVect::Unit;
             m_IBCPtr->initializeBed(levelDx,
                                     *m_suhmoParm,
-                                    *m_bedelevation[lev],
+                                    *m_bedelevation[lev],     // modif
                                     *m_bumpHeight[lev],
                                     *m_bumpSpacing[lev]);
-            m_IBCPtr->setup_iceMask(levelDx, *m_suhmoParm, *m_overburdenpress[lev], *m_iceMask[lev]);
+            m_IBCPtr->initializePi(levelDx, 
+                                   *m_suhmoParm,       
+                                   *m_head[lev],
+                                   *m_gapheight[lev],
+                                   *m_Pw[lev],
+                                   *m_bedelevation[lev],      // modif
+                                   *m_overburdenpress[lev],   // modif
+                                   *m_iceheight[lev],         // modif
+                                   *m_bumpHeight[lev],
+                                   *m_bumpSpacing[lev]);
             if (lev > 0) {
                 // handle ghost cells on the coarse-fine interface
                 PiecewiseLinearFillPatch ghostFiller (newDBL, 
@@ -4279,25 +4335,34 @@ AmrHydro::regrid()
                                                       m_refinement_ratios[lev-1],
                                                       (m_bedelevation[lev-1])->ghostVect()[0]);
                 ghostFiller.fillInterp(*m_bedelevation[lev], *m_bedelevation[lev-1], *m_bedelevation[lev-1], 1.0, 0, 0,  (m_bedelevation[lev-1])->nComp());
-                ghostFiller.fillInterp(*m_iceMask[lev], *m_iceMask[lev-1], *m_iceMask[lev-1], 1.0, 0, 0,  (m_iceMask[lev-1])->nComp());
+                ghostFiller.fillInterp(*m_overburdenpress[lev], *m_overburdenpress[lev-1], *m_overburdenpress[lev-1], 1.0, 0, 0,  (m_overburdenpress[lev-1])->nComp());
+                ghostFiller.fillInterp(*m_iceheight[lev], *m_iceheight[lev-1], *m_iceheight[lev-1], 1.0, 0, 0,  (m_iceheight[lev-1])->nComp());
             }
             // f/f
             (m_bedelevation[lev])->exchange();
-            (m_iceMask[lev])->exchange();
+            (m_overburdenpress[lev])->exchange();
+            (m_iceheight[lev])->exchange();
             // BC
             CopyGhostCells( *m_bedelevation[lev], m_amrDomains[lev]);
-            CopyGhostCells( *m_iceMask[lev], m_amrDomains[lev]);
+            ExtrapGhostCells( *m_overburdenpress[lev], m_amrDomains[lev]);
+            ExtrapGhostCells( *m_iceheight[lev], m_amrDomains[lev]);
 
-            //m_IBCPtr->initializePi(levelDx, 
-            //                       *m_suhmoParm,       
-            //                       *m_head[lev],
-            //                       *m_gapheight[lev],
-            //                       *m_Pw[lev],
-            //                       *m_bedelevation[lev],
-            //                       *m_overburdenpress[lev],
-            //                       *m_iceheight[lev],
-            //                       *m_bumpHeight[lev],
-            //                       *m_bumpSpacing[lev]);
+            // need Pi so done after
+            m_IBCPtr->setup_iceMask(*m_overburdenpress[lev], *m_iceMask[lev]);
+            if (lev > 0) {
+                // handle ghost cells on the coarse-fine interface
+                PiecewiseLinearFillPatch ghostFiller (newDBL, 
+                                                      (m_iceMask[lev-1])->disjointBoxLayout() ,  
+                                                      (m_iceMask[lev-1])->nComp(), 
+                                                      (m_iceMask[lev-1])->disjointBoxLayout().physDomain(), 
+                                                      m_refinement_ratios[lev-1],
+                                                      (m_iceMask[lev-1])->ghostVect()[0]);
+                ghostFiller.fillInterp(*m_iceMask[lev], *m_iceMask[lev-1], *m_iceMask[lev-1], 1.0, 0, 0,  (m_iceMask[lev-1])->nComp());
+            }
+            (m_iceMask[lev])->exchange();
+            CopyGhostCells( *m_iceMask[lev], m_amrDomains[lev]);
+            m_IBCPtr->setup_iceMask_EC(*m_iceMask[lev], *m_iceMask_ec[lev]);
+
 
 
             //if (m_verbosity > 20) {
@@ -4932,7 +4997,7 @@ AmrHydro::levelSetup(int a_level, const DisjointBoxLayout& a_grids)
 
     m_head[a_level]            = RefCountedPtr<LevelData<FArrayBox>> (new LevelData<FArrayBox>(a_grids, nPhiComp, HeadGhostVect));
     m_gradhead[a_level]        = RefCountedPtr<LevelData<FArrayBox>> (new LevelData<FArrayBox>(a_grids, SpaceDim*nPhiComp, HeadGhostVect));
-    m_gradhead_ec[a_level]     = RefCountedPtr<LevelData<FluxBox>> (new LevelData<FluxBox>(a_grids, nPhiComp, IntVect::Zero));
+    m_gradhead_ec[a_level]     = RefCountedPtr<LevelData<FluxBox>>   (new LevelData<FluxBox>(a_grids, nPhiComp, IntVect::Zero));
     m_gapheight[a_level]       = RefCountedPtr<LevelData<FArrayBox>> (new LevelData<FArrayBox>(a_grids, nPhiComp, HeadGhostVect));
     m_Pw[a_level]              = RefCountedPtr<LevelData<FArrayBox>> (new LevelData<FArrayBox>(a_grids, nPhiComp, HeadGhostVect));
     m_qw[a_level]              = RefCountedPtr<LevelData<FArrayBox>> (new LevelData<FArrayBox>(a_grids, SpaceDim*nPhiComp, HeadGhostVect));
@@ -4946,6 +5011,7 @@ AmrHydro::levelSetup(int a_level, const DisjointBoxLayout& a_grids)
     m_bumpHeight[a_level]      = RefCountedPtr<LevelData<FArrayBox>> (new LevelData<FArrayBox>(a_grids, nPhiComp, HeadGhostVect));
     m_bumpSpacing[a_level]     = RefCountedPtr<LevelData<FArrayBox>> (new LevelData<FArrayBox>(a_grids, nPhiComp, HeadGhostVect));
     m_iceMask[a_level]         = RefCountedPtr<LevelData<FArrayBox>> (new LevelData<FArrayBox>(a_grids, nPhiComp, HeadGhostVect));
+    m_iceMask_ec[a_level]      = RefCountedPtr<LevelData<FluxBox>>   (new LevelData<FluxBox>(a_grids, nPhiComp, IntVect::Zero));
 }
 
 void
@@ -4972,6 +5038,7 @@ AmrHydro::initData(Vector<RefCountedPtr<LevelData<FArrayBox>> >& a_head)
         LevelData<FArrayBox>& levelbumpSpacing  = *m_bumpSpacing[lev];
         LevelData<FArrayBox>& levelmagVel       = *m_magVel[lev];
         LevelData<FArrayBox>& levelIceMask      = *m_iceMask[lev];
+        LevelData<FluxBox>& levelIceMaskEC      = *m_iceMask_ec[lev];
 
         RealVect levelDx = m_amrDx[lev] ;
         m_IBCPtr->define(m_amrDomains[lev], levelDx[0]);
@@ -4992,8 +5059,20 @@ AmrHydro::initData(Vector<RefCountedPtr<LevelData<FArrayBox>> >& a_head)
 
         CopyGhostCells( levelzBed, m_amrDomains[lev]);
 
-        m_IBCPtr->setup_iceMask(levelDx, *m_suhmoParm, levelPi, levelIceMask);
+        m_IBCPtr->setup_iceMask(levelPi, levelIceMask);
+        if (lev > 0) {
+            // handle ghost cells on the coarse-fine interface
+            PiecewiseLinearFillPatch ghostFiller (m_amrGrids[lev], 
+                                                  m_amrGrids[lev-1],  
+                                                  (m_iceMask[lev-1])->nComp(), 
+                                                  (m_iceMask[lev-1])->disjointBoxLayout().physDomain(), 
+                                                  m_refinement_ratios[lev-1],
+                                                  (m_iceMask[lev-1])->ghostVect()[0]);
+            ghostFiller.fillInterp(*m_iceMask[lev], *m_iceMask[lev-1], *m_iceMask[lev-1], 1.0, 0, 0,  (m_iceMask[lev-1])->nComp());
+        }
+        (m_iceMask[lev])->exchange();
         CopyGhostCells( *m_iceMask[lev], m_amrDomains[lev]);
+        m_IBCPtr->setup_iceMask_EC(levelIceMask, levelIceMaskEC);
     }
 
     //writePlotFile();
@@ -5837,6 +5916,7 @@ AmrHydro::readCheckpointFile(HDF5Handle& a_handle)
     m_bumpHeight.resize(m_max_level + 1);
     m_bumpSpacing.resize(m_max_level + 1);
     m_iceMask.resize(m_max_level + 1);
+    m_iceMask_ec.resize(m_max_level + 1);
 
     // now read in level-by-level data -- go to Max lev of checkfile
     for (int lev = 0; lev <= max_level_check; lev++) {
@@ -5937,6 +6017,7 @@ AmrHydro::readCheckpointFile(HDF5Handle& a_handle)
             m_bumpHeight[lev]        = RefCountedPtr<LevelData<FArrayBox>> (new LevelData<FArrayBox>(levelDBL, nPhiComp, nGhost)); 
             m_bumpSpacing[lev]       = RefCountedPtr<LevelData<FArrayBox>> (new LevelData<FArrayBox>(levelDBL, nPhiComp, nGhost)); 
             m_iceMask[lev]       = RefCountedPtr<LevelData<FArrayBox>> (new LevelData<FArrayBox>(levelDBL, nPhiComp, nGhost)); 
+            m_iceMask_ec[lev]    = RefCountedPtr<LevelData<FluxBox>>   (new LevelData<FluxBox>(levelDBL, nPhiComp, IntVect::Zero));
 
             // read this level's data
             /* HEAD */
@@ -6083,7 +6164,7 @@ AmrHydro::restart(string& a_restart_file)
         //                       *m_bumpHeight[lev],
         //                       *m_bumpSpacing[lev]);
         m_IBCPtr->resetCovered(*m_suhmoParm, *m_head[lev], *m_overburdenpress[lev]);
-        //m_IBCPtr->setup_iceMask(levelDx, *m_suhmoParm, *m_overburdenpress[lev], *m_iceMask[lev]);
+        m_IBCPtr->setup_iceMask_EC(*m_iceMask[lev], *m_iceMask_ec[lev]); // Hoping GC properly set via copy in readCheckpointFile
     }
 }
 

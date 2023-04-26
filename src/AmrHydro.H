@@ -489,6 +489,7 @@ protected:
 
     /* Misc */
     Vector<RefCountedPtr<LevelData<FArrayBox>> > m_iceMask;    // fake EB mask
+    Vector<RefCountedPtr<LevelData<FluxBox>>>    m_iceMask_ec; // fake EB mask EC
    
 
     //Vector<LevelData<FArrayBox>*> m_gradZb;      

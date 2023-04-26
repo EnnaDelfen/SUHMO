@@ -140,13 +140,10 @@ SqrtIBC::initializeBed(RealVect& a_dx,
     if (Params.m_verbosity > 3) {
         pout() << "(Done with SqrtIBC::initializeBed)" << endl;
     }
-
 }
 
 void 
-SqrtIBC::setup_iceMask(RealVect& a_dx,
-                       suhmo_params Params,
-                       LevelData<FArrayBox>& a_Pi,
+SqrtIBC::setup_iceMask(LevelData<FArrayBox>& a_Pi,
                        LevelData<FArrayBox>& a_iceMask)
 {
     DataIterator dit = a_iceMask.dataIterator();
