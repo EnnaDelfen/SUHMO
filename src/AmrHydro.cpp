@@ -500,16 +500,18 @@ AmrHydro::check_fluxes(Vector<RefCountedPtr<LevelData<FluxBox> > >&   a_bCoef)
                     // fake EB attempt
                     Real IMhi = thisIM(ivhi,0);
                     Real IMlo = thisIM(ivlo,0);
-                    if (thisIMEC_dir(iv,0) > 0.0) {
+                    if (thisIMEC_dir(iv,0) > 0.0) { // so you are on a boundary
                         if ((IMhi - IMlo) > 0.0) { // will be 2, lower boundary
                             sumDir[dir] += thisFluxes_dir(iv,0) * area;
                         } else if ((IMhi - IMlo) < 0.0) { // will be -2, upper boundary
                             sumDir[dir] -= thisFluxes_dir(iv,0) * area;
-                        } else { // no fake EB, domain boundary
-                            if ( iv[dir] == face_box.smallEnd(dir) ) {
-                                sumDir[dir] += thisFluxes_dir(iv,0) * area;
-                            } else if ( iv[dir] == face_box.bigEnd(dir) ) {
-                                sumDir[dir] -= thisFluxes_dir(iv,0) * area;
+                        } else { // no fake EB, domain boundary, IMhi - IMlo = 0.0
+                            if (IMhi > 0.0) { // don't do anything if you're out of the domain
+                                if ( iv[dir] == face_box.smallEnd(dir) ) {
+                                    sumDir[dir] += thisFluxes_dir(iv,0) * area;
+                                } else if ( iv[dir] == face_box.bigEnd(dir) ) {
+                                    sumDir[dir] -= thisFluxes_dir(iv,0) * area;
+                                }
                             }
                         }
                     }
