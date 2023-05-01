@@ -2012,6 +2012,7 @@ AmrHydro::CalcRHS_gapHeightFAS(LevelData<FArrayBox>& levelRHS_b,
                                LevelData<FArrayBox>& levelmR, 
                                LevelData<FArrayBox>& levelB,
                                LevelData<FArrayBox>& levelDT,
+                               LevelData<FArrayBox>& levelIM,
                                LevelData<FArrayBox>& levelbumpHeight,
                                LevelData<FArrayBox>& levelbumpSpacing,
                                LevelData<FArrayBox>& levelmagVel,
@@ -2035,6 +2036,7 @@ AmrHydro::CalcRHS_gapHeightFAS(LevelData<FArrayBox>& levelRHS_b,
        FArrayBox& CD      = levelchanDegree[dit];
 
        FArrayBox& Pressi  = levelPi[dit];
+       FArrayBox& IM      = levelIM[dit];
        FArrayBox& Pw      = levelPw[dit];
        FArrayBox& meltR   = levelmR[dit];
        FArrayBox& BH      = levelbumpHeight[dit];
@@ -2059,10 +2061,14 @@ AmrHydro::CalcRHS_gapHeightFAS(LevelData<FArrayBox>& levelRHS_b,
 
            Real ub_norm = MV(iv,0);
            
-           if (Pressi(iv,0) < 1e-18 ) {
-               RHS(iv,0) =  0.0;
-               CD(iv,0) = 0.0;
-           } else {
+           /* shut off if no ice */
+           //if (IM(iv,0) < 0.0 ) {
+           //    RHS(iv,0) =  0.0;
+           //    CD(iv,0) = 0.0;
+           //    if (m_use_ImplDiff) {
+           //         RHS(iv,0) = B(iv,0);
+           //    }
+           //} else {
                if ( B(iv,0) < BH(iv,0)) {
                    RHS(iv,0) +=  ub_norm * (BH(iv,0) - B(iv,0)) / BL(iv,0);
                    RHS_B(iv,0) = ub_norm * (BH(iv,0) - B(iv,0)) / BL(iv,0);
@@ -2098,7 +2104,7 @@ AmrHydro::CalcRHS_gapHeightFAS(LevelData<FArrayBox>& levelRHS_b,
                     RHS(iv,0) = B(iv,0) + a_dt * RHS(iv,0);
                     //RHS(iv,0) = B(iv,0);
                }
-           } 
+           //} 
        }
    }
 }
@@ -2121,6 +2127,7 @@ AmrHydro::Calc_meltingRate(int                   lev,
     LevelData<FArrayBox>& levelmR     = *m_meltRate[lev];
     LevelData<FArrayBox>& levelB      = *m_gapheight[lev];    
     LevelData<FArrayBox>& levelmagVel = *m_magVel[lev];
+    LevelData<FArrayBox>& levelIM     = *m_iceMask[lev];
 
     DataIterator dit                = levelGrids.dataIterator();
     for (dit.begin(); dit.ok(); ++dit) {
@@ -2128,6 +2135,7 @@ AmrHydro::Calc_meltingRate(int                   lev,
         FArrayBox& zb      = levelZb[dit];
         FArrayBox& Pressw  = levelPw[dit];
         FArrayBox& Pressi  = levelPi[dit];
+        FArrayBox& IM      = levelIM[dit];
         FArrayBox& tmp_cc  = leveltmp_cc[dit];
         FArrayBox& tmp2_cc = leveltmp2_cc[dit];
         FArrayBox& B       = levelB[dit];
@@ -2169,9 +2177,10 @@ AmrHydro::Calc_meltingRate(int                   lev,
             //}
 
             mR(iv,0)   = std::max(mR(iv,0), 0.0);
-            if (Pressi(iv,0) < 1e-18 ) {
-                mR(iv,0)   = 0.0;
-            }
+           /* shut off if no ice */
+            //if (IM(iv,0) < 0.0 ) {
+            //    mR(iv,0)   = 0.0;
+            //}
 
             //DEBUG
             mMR_A(iv,0) = (m_suhmoParm->m_G + sca_prod)/m_suhmoParm->m_L;
@@ -2775,7 +2784,7 @@ AmrHydro::timeStepFAS(Real a_dt)
             }
             for (int lev = 0; lev <= m_finest_level; lev++) {
                 LevelData<FArrayBox>& levelmoulin_source_term = *m_moulin_source_term[lev];
-                LevelData<FArrayBox>& levelPi                 = *m_overburdenpress[lev];
+                LevelData<FArrayBox>& levelIM                 = *m_iceMask[lev];
                 LevelData<FArrayBox>& levelIceHeight          = *m_iceheight[lev];
 
                 DisjointBoxLayout& levelGrids                 = m_amrGrids[lev];
@@ -2794,11 +2803,11 @@ AmrHydro::timeStepFAS(Real a_dt)
                 } else {
                     for (dit.begin(); dit.ok(); ++dit) {
                         FArrayBox& moulinSrc = levelmoulin_source_term[dit];
-                        FArrayBox& pressi    = levelPi[dit];
+                        FArrayBox& IM        = levelIM[dit];
                         BoxIterator bit(moulinSrc.box());
                         for (bit.begin(); bit.ok(); ++bit) {
                             IntVect iv = bit();
-                            if (pressi(iv,0) > 0.0) {
+                            if (IM(iv,0) > 0.0) {
                                 moulinSrc(iv,0) = m_suhmoParm->m_distributed_input;
                             } else {
                                 moulinSrc(iv,0) = 0.0;
@@ -2860,6 +2869,7 @@ AmrHydro::timeStepFAS(Real a_dt)
             LevelData<FArrayBox>& levelBL                 = *m_bumpSpacing[lev];
             LevelData<FArrayBox>& levelmagVel             = *m_magVel[lev];
             LevelData<FArrayBox>& levelmR                 = *m_meltRate[lev];
+            LevelData<FArrayBox>& levelIM                 = *m_iceMask[lev];
 
             LevelData<FArrayBox>& levelDterm              = *a_diffusiveTerm[lev];    
 
@@ -2961,12 +2971,12 @@ AmrHydro::timeStepFAS(Real a_dt)
                 // CC
                 FArrayBox& B       = levelB[dit];
                 FArrayBox& RHSh    = levelRHSh[dit];
-                FArrayBox& Pressi  = levelPi[dit];
                 FArrayBox& bumpHeight    = levelBH[dit];
                 FArrayBox& bumpSpacing   = levelBL[dit];
                 FArrayBox& DiffusiveTerm = levelDterm[dit];
                 FArrayBox& MV      = levelmagVel[dit];
                 FArrayBox& mR      = levelmR[dit];
+                FArrayBox& IM      = levelIM[dit];
 
                 FArrayBox& moulinSrc = levelmoulin_source_term[dit];
 
@@ -3000,9 +3010,9 @@ AmrHydro::timeStepFAS(Real a_dt)
                     RHSh(iv,0) -= m_suhmoParm->m_DiffFactor * DiffusiveTerm(iv,0);
 
                     /* shut off if no ice */
-                    if (Pressi(iv,0) < 1e-18 ) {
-                        RHSh(iv,0) = 0.0;
-                    }
+                    //if (IM(iv,0) < 0.0 ) {
+                    //    RHSh(iv,0) = 0.0;
+                    //}
                 }
             }
         }// loop on levs
@@ -3290,6 +3300,7 @@ AmrHydro::timeStepFAS(Real a_dt)
         LevelData<FArrayBox>& levelBL    = *m_bumpSpacing[lev];    
         LevelData<FArrayBox>& levelDT    = *a_diffusiveTerm[lev];    
         LevelData<FArrayBox>& levelMV    = *m_magVel[lev];
+        LevelData<FArrayBox>& levelIM    = *m_iceMask[lev];
 
         // DEBUG
         LevelData<FArrayBox>& levelRHS_b_A = *RHS_b_A[lev];
@@ -3299,7 +3310,7 @@ AmrHydro::timeStepFAS(Real a_dt)
 
         CalcRHS_gapHeightFAS(levelRHS_b, levelPi, 
                              levelPw, levelmR, 
-                             levelB, levelDT, levelBH, levelBL, levelMV,
+                             levelB, levelDT, levelIM, levelBH, levelBL, levelMV,
                              levelRHS_b_A, levelRHS_b_B, levelRHS_b_C, 
                              levelchanDegree, a_dt); 
 

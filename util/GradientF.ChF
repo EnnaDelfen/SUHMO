@@ -56,7 +56,7 @@ c ::: local variables
 c ::: this is a normal derivative (simpler stencil)
          factor = one/dx(dir)
          CHF_MULTIDO[edgeGrid;i;j;k]
-         if ( (mask(CHF_IX[i;j;k])<1E-6) .OR. (mask(CHF_IX[i-ii;j-jj;k-kk])<1E-6) ) then
+         if ( (mask(CHF_IX[i;j;k])<-10000) .OR. (mask(CHF_IX[i-ii;j-jj;k-kk])<-10000) ) then
              edgeGrad(CHF_IX[i;j;k]) =  0.0
          else
              edgeGrad(CHF_IX[i;j;k]) = factor*(phi(CHF_IX[i;j;k])
@@ -123,7 +123,7 @@ c     :: check to see if enough cells exist for full stencil
          if (mask(CHF_IX[i-2*ii; j-2*jj; k-2*kk]).eq.MASKCOPY) then
 
 c     :: do linear extrapolation
-           if ( (usermask(CHF_IX[i;j;k])<1E-6) .OR. (usermask(CHF_IX[i-ii;j-jj;k-kk])<1E-6) .OR. (usermask(CHF_IX[i-2*ii;j-2*jj;k-2*kk])<1E-6) ) then
+           if ( (usermask(CHF_IX[i;j;k])<-10000) .OR. (usermask(CHF_IX[i-ii;j-jj;k-kk])<-10000) .OR. (usermask(CHF_IX[i-2*ii;j-2*jj;k-2*kk])<-10000) ) then
               edgeGrad(CHF_IX[i;j;k]) = 0.0
            else
               edgeGrad(CHF_IX[i;j;k]) = two*edgeGrad(CHF_IX[i-ii;j-jj;k-kk])
@@ -133,7 +133,7 @@ c     :: do linear extrapolation
          else if (mask(CHF_IX[i-ii;j-jj;k-kk]).eq.MASKCOPY) then
 
 c     ::: just do simple extrapoplation
-           if ( (usermask(CHF_IX[i;j;k])<1E-6) .OR. (usermask(CHF_IX[i-ii;j-jj;k-kk])<1E-6) ) then
+           if ( (usermask(CHF_IX[i;j;k])<-10000) .OR. (usermask(CHF_IX[i-ii;j-jj;k-kk])<-10000) ) then
               edgeGrad(CHF_IX[i;j;k]) = 0.0
            else
               edgeGrad(CHF_IX[i;j;k]) = edgeGrad(CHF_IX[i-ii;j-jj;k-kk])
@@ -159,7 +159,7 @@ c     :: of edges
          if (mask(CHF_IX[i+ii; j+jj;k+kk]).eq.MASKCOPY) then
 
 c     :: do linear extrapolation
-           if ( (usermask(CHF_IX[i;j;k])<1E-6) .OR. (usermask(CHF_IX[i+ii;j+jj;k+kk])<1E-6) .OR. (usermask(CHF_IX[i+2*ii;j+2*jj;k+2*kk])<1E-6) ) then
+           if ( (usermask(CHF_IX[i;j;k])<-10000) .OR. (usermask(CHF_IX[i+ii;j+jj;k+kk])<-10000) .OR. (usermask(CHF_IX[i+2*ii;j+2*jj;k+2*kk])<-10000) ) then
               edgeGrad(CHF_IX[i;j;k]) = 0.0
            else
               edgeGrad(CHF_IX[i;j;k]) = two*edgeGrad(CHF_IX[i+ii;j+jj;k+kk])
@@ -169,7 +169,7 @@ c     :: do linear extrapolation
          else if (mask(CHF_IX[i;j;k]).eq.MASKCOPY) then
 
 c     ::: just do simple extrapolation
-           if ( (usermask(CHF_IX[i;j;k])<1E-6) .OR. (usermask(CHF_IX[i+ii;j+jj;k+kk])<1E-6) ) then
+           if ( (usermask(CHF_IX[i;j;k])<-10000) .OR. (usermask(CHF_IX[i+ii;j+jj;k+kk])<-10000) ) then
               edgeGrad(CHF_IX[i;j;k]) = 0.0
            else
               edgeGrad(CHF_IX[i;j;k]) = edgeGrad(CHF_IX[i+ii;j+jj;k+kk])

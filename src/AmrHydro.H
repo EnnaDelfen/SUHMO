@@ -145,6 +145,7 @@ public:
                               LevelData<FArrayBox>& levelmR, 
                               LevelData<FArrayBox>& levelB,
                               LevelData<FArrayBox>& levelDT,
+                              LevelData<FArrayBox>& levelIM,
                               LevelData<FArrayBox>& levelBH, 
                               LevelData<FArrayBox>& levelBL,
                               LevelData<FArrayBox>& levelmagVel,
