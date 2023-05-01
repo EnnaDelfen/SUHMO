@@ -2179,10 +2179,10 @@ AmrHydro::Calc_meltingRate(int                   lev,
             //}
 
             mR(iv,0)   = std::max(mR(iv,0), 0.0);
-           /* shut off if no ice */
-            //if (IM(iv,0) < 0.0 ) {
-            //    mR(iv,0)   = 0.0;
-            //}
+            /* shut off if no ice */
+            if (IM(iv,0) < 0.0 ) {
+                mR(iv,0)   = 0.0;
+            }
 
             //DEBUG
             mMR_A(iv,0) = (m_suhmoParm->m_G + sca_prod)/m_suhmoParm->m_L;
@@ -3012,9 +3012,9 @@ AmrHydro::timeStepFAS(Real a_dt)
                     RHSh(iv,0) -= m_suhmoParm->m_DiffFactor * DiffusiveTerm(iv,0);
 
                     /* shut off if no ice */
-                    //if (IM(iv,0) < 0.0 ) {
-                    //    RHSh(iv,0) = 0.0;
-                    //}
+                    if (IM(iv,0) < 0.0 ) {
+                        RHSh(iv,0) = 0.0;
+                    }
                 }
             }
         }// loop on levs
