@@ -2064,13 +2064,13 @@ AmrHydro::CalcRHS_gapHeightFAS(LevelData<FArrayBox>& levelRHS_b,
            Real ub_norm = MV(iv,0);
            
            /* shut off if no ice */
-           //if (IM(iv,0) < 0.0 ) {
-           //    RHS(iv,0) =  0.0;
-           //    CD(iv,0) = 0.0;
-           //    if (m_use_ImplDiff) {
-           //         RHS(iv,0) = B(iv,0);
-           //    }
-           //} else {
+           if (IM(iv,0) < 0.0 ) {
+               RHS(iv,0) =  0.0;
+               CD(iv,0) = 0.0;
+               if (m_use_ImplDiff) {
+                    RHS(iv,0) = B(iv,0);
+               }
+           } else {
                if ( B(iv,0) < BH(iv,0)) {
                    RHS(iv,0) +=  ub_norm * (BH(iv,0) - B(iv,0)) / BL(iv,0);
                    RHS_B(iv,0) = ub_norm * (BH(iv,0) - B(iv,0)) / BL(iv,0);
@@ -2106,7 +2106,7 @@ AmrHydro::CalcRHS_gapHeightFAS(LevelData<FArrayBox>& levelRHS_b,
                     RHS(iv,0) = B(iv,0) + a_dt * RHS(iv,0);
                     //RHS(iv,0) = B(iv,0);
                }
-           //} 
+           } 
        }
    }
 }
