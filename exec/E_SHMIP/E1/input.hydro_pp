@@ -53,7 +53,7 @@ suhmo.floor_max = 1.0
 solver.use_fas=true
 solver.use_NL=true
 solver.bcoeff_otf=true
-solver.eps_PicardIte=0.0001
+solver.eps_PicardIte=0.0002
 solver.use_ImplDiff=true
 
 # class AmrHydro.cpp
