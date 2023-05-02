@@ -1780,12 +1780,15 @@ AmrHydro::dCoeff(LevelData<FluxBox>&    leveldcoef,
                  LevelData<FluxBox>&    a_Bec,
                  int lev)
 {
+    LevelData<FluxBox>&   levelIMEC     = *m_iceMask_ec[lev];
+
     DataIterator dit = leveldcoef.dataIterator();
     for (dit.begin(); dit.ok(); ++dit) {
 
         FluxBox& bC      = leveldcoef[dit];
         FluxBox& MRec    = a_mRec[dit];
         FluxBox& Bec     = a_Bec[dit];
+        FluxBox& IMec    = levelIMEC[dit];
 
         // loop over directions
         for (int dir = 0; dir<SpaceDim; dir++) {
@@ -1797,7 +1800,8 @@ AmrHydro::dCoeff(LevelData<FluxBox>&    leveldcoef,
                                 CHF_CONST_REALVECT(m_amrDx[lev]), 
                                 CHF_CONST_REAL(m_suhmoParm->m_rho_i),
                                 CHF_FRA(MRec[dir]), 
-                                CHF_FRA(Bec[dir]) );
+                                CHF_FRA(Bec[dir]),
+                                CHF_FRA(IMec[dir]) );
         }
     }
 }

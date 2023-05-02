@@ -160,9 +160,13 @@ HydroIBC::setup_iceMask_EC(LevelData<FArrayBox>& a_iceMask,
                 IntVect ivm1=bit();
                 ivm1[dir] -= 1;
                 // fake EB
-                if ( std::abs(thisIM(iv,0)-thisIM(ivm1,0)) < 1e-10 ) {
-                    thisIMEC_dir(iv,0) = 0.0;
-                } else {
+                if ( std::abs(thisIM(iv,0)-thisIM(ivm1,0)) < 1e-10 ) { // no boundary
+                    if (thisIM(iv,0) > 0.0) { // inside domain
+                        thisIMEC_dir(iv,0) = 0.0;
+                    } else { // outside domain
+                        thisIMEC_dir(iv,0) = -1.0;
+                    }
+                } else { // boundary !
                     thisIMEC_dir(iv,0) = 1.0;
                 }
                 // domain box

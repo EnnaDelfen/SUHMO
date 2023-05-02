@@ -54,12 +54,12 @@ solver.use_fas=true
 solver.use_NL=true
 solver.bcoeff_otf=true
 solver.eps_PicardIte=0.0001
-solver.use_ImplDiff=true
+solver.use_ImplDiff=false
 
 # class AmrHydro.cpp
 # misc
 AmrHydro.PrintCustom=false
-AmrHydro.post_proc=false
+AmrHydro.post_proc=true
 AmrHydro.verbosity=5
 # mesh and refinement
 AmrHydro.num_cells=256 64 # number of cells on coarsest domain

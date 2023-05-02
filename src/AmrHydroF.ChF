@@ -237,14 +237,19 @@ C     ------------------------------------------------------------------
      &     CHF_CONST_REALVECT[dx], 
      &     CHF_CONST_REAL[rho], 
      &     CHF_FRA[MRec],
-     &     CHF_FRA[Bec]) 
+     &     CHF_FRA[Bec],
+     &     CHF_FRA[IMec]) 
     
       integer CHF_DDECL[i;j;k]
 
       CHF_MULTIDO[region; i; j; k]
 C        m2/s
 C         Dcoeff(CHF_IX[i;j;k],0) = 1.0
-         Dcoeff(CHF_IX[i;j;k],0) = max(Bec(CHF_IX[i;j;k],0) * MRec(CHF_IX[i;j;k],0) / rho , 5.0e-6)
+         if ( IMec(CHF_IX[i;j;k],0) < 0.0 )  then
+             Dcoeff(CHF_IX[i;j;k],0) = 0.0 
+         else
+             Dcoeff(CHF_IX[i;j;k],0) = max(Bec(CHF_IX[i;j;k],0) * MRec(CHF_IX[i;j;k],0) / rho , 5.0e-6)
+         endif
 
       CHF_ENDDO
 
