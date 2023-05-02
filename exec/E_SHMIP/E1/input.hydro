@@ -1,4 +1,7 @@
 # main - driver.cpp
+# NOTE: if you're doing fake EBs like for the valley case, its best if you shut off the implicit solver for b (solver.use_ImplDiff=false)
+#       that way, the diffusion term is in the RHS for both h/b equations, and shut off in regions where IM<0
+#       If you choose solver.use_ImplDiff=true, your gap height will "spill" on the covered regions
 main.domain_size=6000.00 1500.00 # physical dimensions of domain
 main.problem_type=valley
 valleypp.gamma = 0.05 
@@ -53,13 +56,13 @@ suhmo.floor_max = 1.0
 solver.use_fas=true
 solver.use_NL=true
 solver.bcoeff_otf=true
-solver.eps_PicardIte=0.0001
+solver.eps_PicardIte=0.0002
 solver.use_ImplDiff=true
 
 # class AmrHydro.cpp
 # misc
 AmrHydro.PrintCustom=false
-AmrHydro.post_proc=false
+AmrHydro.post_proc=true
 AmrHydro.verbosity=5
 # mesh and refinement
 AmrHydro.num_cells=256 64 # number of cells on coarsest domain

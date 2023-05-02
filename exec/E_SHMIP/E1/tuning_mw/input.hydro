@@ -27,7 +27,7 @@ suhmo.SlidingVelocity = 2.5e-7 0.0
 suhmo.br = 0.1
 suhmo.lr = 2.0
 suhmo.A  = 5e-25
-suhmo.cutOffbr  = 0.01
+suhmo.cutOffbr  = 0.0
 suhmo.maxOffbr  = 10000.0
 suhmo.diffFactor= 2.0
 
@@ -53,8 +53,8 @@ suhmo.floor_max = 1.0
 solver.use_fas=true
 solver.use_NL=true
 solver.bcoeff_otf=true
-solver.eps_PicardIte=0.0001
-solver.use_ImplDiff=true
+solver.eps_PicardIte=0.0003
+solver.use_ImplDiff=false #true
 
 # class AmrHydro.cpp
 # misc
