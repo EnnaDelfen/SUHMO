@@ -345,6 +345,7 @@ protected:
 
     /// FAS
     bool m_use_mask_gradients;
+    bool m_use_mask_rhs_b;
     bool m_use_FAS;
     bool m_use_NL;
     bool m_compute_Bcoeff;

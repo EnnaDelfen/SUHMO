@@ -863,11 +863,13 @@ AmrHydro::initialize()
     /* PARSING */
     ParmParse ppSolver("solver");
     m_use_mask_gradients  = false;
+    m_use_mask_rhs_b      = false;
     m_use_FAS        = false;
     m_compute_Bcoeff = false;
     m_use_NL         = false;
     m_use_ImplDiff   =  false;
     ppSolver.query("use_mask_for_gradients", m_use_mask_gradients); // use the mask to compute reduced gradients at fake EB
+    ppSolver.query("use_mask_rhs_b", m_use_mask_rhs_b); // use the mask to compute reduced gradients at fake EB
     ppSolver.query("use_fas", m_use_FAS); // use FAS scheme for head 
     if (m_use_FAS) {
         ppSolver.query("use_NL", m_use_NL); // use FAS formulation with NL portion 
@@ -2105,7 +2107,7 @@ AmrHydro::CalcRHS_gapHeightFAS(LevelData<FArrayBox>& levelRHS_b,
            Real ub_norm = MV(iv,0);
            
            /* shut off if no ice */
-           if (IM(iv,0) < 0.0 ) {
+           if ((IM(iv,0) < 0.0 ) and (m_use_mask_rhs_b)) {
                RHS(iv,0) =  0.0;
                CD(iv,0) = 0.0;
                if (m_use_ImplDiff) {
