@@ -862,10 +862,12 @@ AmrHydro::initialize()
 
     /* PARSING */
     ParmParse ppSolver("solver");
+    m_use_mask_gradients  = false;
     m_use_FAS        = false;
     m_compute_Bcoeff = false;
     m_use_NL         = false;
     m_use_ImplDiff   =  false;
+    ppSolver.query("use_mask_for_gradients", m_use_mask_gradients); // use the mask to compute reduced gradients at fake EB
     ppSolver.query("use_fas", m_use_FAS); // use FAS scheme for head 
     if (m_use_FAS) {
         ppSolver.query("use_NL", m_use_NL); // use FAS formulation with NL portion 
@@ -1433,10 +1435,17 @@ void AmrHydro::WFlx_level(LevelData<FluxBox>&          a_bcoef,
     int nRefCrse=-1;
     int nRefFine=-1;
     // CC version -- GC ???
-    Gradient::compGradientCC(lvlgradH, lcl_u,
-                             crsePsiPtr, finePsiPtr,
-                             a_dx, nRefCrse, nRefFine,
-                             levelDomain, &a_mask);
+    if (m_use_mask_gradients) { 
+        Gradient::compGradientCC(lvlgradH, lcl_u,
+                                 crsePsiPtr, finePsiPtr,
+                                 a_dx, nRefCrse, nRefFine,
+                                 levelDomain, &a_mask);
+    } else {
+        Gradient::compGradientCC(lvlgradH, lcl_u,
+                                 crsePsiPtr, finePsiPtr,
+                                 a_dx, nRefCrse, nRefFine,
+                                 levelDomain, nullptr);
+    }
 
     // handle ghost cells on the coarse-fine interface
     if ( a_ucoarse != NULL) {
@@ -1453,10 +1462,17 @@ void AmrHydro::WFlx_level(LevelData<FluxBox>&          a_bcoef,
         // Compute CC gradient of phi coarse
         RealVect a_dxcoarse = a_dx * 2; // assumes refRatio = 2
         LevelData<FArrayBox> lvlgradHcoarse(levelGridscoarse, SpaceDim, a_ucoarse->ghostVect() ); 
-        Gradient::compGradientCC(lvlgradHcoarse, lcl_ucoarse,
-                                 crsePsiPtr, finePsiPtr,
-                                 a_dxcoarse, nRefCrse, nRefFine,
-                                 levelDomaincoarse, m_iceMask[a_depth-1]);
+        if (m_use_mask_gradients) { 
+            Gradient::compGradientCC(lvlgradHcoarse, lcl_ucoarse,
+                                     crsePsiPtr, finePsiPtr,
+                                     a_dxcoarse, nRefCrse, nRefFine,
+                                     levelDomaincoarse, m_iceMask[a_depth-1]);
+        } else {
+            Gradient::compGradientCC(lvlgradHcoarse, lcl_ucoarse,
+                                     crsePsiPtr, finePsiPtr,
+                                     a_dxcoarse, nRefCrse, nRefFine,
+                                     levelDomaincoarse, nullptr);
+        }
         lvlgradHcoarse.exchange();
         ExtrapGhostCells( lvlgradHcoarse, levelDomaincoarse);
 
@@ -1567,10 +1583,17 @@ AmrHydro::compute_grad_zb_ec(int                 lev,
     }
     RealVect dx = m_amrDx[lev];  
     // EC version
-    Gradient::compGradientMAC(a_levelgradZb_ec, levelZb,
-                              crsePsiPtr, finePsiPtr,
-                              dx, nRefCrse, nRefFine,
-                              m_amrDomains[lev], m_iceMask[lev]);
+    if (m_use_mask_gradients) { 
+        Gradient::compGradientMAC(a_levelgradZb_ec, levelZb,
+                                  crsePsiPtr, finePsiPtr,
+                                  dx, nRefCrse, nRefFine,
+                                  m_amrDomains[lev], m_iceMask[lev]);
+    } else { 
+        Gradient::compGradientMAC(a_levelgradZb_ec, levelZb,
+                                  crsePsiPtr, finePsiPtr,
+                                  dx, nRefCrse, nRefFine,
+                                  m_amrDomains[lev], nullptr);
+    }
 }
 
 void
@@ -1598,10 +1621,17 @@ AmrHydro::compute_grad_head(int lev)
     }
     RealVect dx = m_amrDx[lev];  
     // EC version
-    Gradient::compGradientMAC(levelgradH_ec, levelcurrentH,
-                             crsePsiPtr, finePsiPtr,
-                             dx, nRefCrse, nRefFine,
-                             m_amrDomains[lev], &levelIceMask);
+    if (m_use_mask_gradients) { 
+        Gradient::compGradientMAC(levelgradH_ec, levelcurrentH,
+                                 crsePsiPtr, finePsiPtr,
+                                 dx, nRefCrse, nRefFine,
+                                 m_amrDomains[lev], &levelIceMask);
+    } else {
+        Gradient::compGradientMAC(levelgradH_ec, levelcurrentH,
+                                 crsePsiPtr, finePsiPtr,
+                                 dx, nRefCrse, nRefFine,
+                                 m_amrDomains[lev], nullptr);
+    }
     // CC version
     EdgeToCell(levelgradH_ec, levelgradH); 
     // handle ghost cells on the coarse-fine interface
@@ -1695,10 +1725,17 @@ AmrHydro::evaluate_Re_quadratic(int lev, bool computeGrad)
         }
         RealVect dx = m_amrDx[lev];  
         // EC version
-        Gradient::compGradientMAC(levelgradH_ec, levelcurrentH,
-                                 crsePsiPtr, finePsiPtr,
-                                 dx, nRefCrse, nRefFine,
-                                 m_amrDomains[lev], &levelIceMask);
+        if (m_use_mask_gradients) { 
+            Gradient::compGradientMAC(levelgradH_ec, levelcurrentH,
+                                     crsePsiPtr, finePsiPtr,
+                                     dx, nRefCrse, nRefFine,
+                                     m_amrDomains[lev], &levelIceMask);
+        } else {
+            Gradient::compGradientMAC(levelgradH_ec, levelcurrentH,
+                                     crsePsiPtr, finePsiPtr,
+                                     dx, nRefCrse, nRefFine,
+                                     m_amrDomains[lev], nullptr);
+        }
         EdgeToCell(levelgradH_ec, levelgradH); 
         // handle ghost cells on the coarse-fine interface
         if (lev > 0) {
