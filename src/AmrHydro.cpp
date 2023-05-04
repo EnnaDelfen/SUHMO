@@ -1506,8 +1506,10 @@ void AmrHydro::WFlx_level(LevelData<FluxBox>&          a_bcoef,
     // CC -> EC
     LevelData<FluxBox>   lvlB_ec(levelGrids, 1, IntVect::Zero);
     LevelData<FluxBox>   lvlRe_ec(levelGrids, 1, IntVect::Zero);
+    LevelData<FluxBox>   lvlIM_ec(levelGrids, 1, IntVect::Zero);
     CellToEdge(lvlRe, lvlRe_ec);
     CellToEdge(a_B, lvlB_ec);
+    m_IBCPtr->setup_iceMask_EC(a_mask,  lvlIM_ec);
 
     // Update Bcoef
     dit = a_bcoef.dataIterator();
@@ -1515,6 +1517,7 @@ void AmrHydro::WFlx_level(LevelData<FluxBox>&          a_bcoef,
         FluxBox& bC        = a_bcoef[dit];
         FluxBox& B_ec      = lvlB_ec[dit];
         FluxBox& Re_ec     = lvlRe_ec[dit];
+        FluxBox& IM_ec     = lvlIM_ec[dit];
         // loop over directions
         for (int dir = 0; dir<SpaceDim; dir++) {
 
@@ -1524,6 +1527,7 @@ void AmrHydro::WFlx_level(LevelData<FluxBox>&          a_bcoef,
                                 CHF_FRA(Re_ec[dir]),
                                 CHF_BOX(region),
                                 CHF_FRA(bC[dir]),
+                                CHF_FRA(IM_ec[dir]),
                                 CHF_CONST_REAL(m_suhmoParm->m_omega),
                                 CHF_CONST_REAL(m_suhmoParm->m_nu) );
         }
@@ -1774,8 +1778,11 @@ AmrHydro::aCoeff_bCoeff(LevelData<FArrayBox>&  levelacoef,
                         LevelData<FluxBox>&    levelbcoef, 
                         LevelData<FluxBox>&    levelRe, 
                         LevelData<FluxBox>&    levelB,
-                        LevelData<FluxBox>&    levelPi)
+                        LevelData<FluxBox>&    levelPi,
+                        int lev)
 {
+    LevelData<FluxBox>&   levelIMEC     = *m_iceMask_ec[lev];
+
     DataIterator dit = levelbcoef.dataIterator();
     for (dit.begin(); dit.ok(); ++dit) {
 
@@ -1783,6 +1790,7 @@ AmrHydro::aCoeff_bCoeff(LevelData<FArrayBox>&  levelacoef,
         FArrayBox& aC     = levelacoef[dit];
         FluxBox& bC       = levelbcoef[dit];
         FluxBox& Re       = levelRe[dit];
+        FluxBox& IMec     = levelIMEC[dit];
 
         aC.setVal(0.0);
 
@@ -1795,6 +1803,7 @@ AmrHydro::aCoeff_bCoeff(LevelData<FArrayBox>&  levelacoef,
                                 CHF_FRA(Re[dir]),
                                 CHF_BOX(region),
                                 CHF_FRA(bC[dir]),
+                                CHF_FRA(IMec[dir]),
                                 CHF_CONST_REAL(m_suhmoParm->m_omega),
                                 CHF_CONST_REAL(m_suhmoParm->m_nu) );
         }
@@ -3078,7 +3087,7 @@ AmrHydro::timeStepFAS(Real a_dt)
             LevelData<FluxBox>& levelPi_ec  = *a_Pi_ec[lev];    
 
             // Compute aCoeff and bCoeff using updated qtites
-            aCoeff_bCoeff(levelacoef, levelbcoef, levelRe_ec, levelB_ec, levelPi_ec);
+            aCoeff_bCoeff(levelacoef, levelbcoef, levelRe_ec, levelB_ec, levelPi_ec, lev);
 
             //stuff for solve -- to get SAME number of levs and not max/finest
             m_amrGrids_curr[lev]   = m_amrGrids[lev];

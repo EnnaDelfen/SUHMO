@@ -200,6 +200,7 @@ C     ------------------------------------------------------------------
      &     CHF_CONST_FRA[aRe],
      &     CHF_BOX[region],
      &     CHF_CONST_FRA[Bcoeff],
+     &     CHF_CONST_FRA[IMec],
      &     CHF_CONST_REAL[omegaparam],
      &     CHF_CONST_REAL[nuparam]) 
     
@@ -216,7 +217,11 @@ C     ------------------------------------------------------------------
          denom_q  =  12.0 * nuparam * ( 1.0 +
      &               omegaparam * aRe(CHF_IX[i;j  ;k  ],0) ) 
 
-         Bcoeff(CHF_IX[i;j;k],0) = num_q / denom_q
+         if ( IMec(CHF_IX[i;j;k],0) < 0.0 )  then
+             Bcoeff(CHF_IX[i;j;k],0) = 0.0
+         else
+             Bcoeff(CHF_IX[i;j;k],0) = num_q / denom_q
+         endif
 
       CHF_ENDDO
 

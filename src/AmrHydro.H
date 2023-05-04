@@ -121,7 +121,8 @@ public:
                        LevelData<FluxBox>&    levelbcoef, 
                        LevelData<FluxBox>&    levelRe, 
                        LevelData<FluxBox>&    levelB, 
-                       LevelData<FluxBox>&    levelPi);
+                       LevelData<FluxBox>&    levelPi,
+                       int lev);
 
     void aCoeff_GH(LevelData<FArrayBox>&  levelacoef,
                    LevelData<FluxBox>&    leveldcoef);
