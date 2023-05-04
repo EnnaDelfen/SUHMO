@@ -274,7 +274,7 @@ ValleyIBC::initializeData(RealVect& a_dx,
 
             /* bed topography */
             /* Ice height = ICE from 0 (should be ice only, so surface - (bed + gap)) */
-            // parabolic profile
+            // parabolic profile of SURFACE
             thisiceHeight(iv, 0) = 100.0 * std::pow(x_loc + 200.0, 0.25) + x_loc/60.0 - std::pow(2.0e10, 0.25) + 1.0;
             // Weird bed
             Real gamma_b         = 0.05;
@@ -299,6 +299,8 @@ ValleyIBC::initializeData(RealVect& a_dx,
                 //thisGapHeight(iv, 0) = std::max(Params.m_gapInit + dist2(generator2), 0.0001);
 
             }
+            // correct for ice height
+            thisiceHeight(iv, 0) = std::max(thisiceHeight(iv, 0) - thiszbed(iv, 0), 0.0);
             
             /* option 1: guess Pw, find head */
             // Water press ?? No idea --> Pi/2.0
