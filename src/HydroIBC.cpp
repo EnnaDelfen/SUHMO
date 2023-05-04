@@ -140,7 +140,6 @@ HydroIBC::setup_iceMask_EC(LevelData<FArrayBox>& a_iceMask,
                            LevelData<FluxBox>&   a_iceMask_ec)
 {
 
-    pout() << "HydroIBC::setup_iceMask_EC"<< endl;
     Box domain_box = (a_iceMask.disjointBoxLayout()).physDomain().domainBox();
     DataIterator dit = a_iceMask.dataIterator();
     for (dit.begin(); dit.ok(); ++dit) {
