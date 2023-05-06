@@ -3,7 +3,7 @@ main.domain_size=6000.00 1500.00 # physical dimensions of domain
 main.problem_type=valley
 valleypp.gamma = 0.05 
 main.maxTime = 1000000000000.0
-main.maxStep= 60000 # approx 18 years
+main.maxStep= 30000 # approx 17 years
 
 # bc - 0 = diri / 1 = neum
 bc.lo_bc = 0 1
@@ -55,12 +55,12 @@ solver.use_mask_rhs_b=true
 solver.use_fas=true
 solver.use_NL=true
 solver.bcoeff_otf=true
-solver.eps_PicardIte=0.0003
+solver.eps_PicardIte=0.0001
 solver.use_ImplDiff=true
 
 # class AmrHydro.cpp
 # misc
-AmrHydro.PrintCustom=true
+AmrHydro.PrintCustom=false
 AmrHydro.post_proc=true
 AmrHydro.post_proc_shmip=false
 AmrHydro.verbosity=5
@@ -90,7 +90,7 @@ AmrHydro.tagging_values_max=100000000.0
 AmrHydro.cfl=0.5
 AmrHydro.initial_cfl=0.5
 AmrHydro.max_dt_grow_factor=1.1
-AmrHydro.fixed_dt=7200.0 # 2 h dt
+AmrHydro.fixed_dt=18000. # 5 h dt
 AmrHydro.offsetTime=0.0
 # Typically -1 for never, 0 for last step only, or integer interval (number of steps)
 # Plot and output
