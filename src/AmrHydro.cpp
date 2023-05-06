@@ -4320,6 +4320,7 @@ AmrHydro::regrid()
             // Gradients
             m_gradhead[lev]        = RefCountedPtr<LevelData<FArrayBox>> (new LevelData<FArrayBox>(newDBL, m_gradhead[0]->nComp(), m_gradhead[0]->ghostVect()));
             m_gradhead_ec[lev]     = RefCountedPtr<LevelData<FluxBox>> (new LevelData<FluxBox>(newDBL, m_gradhead_ec[0]->nComp(), IntVect::Zero));
+            m_iceMask_ec[lev]      = RefCountedPtr<LevelData<FluxBox>> (new LevelData<FluxBox>(newDBL, m_iceMask_ec[0]->nComp(), IntVect::Zero));
 
 
             /* DEBUG VAR */
