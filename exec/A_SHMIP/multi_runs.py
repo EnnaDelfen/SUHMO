@@ -34,4 +34,4 @@ for i, pat in enumerate(patterns):
     shutil.move(exec_dir+"pout.0", exec_dir+"{}".format("postproc.output") )
     print(".. analyze pp and produce datafile ")
     os.system("python ../dump_PP.py {} > postproc.dat".format(pat)) 
-    os.system("rm pout.* plot000000.2d.hdf5") 
+    os.system("rm pout.* plot000000.2d.hdf5 plot010000.2d.hdf5") 
