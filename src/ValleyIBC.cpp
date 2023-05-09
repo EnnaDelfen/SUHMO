@@ -107,9 +107,9 @@ ValleyIBC::initializePi(RealVect& a_dx,
                         LevelData<FArrayBox>& a_head,
                         LevelData<FArrayBox>& a_gapHeight,
                         LevelData<FArrayBox>& a_Pw,
-                        LevelData<FArrayBox>& a_zbed,
-                        LevelData<FArrayBox>& a_Pi,
-                        LevelData<FArrayBox>& a_iceHeight,
+                        LevelData<FArrayBox>& a_zbed,       // modified
+                        LevelData<FArrayBox>& a_Pi,         // modified
+                        LevelData<FArrayBox>& a_iceHeight,  // modified
                         LevelData<FArrayBox>& a_bumpHeight,
                         LevelData<FArrayBox>& a_bumpSpacing)
 {
@@ -194,24 +194,48 @@ ValleyIBC::resetCovered(suhmo_params Params,
     }
 }
 
+void
+ValleyIBC::setup_iceMask(LevelData<FArrayBox>& a_Pi,
+                         LevelData<FArrayBox>& a_iceMask)
+{
+    DataIterator dit = a_iceMask.dataIterator();
+    for (dit.begin(); dit.ok(); ++dit) {
+        FArrayBox& thispi        = a_Pi[dit];
+        FArrayBox& thisiceMask   = a_iceMask[dit];
+        
+        BoxIterator bit(thisiceMask.box()); 
+        for (bit.begin(); bit.ok(); ++bit) {
+            IntVect iv = bit();
+
+            /* Where do we disable the gradient computations */
+            if (thispi(iv, 0) > 0.0) {
+                thisiceMask(iv, 0)        = 1.0;
+            } else {
+                thisiceMask(iv, 0)        = -1.0;
+            }
+            
+        } // end loop over cells
+    }     // end loop over boxes
+}
+
 
 /** Set up initial conditions 
  */
 void
 ValleyIBC::initializeData(RealVect& a_dx,
-                         suhmo_params Params,     
-                         LevelData<FArrayBox>& a_head,
-                         LevelData<FArrayBox>& a_gapHeight,
-                         LevelData<FArrayBox>& a_Pw,
-                         LevelData<FArrayBox>& a_qw,
-                         LevelData<FArrayBox>& a_Re,
-                         LevelData<FArrayBox>& a_meltRate,
-                         LevelData<FArrayBox>& a_zbed,
-                         LevelData<FArrayBox>& a_Pi,
-                         LevelData<FArrayBox>& a_iceHeight,
-                         LevelData<FArrayBox>& a_bumpHeight,
-                         LevelData<FArrayBox>& a_bumpSpacing,
-                         LevelData<FArrayBox>& a_levelmagVel)
+                          suhmo_params Params,     
+                          LevelData<FArrayBox>& a_head,
+                          LevelData<FArrayBox>& a_gapHeight,
+                          LevelData<FArrayBox>& a_Pw,
+                          LevelData<FArrayBox>& a_qw,
+                          LevelData<FArrayBox>& a_Re,
+                          LevelData<FArrayBox>& a_meltRate,
+                          LevelData<FArrayBox>& a_zbed,
+                          LevelData<FArrayBox>& a_Pi,
+                          LevelData<FArrayBox>& a_iceHeight,
+                          LevelData<FArrayBox>& a_bumpHeight,
+                          LevelData<FArrayBox>& a_bumpSpacing,
+                          LevelData<FArrayBox>& a_levelmagVel)
 {
     
     pout() << "ValleyIBC::initializeData" << endl;
@@ -250,7 +274,7 @@ ValleyIBC::initializeData(RealVect& a_dx,
 
             /* bed topography */
             /* Ice height = ICE from 0 (should be ice only, so surface - (bed + gap)) */
-            // parabolic profile
+            // parabolic profile of SURFACE
             thisiceHeight(iv, 0) = 100.0 * std::pow(x_loc + 200.0, 0.25) + x_loc/60.0 - std::pow(2.0e10, 0.25) + 1.0;
             // Weird bed
             Real gamma_b         = 0.05;
@@ -264,7 +288,7 @@ ValleyIBC::initializeData(RealVect& a_dx,
             thispi(iv, 0)        = Params.m_rho_i * Params.m_gravity * std::max(thisiceHeight(iv, 0) - thiszbed(iv, 0), 0.0);
             //Real smooth_Pi       = Params.m_rho_i * Params.m_gravity * std::max(thisiceHeight(iv, 0) - (fx + gy*hx), 0.0);
             /* initial gap height */
-            if (thispi(iv, 0) == 0.0) {
+            if (thispi(iv, 0) < 1.0e-10) {
                 thisGapHeight(iv, 0) = 1.0e-16;
                 //thiszbed(iv, 0) = thisiceHeight(iv, 0);
                 //thisiceHeight(iv, 0) = 0.0;
@@ -275,6 +299,8 @@ ValleyIBC::initializeData(RealVect& a_dx,
                 //thisGapHeight(iv, 0) = std::max(Params.m_gapInit + dist2(generator2), 0.0001);
 
             }
+            // correct for ice height
+            thisiceHeight(iv, 0) = std::max(thisiceHeight(iv, 0) - thiszbed(iv, 0), 0.0);
             
             /* option 1: guess Pw, find head */
             // Water press ?? No idea --> Pi/2.0
@@ -292,7 +318,7 @@ ValleyIBC::initializeData(RealVect& a_dx,
             // if randomness
             //thisbumpHeight(iv, 0)      = std::min(std::max(Params.m_br + dist(generator), 0.0), 0.1); 
             //thisbumpHeight(iv, 0)      = std::max(thisbumpHeight(iv, 0)  + 0.01*(thiszbed(iv, 0) - (fx + gy*hx)), 0.0);
-            if (thispi(iv, 0) == 0.0) {
+            if (thispi(iv, 0) < 1.0e-10) {
                 thisbumpHeight(iv, 0)      = 0.1 * Params.m_br;
             }
 

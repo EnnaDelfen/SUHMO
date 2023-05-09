@@ -116,9 +116,7 @@ HydroIBC::resetCovered(suhmo_params Params,
 }
 
 void 
-HydroIBC::setup_iceMask(RealVect& a_dx,
-                        suhmo_params Params,
-                        LevelData<FArrayBox>& a_Pi,
+HydroIBC::setup_iceMask(LevelData<FArrayBox>& a_Pi,
                         LevelData<FArrayBox>& a_iceMask)
 {
     DataIterator dit = a_iceMask.dataIterator();
@@ -134,6 +132,54 @@ HydroIBC::setup_iceMask(RealVect& a_dx,
             thisiceMask(iv, 0)        = 1.0;
             
         } // end loop over cells
+    }     // end loop over boxes
+}
+
+void 
+HydroIBC::setup_iceMask_EC(LevelData<FArrayBox>& a_iceMask,
+                           LevelData<FluxBox>&   a_iceMask_ec)
+{
+
+    Box domain_box = (a_iceMask.disjointBoxLayout()).physDomain().domainBox();
+    DataIterator dit = a_iceMask.dataIterator();
+    for (dit.begin(); dit.ok(); ++dit) {
+        FArrayBox& thisIM      = a_iceMask[dit];
+        FluxBox&   thisIMEC    = a_iceMask_ec[dit];
+        for (int dir=0; dir<SpaceDim; dir++) {
+            // get the face box
+            Box face_box = domain_box;
+            IntVect toto = IntVect::Zero;
+            toto[dir] +=1;
+            face_box.convert(toto);
+
+            FArrayBox& thisIMEC_dir = thisIMEC[dir];
+            BoxIterator bit(thisIMEC_dir.box());
+            for (bit.begin(); bit.ok(); ++bit) {
+                IntVect iv=bit();
+                IntVect ivm1=bit();
+                ivm1[dir] -= 1;
+                // fake EB
+                if ( std::abs(thisIM(iv,0)-thisIM(ivm1,0)) < 1e-10 ) { // no boundary
+                    if (thisIM(iv,0) > 0.0) { // inside domain
+                        thisIMEC_dir(iv,0) = 0.0;
+                    } else { // outside domain
+                        thisIMEC_dir(iv,0) = -1.0;
+                    }
+                } else { // boundary !
+                    thisIMEC_dir(iv,0) = 1.0;
+                }
+                // domain box
+                if ( iv[dir] == face_box.smallEnd(dir) ) {
+                    thisIMEC_dir(iv,0) = 1.0;
+                } 
+                if ( iv[dir] == face_box.bigEnd(dir) ) {
+                    thisIMEC_dir(iv,0) = 1.0;
+                }
+                //if (iv[0] == 5) {
+                //    pout() << "ivm1, iv, maskCC-1, maskCC+1, maskEC = " << ivm1 << " " << iv << " " << thisIM(ivm1,0) << " " << thisIM(iv,0) << " " << thisIMEC_dir(iv,0) << endl; 
+                //}
+            }
+        } // end loop dir
     }     // end loop over boxes
 }
 

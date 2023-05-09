@@ -1,0 +1,2 @@
+pout.cutoff = everything in covered area remains like last cell with no more recharge
+pout.zero   = don't solve anything in covered area

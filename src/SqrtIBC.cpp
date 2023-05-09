@@ -140,7 +140,30 @@ SqrtIBC::initializeBed(RealVect& a_dx,
     if (Params.m_verbosity > 3) {
         pout() << "(Done with SqrtIBC::initializeBed)" << endl;
     }
+}
 
+void 
+SqrtIBC::setup_iceMask(LevelData<FArrayBox>& a_Pi,
+                       LevelData<FArrayBox>& a_iceMask)
+{
+    DataIterator dit = a_iceMask.dataIterator();
+    for (dit.begin(); dit.ok(); ++dit) {
+        FArrayBox& thispi        = a_Pi[dit];
+        FArrayBox& thisiceMask   = a_iceMask[dit];
+        
+        BoxIterator bit(thisiceMask.box()); 
+        for (bit.begin(); bit.ok(); ++bit) {
+            IntVect iv = bit();
+
+            /* Where do we disable the gradient computations */
+            if (thispi(iv, 0) > 0.0) {
+                thisiceMask(iv, 0)        = 1.0;
+            } else {
+                thisiceMask(iv, 0)        = -1.0;
+            }
+            
+        } // end loop over cells
+    }     // end loop over boxes
 }
 
 /** Set up initial conditions 
@@ -221,18 +244,16 @@ SqrtIBC::initializeData(RealVect& a_dx,
                 // typical
                 thiszbed(iv, 0)      = Params.m_slope*x_loc;
             }
-            /* initial gap height */
-            thisGapHeight(iv, 0) = Params.m_gapInit;
-            //thisGapHeight(iv, 0) = std::max(Params.m_gapInit + dist2(generator2), 0.0001);
             /* Ice height (should be ice only, so surface - (bed + gap)) */
             // parabolic profile
             thisiceHeight(iv, 0) = std::max(6.0 * (std::sqrt(x_loc + Params.m_H) - std::sqrt(Params.m_H)) + 1.0, 0.0);  
             /* Ice overburden pressure : rho_i * g * H */
             thispi(iv, 0)        = std::max(Params.m_rho_i * Params.m_gravity * thisiceHeight(iv, 0), 0.0);
+            /* initial gap height */
+            thisGapHeight(iv, 0) = Params.m_gapInit;
             
             /* option 1: guess Pw, find head */
-            // Water press ?? No idea --> Pi/2.0
-            thisPw(iv, 0)        = thispi(iv, 0) * 0.5;
+            thisPw(iv, 0)        = 101325;
             Real Fact            = 1./(Params.m_rho_w * Params.m_gravity);
             thisHead(iv, 0)      = thisPw(iv, 0) * Fact + thiszbed(iv, 0) ;
 

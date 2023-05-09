@@ -11,7 +11,7 @@ with open("postproc.output", 'r') as reader:
     lines=reader.readlines()
     for line in lines:
         if "POST PROC analysis" in line:
-            line_end = int((line.split(")")[0]).split(" ")[-1])
+            line_end = int((line.split(",")[0]).split(" ")[-1])
         if "XaxisSUHMO_" in line:
             if (count_PP>0):
                 line_start = count_lines

@@ -23,6 +23,7 @@
 
 #include "NamespaceHeader.H"
 
+
 /// Physical/domain initial and boundary conditions
 /**
 
@@ -98,6 +99,9 @@ public:
                                LevelData<FArrayBox>& a_zbed,
                                LevelData<FArrayBox>& a_bumpHeight,
                                LevelData<FArrayBox>& a_bumpSpacing);
+
+    virtual void setup_iceMask(LevelData<FArrayBox>& a_Pi,
+                               LevelData<FArrayBox>& a_iceMask);
 
     virtual void resetCovered(suhmo_params Params,
                               LevelData<FArrayBox>& a_head,

@@ -47,6 +47,8 @@ suhmo.floor_min = 0.001
 suhmo.floor_max = 1.0
 
 # Solver
+solver.use_mask_for_gradients=false
+solver.use_mask_rhs_b=false
 solver.use_fas=true
 solver.use_NL=true
 solver.bcoeff_otf=true
@@ -57,6 +59,7 @@ solver.use_ImplDiff=true
 # misc
 AmrHydro.PrintCustom=true
 AmrHydro.post_proc=true
+AmrHydro.post_proc_shmip=true
 AmrHydro.verbosity=5
 # mesh and refinement
 AmrHydro.num_cells=512 128  # number of cells on coarsest domain

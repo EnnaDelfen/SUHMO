@@ -200,6 +200,7 @@ C     ------------------------------------------------------------------
      &     CHF_CONST_FRA[aRe],
      &     CHF_BOX[region],
      &     CHF_CONST_FRA[Bcoeff],
+     &     CHF_CONST_FRA[IMec],
      &     CHF_CONST_REAL[omegaparam],
      &     CHF_CONST_REAL[nuparam]) 
     
@@ -216,7 +217,11 @@ C     ------------------------------------------------------------------
          denom_q  =  12.0 * nuparam * ( 1.0 +
      &               omegaparam * aRe(CHF_IX[i;j  ;k  ],0) ) 
 
-         Bcoeff(CHF_IX[i;j;k],0) = num_q / denom_q
+         if ( IMec(CHF_IX[i;j;k],0) < 0.0 )  then
+             Bcoeff(CHF_IX[i;j;k],0) = 0.0
+         else
+             Bcoeff(CHF_IX[i;j;k],0) = num_q / denom_q
+         endif
 
       CHF_ENDDO
 
@@ -237,14 +242,19 @@ C     ------------------------------------------------------------------
      &     CHF_CONST_REALVECT[dx], 
      &     CHF_CONST_REAL[rho], 
      &     CHF_FRA[MRec],
-     &     CHF_FRA[Bec]) 
+     &     CHF_FRA[Bec],
+     &     CHF_FRA[IMec]) 
     
       integer CHF_DDECL[i;j;k]
 
       CHF_MULTIDO[region; i; j; k]
 C        m2/s
 C         Dcoeff(CHF_IX[i;j;k],0) = 1.0
-         Dcoeff(CHF_IX[i;j;k],0) = max(Bec(CHF_IX[i;j;k],0) * MRec(CHF_IX[i;j;k],0) / rho , 5.0e-6)
+         if ( IMec(CHF_IX[i;j;k],0) < 0.0 )  then
+             Dcoeff(CHF_IX[i;j;k],0) = 0.0 
+         else
+             Dcoeff(CHF_IX[i;j;k],0) = max(Bec(CHF_IX[i;j;k],0) * MRec(CHF_IX[i;j;k],0) / rho , 5.0e-6)
+         endif
 
       CHF_ENDDO
 
