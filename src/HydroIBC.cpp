@@ -161,19 +161,19 @@ HydroIBC::setup_iceMask_EC(LevelData<FArrayBox>& a_iceMask,
                 // fake EB
                 if ( std::abs(thisIM(iv,0)-thisIM(ivm1,0)) < 1e-10 ) { // no boundary
                     if (thisIM(iv,0) > 0.0) { // inside domain
-                        thisIMEC_dir(iv,0) = 0.0;
+                        thisIMEC_dir(iv,0) = 1.0;
                     } else { // outside domain
                         thisIMEC_dir(iv,0) = -1.0;
                     }
                 } else { // boundary !
-                    thisIMEC_dir(iv,0) = 1.0;
+                    thisIMEC_dir(iv,0) = 0.0;
                 }
                 // domain box
                 if ( iv[dir] == face_box.smallEnd(dir) ) {
-                    thisIMEC_dir(iv,0) = 1.0;
+                    thisIMEC_dir(iv,0) = 0.0;
                 } 
                 if ( iv[dir] == face_box.bigEnd(dir) ) {
-                    thisIMEC_dir(iv,0) = 1.0;
+                    thisIMEC_dir(iv,0) = 0.0;
                 }
                 //if (iv[0] == 5) {
                 //    pout() << "ivm1, iv, maskCC-1, maskCC+1, maskEC = " << ivm1 << " " << iv << " " << thisIM(ivm1,0) << " " << thisIM(iv,0) << " " << thisIMEC_dir(iv,0) << endl; 

@@ -500,7 +500,7 @@ AmrHydro::check_fluxes(Vector<RefCountedPtr<LevelData<FluxBox> > >&   a_bCoef)
                     // fake EB attempt
                     Real IMhi = thisIM(ivhi,0);
                     Real IMlo = thisIM(ivlo,0);
-                    if (thisIMEC_dir(iv,0) > 0.0) { // so you are on a boundary
+                    if (std::abs(thisIMEC_dir(iv,0)) < 1.0e-10) { // so you are on a boundary
                         if ((IMhi - IMlo) > 0.0) { // will be 2, lower boundary
                             sumDir[dir] += thisFluxes_dir(iv,0) * area;
                         } else if ((IMhi - IMlo) < 0.0) { // will be -2, upper boundary
