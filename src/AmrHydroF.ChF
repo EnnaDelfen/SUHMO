@@ -23,6 +23,7 @@ C     ------------------------------------------------------------------
       subroutine COMPUTENONLINEARTERMS(
      &     CHF_CONST_FRA[phi],
      &     CHF_CONST_FRA[aB],
+     &     CHF_CONST_FRA[IM],
      &     CHF_CONST_FRA[aPi],
      &     CHF_CONST_FRA[aZb],
      &     CHF_BOX[region],
@@ -36,7 +37,7 @@ C     ------------------------------------------------------------------
 
       CHF_MULTIDO[region; i; j; k]
 
-         if ( aPi(CHF_IX[i;j;k],0) < 1e-16 )  then 
+         if ( IM(CHF_IX[i;j;k],0) < 0.0 )  then 
              nlfunc(CHF_IX[i;j;k],0) = 0.0
              dnlfunc(CHF_IX[i;j;k],0) = 0.0
          else
@@ -202,7 +203,8 @@ C     ------------------------------------------------------------------
      &     CHF_CONST_FRA[Bcoeff],
      &     CHF_CONST_FRA[IMec],
      &     CHF_CONST_REAL[omegaparam],
-     &     CHF_CONST_REAL[nuparam]) 
+     &     CHF_CONST_REAL[nuparam], 
+     &     CHF_INT[cutOffB]) 
     
       REAL_T num_q, denom_q
       integer CHF_DDECL[i;j;k]
@@ -217,7 +219,7 @@ C     ------------------------------------------------------------------
          denom_q  =  12.0 * nuparam * ( 1.0 +
      &               omegaparam * aRe(CHF_IX[i;j  ;k  ],0) ) 
 
-         if ( IMec(CHF_IX[i;j;k],0) < 0.0 )  then
+         if ( (IMec(CHF_IX[i;j;k],0) < 0.0) .AND. (cutOffB > 0) )  then
              Bcoeff(CHF_IX[i;j;k],0) = 0.0
          else
              Bcoeff(CHF_IX[i;j;k],0) = num_q / denom_q
@@ -243,14 +245,15 @@ C     ------------------------------------------------------------------
      &     CHF_CONST_REAL[rho], 
      &     CHF_FRA[MRec],
      &     CHF_FRA[Bec],
-     &     CHF_FRA[IMec]) 
+     &     CHF_FRA[IMec],
+     &     CHF_INT[cutOffB]) 
     
       integer CHF_DDECL[i;j;k]
 
       CHF_MULTIDO[region; i; j; k]
 C        m2/s
 C         Dcoeff(CHF_IX[i;j;k],0) = 1.0
-         if ( IMec(CHF_IX[i;j;k],0) < 0.0 )  then
+         if ( (IMec(CHF_IX[i;j;k],0) < 0.0) .AND. (cutOffB > 0) )  then
              Dcoeff(CHF_IX[i;j;k],0) = 0.0 
          else
              Dcoeff(CHF_IX[i;j;k],0) = max(Bec(CHF_IX[i;j;k],0) * MRec(CHF_IX[i;j;k],0) / rho , 5.0e-6)

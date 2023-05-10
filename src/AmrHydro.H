@@ -87,6 +87,7 @@ public:
                          LevelData<FArrayBox>&        a_dNL,
                          const LevelData<FArrayBox>&  a_u,
                          LevelData<FArrayBox>&        a_B,
+                         LevelData<FArrayBox>&        a_mask,
                          LevelData<FArrayBox>&        a_Pi,
                          LevelData<FArrayBox>&        a_zb);
 
@@ -345,6 +346,7 @@ protected:
     Real computeInitialDt();
 
     /// FAS
+    int  m_cutOffBcoef;
     bool m_use_mask_gradients;
     bool m_use_mask_rhs_b;
     bool m_use_FAS;

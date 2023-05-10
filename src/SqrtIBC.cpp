@@ -250,7 +250,11 @@ SqrtIBC::initializeData(RealVect& a_dx,
             /* Ice overburden pressure : rho_i * g * H */
             thispi(iv, 0)        = std::max(Params.m_rho_i * Params.m_gravity * thisiceHeight(iv, 0), 0.0);
             /* initial gap height */
-            thisGapHeight(iv, 0) = Params.m_gapInit;
+            if (thispi(iv, 0) < 2.0) {
+                thisGapHeight(iv, 0) = 1.0e-16;
+            } else {
+                thisGapHeight(iv, 0) = Params.m_gapInit;
+            }
             
             /* option 1: guess Pw, find head */
             thisPw(iv, 0)        = 101325;

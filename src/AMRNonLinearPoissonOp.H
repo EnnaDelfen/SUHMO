@@ -31,7 +31,7 @@
 #define MEMBER_FUNC_PTR(object,ptrToMember) ((object).*(ptrToMember))
 
 typedef void (AmrHydro::*NL_level) (LevelData<FArrayBox>& a_NL, LevelData<FArrayBox>& a_dNL, const LevelData<FArrayBox>&  a_u,
-                                    LevelData<FArrayBox>& a_B, LevelData<FArrayBox>& a_Pi, LevelData<FArrayBox>& a_zb);
+                                    LevelData<FArrayBox>& a_B, LevelData<FArrayBox>& a_IM, LevelData<FArrayBox>& a_Pi, LevelData<FArrayBox>& a_zb);
 
 typedef void (AmrHydro::*waterFlux_level) (LevelData<FluxBox>& a_Bcoef, const LevelData<FArrayBox>&  a_u, 
                                            const LevelData<FArrayBox>*  a_ucoarse, LevelData<FArrayBox>& a_B,

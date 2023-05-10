@@ -126,7 +126,7 @@ void VCAMRNonLinearPoissonOp::residualI(LevelData<FArrayBox>&            a_lhs,
   LevelData<FArrayBox>  a_nlfunc(dbl, 1, IntVect::Zero);
   LevelData<FArrayBox>  a_nlDfunc(dbl, 1, IntVect::Zero);
   MEMBER_FUNC_PTR(*m_amrHydro, m_nllevel)(a_nlfunc, a_nlDfunc, a_phi,
-                                          *m_B, *m_Pi, *m_zb);
+                                          *m_B, *m_iceMask, *m_Pi, *m_zb);
 
   for (dit.begin(); dit.ok(); ++dit)
     {
@@ -306,7 +306,7 @@ void VCAMRNonLinearPoissonOp::applyOpNoBoundary(LevelData<FArrayBox>&       a_lh
   LevelData<FArrayBox>  a_nlfunc(dbl, 1, IntVect::Zero);
   LevelData<FArrayBox>  a_nlDfunc(dbl, 1, IntVect::Zero);
   MEMBER_FUNC_PTR(*m_amrHydro, m_nllevel)(a_nlfunc, a_nlDfunc, a_phi,
-                                          *m_B, *m_Pi, *m_zb);
+                                          *m_B, *m_iceMask, *m_Pi, *m_zb);
 
   for (dit.begin(); dit.ok(); ++dit)
     {
@@ -407,7 +407,7 @@ void VCAMRNonLinearPoissonOp::restrictResidual(LevelData<FArrayBox>&       a_res
   LevelData<FArrayBox>  a_nlfunc(dblFine, 1, IntVect::Zero);
   LevelData<FArrayBox>  a_nlDfunc(dblFine, 1, IntVect::Zero);
   MEMBER_FUNC_PTR(*m_amrHydro, m_nllevel)(a_nlfunc, a_nlDfunc, a_phiFine,
-                                          *m_B, *m_Pi, *m_zb);
+                                          *m_B, *m_iceMask, *m_Pi, *m_zb);
 
   for (DataIterator dit = a_phiFine.dataIterator(); dit.ok(); ++dit)
     {
@@ -703,7 +703,7 @@ void VCAMRNonLinearPoissonOp::levelGSRB(LevelData<FArrayBox>&       a_phi,
       }
 
       MEMBER_FUNC_PTR(*m_amrHydro, m_nllevel)(a_nlfunc, a_nlDfunc, a_phi,
-                                              *m_B, *m_Pi, *m_zb);
+                                              *m_B, *m_iceMask, *m_Pi, *m_zb);
 
       for (dit.begin(); dit.ok(); ++dit)
         {

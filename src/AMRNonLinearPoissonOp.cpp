@@ -312,7 +312,7 @@ void AMRNonLinearPoissonOp::residualI(LevelData<FArrayBox>&       a_lhs,
   LevelData<FArrayBox>  a_nlfunc(dbl, 1, IntVect::Zero);
   LevelData<FArrayBox>  a_nlDfunc(dbl, 1, IntVect::Zero);
   MEMBER_FUNC_PTR(*m_amrHydro, m_nllevel)(a_nlfunc, a_nlDfunc, a_phi,
-                                        *m_B, *m_Pi, *m_zb);
+                                        *m_B, *m_iceMask, *m_Pi, *m_zb);
 
   DataIterator dit = phi.dataIterator();
   {
@@ -467,7 +467,7 @@ void AMRNonLinearPoissonOp::applyOpI(LevelData<FArrayBox>&       a_lhs,
   LevelData<FArrayBox>  a_nlfunc(dbl, 1, IntVect::Zero);
   LevelData<FArrayBox>  a_nlDfunc(dbl, 1, IntVect::Zero);
   MEMBER_FUNC_PTR(*m_amrHydro, m_nllevel)(a_nlfunc, a_nlDfunc, a_phi,
-                                        *m_B, *m_Pi, *m_zb);
+                                        *m_B, *m_iceMask, *m_Pi, *m_zb);
 
   for (dit.begin(); dit.ok(); ++dit) {
         const Box& region = dbl[dit];
@@ -492,7 +492,7 @@ void AMRNonLinearPoissonOp::applyOpNoBoundary(LevelData<FArrayBox>&       a_lhs,
   LevelData<FArrayBox>  a_nlfunc(dbl, 1, IntVect::Zero);
   LevelData<FArrayBox>  a_nlDfunc(dbl, 1, IntVect::Zero);
   MEMBER_FUNC_PTR(*m_amrHydro, m_nllevel)(a_nlfunc, a_nlDfunc, a_phi,
-                                        *m_B, *m_Pi, *m_zb);
+                                        *m_B, *m_iceMask, *m_Pi, *m_zb);
 
   DataIterator dit = phi.dataIterator();
   int nbox=dit.size();
@@ -826,7 +826,7 @@ void AMRNonLinearPoissonOp::restrictResidual(LevelData<FArrayBox>&       a_resCo
   LevelData<FArrayBox>  a_nlfunc(dblFine, 1, IntVect::Zero);
   LevelData<FArrayBox>  a_nlDfunc(dblFine, 1, IntVect::Zero);
   MEMBER_FUNC_PTR(*m_amrHydro, m_nllevel)(a_nlfunc, a_nlDfunc, a_phiFine,
-                                        *m_B, *m_Pi, *m_zb);
+                                        *m_B, *m_iceMask, *m_Pi, *m_zb);
 
   for (DataIterator dit = a_phiFine.dataIterator(); dit.ok(); ++dit) {
       FArrayBox&       phi = a_phiFine[dit];
@@ -1408,7 +1408,7 @@ void AMRNonLinearPoissonOp::levelGSRB( LevelData<FArrayBox>&       a_phi,
   LevelData<FArrayBox>  a_nlfunc(dbl, 1, IntVect::Zero);
   LevelData<FArrayBox>  a_nlDfunc(dbl, 1, IntVect::Zero);
   MEMBER_FUNC_PTR(*m_amrHydro, m_nllevel)(a_nlfunc, a_nlDfunc, a_phi,
-                                        *m_B, *m_Pi, *m_zb);
+                                        *m_B, *m_iceMask, *m_Pi, *m_zb);
 
   bool a_homo = false;
 
@@ -1538,7 +1538,7 @@ void AMRNonLinearPoissonOp::levelGS( LevelData<FArrayBox>&       a_phi,
   LevelData<FArrayBox>  a_nlfunc(dbl, 1, IntVect::Zero);
   LevelData<FArrayBox>  a_nlDfunc(dbl, 1, IntVect::Zero);
   MEMBER_FUNC_PTR(*m_amrHydro, m_nllevel)(a_nlfunc, a_nlDfunc, a_phi,
-                                        *m_B, *m_Pi, *m_zb);
+                                        *m_B, *m_iceMask, *m_Pi, *m_zb);
 
   DataIterator dit = a_phi.dataIterator();
   int nbox=dit.size();

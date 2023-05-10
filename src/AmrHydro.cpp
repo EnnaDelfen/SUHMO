@@ -862,12 +862,14 @@ AmrHydro::initialize()
 
     /* PARSING */
     ParmParse ppSolver("solver");
+    m_cutOffBcoef         = 0; // default to false
     m_use_mask_gradients  = false;
     m_use_mask_rhs_b      = false;
     m_use_FAS        = false;
     m_compute_Bcoeff = false;
     m_use_NL         = false;
     m_use_ImplDiff   =  false;
+    ppSolver.get("cut_solve_outside_domain", m_cutOffBcoef);  // max level
     ppSolver.query("use_mask_for_gradients", m_use_mask_gradients); // use the mask to compute reduced gradients at fake EB
     ppSolver.query("use_mask_rhs_b", m_use_mask_rhs_b); // use the mask to compute reduced gradients at fake EB
     ppSolver.query("use_fas", m_use_FAS); // use FAS scheme for head 
@@ -1529,7 +1531,8 @@ void AmrHydro::WFlx_level(LevelData<FluxBox>&          a_bcoef,
                                 CHF_FRA(bC[dir]),
                                 CHF_FRA(IM_ec[dir]),
                                 CHF_CONST_REAL(m_suhmoParm->m_omega),
-                                CHF_CONST_REAL(m_suhmoParm->m_nu) );
+                                CHF_CONST_REAL(m_suhmoParm->m_nu),
+                                CHF_INT(m_cutOffBcoef) );
         }
     }
 
@@ -1540,6 +1543,7 @@ void AmrHydro::NonLinear_level(LevelData<FArrayBox>&        a_NL,
                                LevelData<FArrayBox>&        a_dNL,
                                const LevelData<FArrayBox>&  a_u,
                                LevelData<FArrayBox>&        a_B,
+                               LevelData<FArrayBox>&        a_mask,
                                LevelData<FArrayBox>&        a_Pi,
                                LevelData<FArrayBox>&        a_zb)
 {
@@ -1555,6 +1559,7 @@ void AmrHydro::NonLinear_level(LevelData<FArrayBox>&        a_NL,
 
           FORT_COMPUTENONLINEARTERMS( CHF_FRA(a_u[levelDit]),
                                       CHF_FRA(a_B[levelDit]),
+                                      CHF_FRA(a_mask[levelDit]),
                                       CHF_FRA(a_Pi[levelDit]),
                                       CHF_FRA(a_zb[levelDit]),
                                       CHF_BOX(region),
@@ -1805,7 +1810,8 @@ AmrHydro::aCoeff_bCoeff(LevelData<FArrayBox>&  levelacoef,
                                 CHF_FRA(bC[dir]),
                                 CHF_FRA(IMec[dir]),
                                 CHF_CONST_REAL(m_suhmoParm->m_omega),
-                                CHF_CONST_REAL(m_suhmoParm->m_nu) );
+                                CHF_CONST_REAL(m_suhmoParm->m_nu),
+                                CHF_INT(m_cutOffBcoef) );
         }
     }
 }
@@ -1849,7 +1855,8 @@ AmrHydro::dCoeff(LevelData<FluxBox>&    leveldcoef,
                                 CHF_CONST_REAL(m_suhmoParm->m_rho_i),
                                 CHF_FRA(MRec[dir]), 
                                 CHF_FRA(Bec[dir]),
-                                CHF_FRA(IMec[dir]) );
+                                CHF_FRA(IMec[dir]),
+                                CHF_INT(m_cutOffBcoef) );
         }
     }
 }

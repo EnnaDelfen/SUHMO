@@ -50,12 +50,13 @@ suhmo.floor_min = 0.001
 suhmo.floor_max = 1.0
 
 # Solver
+solver.cut_solve_outside_domain=1
 solver.use_mask_for_gradients=true
 solver.use_mask_rhs_b=true
 solver.use_fas=true
 solver.use_NL=true
 solver.bcoeff_otf=true
-solver.eps_PicardIte=0.0003
+solver.eps_PicardIte=0.0005
 solver.use_ImplDiff=true
 
 # class AmrHydro.cpp
