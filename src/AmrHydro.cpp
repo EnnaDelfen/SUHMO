@@ -3457,7 +3457,7 @@ AmrHydro::timeStepFAS(Real a_dt)
 
         }  // loop on levs
     }
-    
+
 
     /* FINAL custom plt here -- debug print */
     if ((m_PrintCustom) && (m_cur_step % m_plot_interval == 0) ) {
@@ -3476,9 +3476,9 @@ AmrHydro::timeStepFAS(Real a_dt)
         vectName[9]="DiffusiveTerm";
         vectName[10]="Dcoef_x";
         vectName[11]="Dcoef_y";
-        vectName[12]= "RHS_b_A"; //"MRA"; //"RHS_b_A"; //    
-        vectName[13]= "RHS_b_B"; //"MRB"; //"RHS_b_B"; //
-        vectName[14]= "RHS_b_C"; //"MRC"; //"RHS_b_C"; // 
+        vectName[12]="MRA";
+        vectName[13]="MRB";
+        vectName[14]="MRC";
 
         Vector<Vector<LevelData<FArrayBox>*>> stuffToPlot;
         stuffToPlot.resize(nStuffToPlot);
@@ -3537,11 +3537,11 @@ AmrHydro::timeStepFAS(Real a_dt)
             LevelData<FArrayBox>& levelDcXSTP     = *stuffToPlot[10][lev];
             LevelData<FArrayBox>& levelDcYSTP     = *stuffToPlot[11][lev];
 
-            LevelData<FArrayBox>& levelMRA        = *RHS_b_A[lev]; // *MR_A[lev]; 
+            LevelData<FArrayBox>& levelMRA        = *MR_A[lev];
             LevelData<FArrayBox>& levelMRASTP     = *stuffToPlot[12][lev];
-            LevelData<FArrayBox>& levelMRB        = *RHS_b_B[lev]; //*MR_B[lev]; 
+            LevelData<FArrayBox>& levelMRB        = *MR_B[lev];
             LevelData<FArrayBox>& levelMRBSTP     = *stuffToPlot[13][lev];
-            LevelData<FArrayBox>& levelMRC        = *RHS_b_C[lev]; //*MR_C[lev];  
+            LevelData<FArrayBox>& levelMRC        = *MR_C[lev];
             LevelData<FArrayBox>& levelMRCSTP     = *stuffToPlot[14][lev];
 
             DataIterator dit = levelHead.dataIterator();
