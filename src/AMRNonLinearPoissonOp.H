@@ -31,7 +31,7 @@
 #define MEMBER_FUNC_PTR(object,ptrToMember) ((object).*(ptrToMember))
 
 typedef void (AmrHydro::*NL_level) (LevelData<FArrayBox>& a_NL, LevelData<FArrayBox>& a_dNL, const LevelData<FArrayBox>&  a_u,
-                                    LevelData<FArrayBox>& a_B, LevelData<FArrayBox>& a_Pi, LevelData<FArrayBox>& a_zb);
+                                    LevelData<FArrayBox>& a_B, LevelData<FArrayBox>& a_IM, LevelData<FArrayBox>& a_Pi, LevelData<FArrayBox>& a_zb);
 
 typedef void (AmrHydro::*waterFlux_level) (LevelData<FluxBox>& a_Bcoef, const LevelData<FArrayBox>&  a_u, 
                                            const LevelData<FArrayBox>*  a_ucoarse, LevelData<FArrayBox>& a_B,
@@ -493,8 +493,9 @@ public:
   RefCountedPtr<LevelData<FArrayBox> > m_B;  // Gap Height
   RefCountedPtr<LevelData<FArrayBox> > m_Pi; // Overb Press
   RefCountedPtr<LevelData<FArrayBox> > m_zb; // Bed Elevation
+  RefCountedPtr<LevelData<FArrayBox> > m_iceMask; // Mask
 
-  NL_level m_nllevel               = nullptr;
+  NL_level        m_nllevel        = nullptr;
   waterFlux_level m_waterFluxlevel = nullptr;
   printData       m_print_data     = nullptr;
   AmrHydro*       m_amrHydro       = nullptr;
@@ -621,6 +622,7 @@ public:
               Vector<RefCountedPtr<LevelData<FArrayBox> > >& a_B,
               Vector<RefCountedPtr<LevelData<FArrayBox> > >& a_Pi,
               Vector<RefCountedPtr<LevelData<FArrayBox> > >& a_zb,
+              Vector<RefCountedPtr<LevelData<FArrayBox> > >& a_IM,
               Real                             a_alpha = 0.0,
               Real                             a_beta  = 1.0);
 
@@ -665,8 +667,9 @@ private:
   Vector<RefCountedPtr<LevelData<FArrayBox> > > m_B;  // Gap Height
   Vector<RefCountedPtr<LevelData<FArrayBox> > > m_Pi; // Overb Press
   Vector<RefCountedPtr<LevelData<FArrayBox> > > m_zb; // Bed Elevation
+  Vector<RefCountedPtr<LevelData<FArrayBox> > > m_iceMask; // Mask
 
-  NL_level m_nllevel               = nullptr;
+  NL_level        m_nllevel        = nullptr;
   waterFlux_level m_waterFluxlevel = nullptr;
   printData       m_print_data     = nullptr;
   AmrHydro*       m_amrHydro       = nullptr;

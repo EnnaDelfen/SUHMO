@@ -188,6 +188,8 @@ MountainIBC::initializeData(RealVect& a_dx,
         FArrayBox& thisbumpHeight    = a_bumpHeight[dit];
         FArrayBox& thisbumpSpacing   = a_bumpSpacing[dit];
 
+        FArrayBox& thismagVel    = a_levelmagVel[dit]; 
+
 
         BoxIterator bit(thisHead.box()); // Default .box() have ghostcells ?
         for (bit.begin(); bit.ok(); ++bit) {
@@ -303,6 +305,9 @@ MountainIBC::initializeData(RealVect& a_dx,
             thisqw(iv, 0)        = num_q/denom_q; 
             thisqw(iv, 1)        = 0.0;
             thismeltRate(iv, 0)  = (Params.m_G/Params.m_L); 
+
+            thismagVel(iv, 0)  = std::sqrt(  Params.m_ub[0]*Params.m_ub[0] 
+                                           + Params.m_ub[1]*Params.m_ub[1] ); 
         } // end loop over cells
     }     // end loop over boxes
 

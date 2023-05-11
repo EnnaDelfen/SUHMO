@@ -31,7 +31,7 @@ os.chdir(convergence_dir)
 # list of runs to post process with compare tool
 patterns = ["1lev", "2lev", "3lev", "4lev", "5lev", "6lev", "7lev"]
 LastIt   = ["12200", "12200", "12200", "12200", "12200", "12200", "12200"]
-LastItSL = ["3200", "3200", "3200", "3200", "3200", "3200", "1600"]
+LastItSL = ["3200", "3200", "3200", "3200", "3200", "1600", "1100"]
 # patterns to modify in the input file, inputs.compare
 searchFor1 = "exactRoot"
 searchFor2 = "computedRoot"

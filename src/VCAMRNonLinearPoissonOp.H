@@ -120,7 +120,8 @@ public:
 
   virtual void setSpecificParams(const RefCountedPtr<LevelData<FArrayBox> >& a_B,
                                  const RefCountedPtr<LevelData<FArrayBox> >& a_Pi,
-                                 const RefCountedPtr<LevelData<FArrayBox> >& a_zb);
+                                 const RefCountedPtr<LevelData<FArrayBox> >& a_zb,
+                                 const RefCountedPtr<LevelData<FArrayBox> >& a_iceMask);
 
   /// Also calls reset lambda
   virtual void setCoefs(const RefCountedPtr<LevelData<FArrayBox> >& a_aCoef,
@@ -324,6 +325,7 @@ public:
               Vector<RefCountedPtr<LevelData<FArrayBox> > >& a_B,
               Vector<RefCountedPtr<LevelData<FArrayBox> > >& a_Pi,
               Vector<RefCountedPtr<LevelData<FArrayBox> > >& a_zb,
+              Vector<RefCountedPtr<LevelData<FArrayBox> > >& a_iceMask,
               bool a_BcoeffOTF);
 
   //! Defines a factory for VCAMRNonLinearPoissonOp which allows the operators to
@@ -387,8 +389,9 @@ private:
   Vector<RefCountedPtr<LevelData<FArrayBox> > > m_B;  // Gap Height
   Vector<RefCountedPtr<LevelData<FArrayBox> > > m_Pi; // Overb Press
   Vector<RefCountedPtr<LevelData<FArrayBox> > > m_zb; // Bed Elevation
+  Vector<RefCountedPtr<LevelData<FArrayBox> > > m_iceMask; // Ice Mask
 
-  NL_level m_nllevel               = nullptr;
+  NL_level        m_nllevel        = nullptr;
   waterFlux_level m_waterFluxlevel = nullptr;
   printData       m_print_data     = nullptr;
   AmrHydro*       m_amrHydro       = nullptr;

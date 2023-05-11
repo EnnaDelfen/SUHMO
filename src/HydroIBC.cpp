@@ -115,6 +115,74 @@ HydroIBC::resetCovered(suhmo_params Params,
     // Do nothing 
 }
 
+void 
+HydroIBC::setup_iceMask(LevelData<FArrayBox>& a_Pi,
+                        LevelData<FArrayBox>& a_iceMask)
+{
+    DataIterator dit = a_iceMask.dataIterator();
+    for (dit.begin(); dit.ok(); ++dit) {
+        FArrayBox& thispi        = a_Pi[dit];
+        FArrayBox& thisiceMask   = a_iceMask[dit];
+        
+        BoxIterator bit(thisiceMask.box()); 
+        for (bit.begin(); bit.ok(); ++bit) {
+            IntVect iv = bit();
+
+            /* Where do we disable the gradient computations */
+            thisiceMask(iv, 0)        = 1.0;
+            
+        } // end loop over cells
+    }     // end loop over boxes
+}
+
+void 
+HydroIBC::setup_iceMask_EC(LevelData<FArrayBox>& a_iceMask,
+                           LevelData<FluxBox>&   a_iceMask_ec)
+{
+
+    Box domain_box = (a_iceMask.disjointBoxLayout()).physDomain().domainBox();
+    DataIterator dit = a_iceMask.dataIterator();
+    for (dit.begin(); dit.ok(); ++dit) {
+        FArrayBox& thisIM      = a_iceMask[dit];
+        FluxBox&   thisIMEC    = a_iceMask_ec[dit];
+        for (int dir=0; dir<SpaceDim; dir++) {
+            // get the face box
+            Box face_box = domain_box;
+            IntVect toto = IntVect::Zero;
+            toto[dir] +=1;
+            face_box.convert(toto);
+
+            FArrayBox& thisIMEC_dir = thisIMEC[dir];
+            BoxIterator bit(thisIMEC_dir.box());
+            for (bit.begin(); bit.ok(); ++bit) {
+                IntVect iv=bit();
+                IntVect ivm1=bit();
+                ivm1[dir] -= 1;
+                // fake EB
+                if ( std::abs(thisIM(iv,0)-thisIM(ivm1,0)) < 1e-10 ) { // no boundary
+                    if (thisIM(iv,0) > 0.0) { // inside domain
+                        thisIMEC_dir(iv,0) = 1.0;
+                    } else { // outside domain
+                        thisIMEC_dir(iv,0) = -1.0;
+                    }
+                } else { // boundary !
+                    thisIMEC_dir(iv,0) = 0.0;
+                }
+                // domain box
+                if ( iv[dir] == face_box.smallEnd(dir) ) {
+                    thisIMEC_dir(iv,0) = 0.0;
+                } 
+                if ( iv[dir] == face_box.bigEnd(dir) ) {
+                    thisIMEC_dir(iv,0) = 0.0;
+                }
+                //if (iv[0] == 5) {
+                //    pout() << "ivm1, iv, maskCC-1, maskCC+1, maskEC = " << ivm1 << " " << iv << " " << thisIM(ivm1,0) << " " << thisIM(iv,0) << " " << thisIMEC_dir(iv,0) << endl; 
+                //}
+            }
+        } // end loop dir
+    }     // end loop over boxes
+}
+
 /** Set up initial conditions 
  */
 void
@@ -156,6 +224,8 @@ HydroIBC::initializeData(RealVect& a_dx,
         FArrayBox& thisbumpHeight    = a_bumpHeight[dit];
         FArrayBox& thisbumpSpacing   = a_bumpSpacing[dit];
 
+        FArrayBox& thismagVel    = a_levelmagVel[dit]; 
+
 
         BoxIterator bit(thisHead.box()); // Default .box() have ghostcells ?
         for (bit.begin(); bit.ok(); ++bit) {
@@ -195,6 +265,9 @@ HydroIBC::initializeData(RealVect& a_dx,
             thisqw(iv, 0)        = num_q/denom_q; 
             thisqw(iv, 1)        = 0.0;
             thismeltRate(iv, 0)  = (Params.m_G/Params.m_L); 
+
+            thismagVel(iv, 0)  = std::sqrt(  Params.m_ub[0]*Params.m_ub[0] 
+                                           + Params.m_ub[1]*Params.m_ub[1] ); 
         } // end loop over cells
     }     // end loop over boxes
 

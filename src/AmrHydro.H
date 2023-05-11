@@ -87,6 +87,7 @@ public:
                          LevelData<FArrayBox>&        a_dNL,
                          const LevelData<FArrayBox>&  a_u,
                          LevelData<FArrayBox>&        a_B,
+                         LevelData<FArrayBox>&        a_mask,
                          LevelData<FArrayBox>&        a_Pi,
                          LevelData<FArrayBox>&        a_zb);
 
@@ -121,7 +122,8 @@ public:
                        LevelData<FluxBox>&    levelbcoef, 
                        LevelData<FluxBox>&    levelRe, 
                        LevelData<FluxBox>&    levelB, 
-                       LevelData<FluxBox>&    levelPi);
+                       LevelData<FluxBox>&    levelPi,
+                       int lev);
 
     void aCoeff_GH(LevelData<FArrayBox>&  levelacoef,
                    LevelData<FluxBox>&    leveldcoef);
@@ -145,6 +147,7 @@ public:
                               LevelData<FArrayBox>& levelmR, 
                               LevelData<FArrayBox>& levelB,
                               LevelData<FArrayBox>& levelDT,
+                              LevelData<FArrayBox>& levelIM,
                               LevelData<FArrayBox>& levelBH, 
                               LevelData<FArrayBox>& levelBL,
                               LevelData<FArrayBox>& levelmagVel,
@@ -153,6 +156,16 @@ public:
                               LevelData<FArrayBox>& levelRHS_b_C,
                               LevelData<FArrayBox>& levelchanDegree,
                               Real a_dt);
+
+    void Calc_meltingRate(int                   lev, 
+                          LevelData<FArrayBox>& leveltmp_cc, 
+                          LevelData<FArrayBox>& leveltmp2_cc,
+                          LevelData<FArrayBox>& levelMR_A,
+                          LevelData<FArrayBox>& levelMR_B,
+                          LevelData<FArrayBox>& levelMR_C);
+
+
+    void check_fluxes(Vector<RefCountedPtr<LevelData<FluxBox> > >&   a_bCoef);
 
 
     void check_fluxes(Vector<RefCountedPtr<LevelData<FluxBox> > >&   a_bCoef);
@@ -337,6 +350,9 @@ protected:
     Real computeInitialDt();
 
     /// FAS
+    int  m_cutOffBcoef;
+    bool m_use_mask_gradients;
+    bool m_use_mask_rhs_b;
     bool m_use_FAS;
     bool m_use_NL;
     bool m_compute_Bcoeff;
@@ -473,13 +489,17 @@ protected:
     Vector<RefCountedPtr<LevelData<FArrayBox>> > m_magVel;                // basal velocity magniture
 
     /* Time-constant parameters */
-    Vector<RefCountedPtr<LevelData<FArrayBox>>> m_bedelevation;           //
+    Vector<RefCountedPtr<LevelData<FArrayBox>>> m_bedelevation;           // height of bed
     Vector<RefCountedPtr<LevelData<FArrayBox>>> m_overburdenpress;        // rhoi*g*H
+    Vector<RefCountedPtr<LevelData<FArrayBox>>> m_moulin_source_term;     // external water source term
 
     /* Bed randomization */
     Vector<RefCountedPtr<LevelData<FArrayBox>> > m_bumpHeight;            // typical ground bump height
     Vector<RefCountedPtr<LevelData<FArrayBox>> > m_bumpSpacing;           // typical ground bump spacing
-    Vector<RefCountedPtr<LevelData<FArrayBox>>> m_moulin_source_term;                     // Reynolds number
+
+    /* Misc */
+    Vector<RefCountedPtr<LevelData<FArrayBox>> > m_iceMask;    // fake EB mask
+    Vector<RefCountedPtr<LevelData<FluxBox>>>    m_iceMask_ec; // fake EB mask EC
    
 
     //Vector<LevelData<FArrayBox>*> m_gradZb;      

@@ -49,6 +49,8 @@ suhmo.floor_min = 0.001
 suhmo.floor_max = 1.0
 
 # Solver
+solver.use_mask_for_gradients=false
+solver.use_mask_rhs_b=false
 solver.use_fas=true
 solver.use_NL=true
 solver.bcoeff_otf=true
@@ -58,7 +60,8 @@ solver.use_ImplDiff=true
 # class AmrHydro.cpp
 # misc
 AmrHydro.PrintCustom=false
-AmrHydro.post_proc=false
+AmrHydro.post_proc=true
+AmrHydro.post_proc_shmip=false
 AmrHydro.verbosity=5
 # mesh and refinement
 AmrHydro.num_cells=512 128  # number of cells on coarsest domain
@@ -95,7 +98,7 @@ AmrHydro.plot_time_interval=0.0 # If we want to plot at a given time interval (r
 AmrHydro.plot_prefix = plot
 AmrHydro.write_gradPhi=false
 # Typically -1 for never, 0 for last step only, or interval
-AmrHydro.check_interval=5000
+AmrHydro.check_interval=-5000
 AmrHydro.check_prefix=chk
 AmrHydro.check_overwrite=false # if true, rewrite old checkpoints with new ones.
 AmrHydro.check_exit=false # if true, exit immediately after writing a checkpoint

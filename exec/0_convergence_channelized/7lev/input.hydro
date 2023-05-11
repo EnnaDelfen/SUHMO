@@ -47,6 +47,8 @@ suhmo.floor_min = 0.001
 suhmo.floor_max = 1.0
 
 # Solver
+solver.use_mask_for_gradients=false
+solver.use_mask_rhs_b=false
 solver.use_fas=true
 solver.use_NL=true
 solver.bcoeff_otf=true
@@ -57,6 +59,7 @@ solver.use_ImplDiff=true
 # misc
 AmrHydro.PrintCustom=false
 AmrHydro.post_proc=true
+AmrHydro.post_proc_shmip=false
 AmrHydro.verbosity=5
 # mesh and refinement
 AmrHydro.num_cells=2048 512  # number of cells on coarsest domain
@@ -88,7 +91,7 @@ AmrHydro.fixed_dt=3600.0 # 1 h dt
 AmrHydro.offsetTime=0.0
 # Typically -1 for never, 0 for last step only, or integer interval (number of steps)
 # Plot and output
-AmrHydro.plot_interval=1500
+AmrHydro.plot_interval=500
 AmrHydro.plot_time_interval=0.0 # If we want to plot at a given time interval (rather than number of steps)
 AmrHydro.plot_prefix = plot
 AmrHydro.write_gradPhi=false
