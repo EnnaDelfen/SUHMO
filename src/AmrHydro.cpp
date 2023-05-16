@@ -2136,6 +2136,7 @@ AmrHydro::CalcRHS_gapHeightFAS(LevelData<FArrayBox>& levelRHS_b,
                }
                // second term ... assume  n = 3 !!
                Real PimPw = std::max(Pressi(iv,0) - Pw(iv,0), 0.0);
+               //Real PimPw = (Pressi(iv,0) - Pw(iv,0));
                Real AbsPimPw = std::abs(PimPw);
                if ( m_suhmoParm->m_cutOffbr > B(iv,0) ) {
                    RHS(iv,0)   -= m_suhmoParm->m_A * std::pow(AbsPimPw, 2) * PimPw * B(iv,0) * ( 1.0 - (m_suhmoParm->m_cutOffbr - B(iv,0)) / m_suhmoParm->m_cutOffbr );
@@ -2217,7 +2218,7 @@ AmrHydro::Calc_meltingRate(int                   lev,
             Real ub_norm = MV(iv,0);
             Real sca_prod = 0.0; 
             if (m_suhmoParm->m_basal_friction) {
-                sca_prod = 20. * 20. * m_suhmoParm->m_ub[0] * std::abs(Pressi(iv,0) - Pressw(iv,0)) * m_suhmoParm->m_ub[0];
+                sca_prod = 20. * 20. * ub_norm * ub_norm * std::abs(Pressi(iv,0) - Pressw(iv,0));
             }
 
             // Pw = rho_w g (h - zb) -- Q*grad(Pw) = rho_w g (Q*grad(h) - Q*grad(zb))  
@@ -2442,7 +2443,7 @@ AmrHydro::timeStepFAS(Real a_dt)
         LevelData<FluxBox>&   levelPi_ec   = *a_Pi_ec[lev];
         CellToEdge(levelcurPi, levelPi_ec);
 
-        m_IBCPtr->resetCovered(*m_suhmoParm, *m_head[lev], *m_overburdenpress[lev]);
+        //m_IBCPtr->resetCovered(*m_suhmoParm, *m_head[lev], *m_overburdenpress[lev]);
 
     } // there. We should start with consistent b and h, GC BC and all ...
 
@@ -2531,7 +2532,7 @@ AmrHydro::timeStepFAS(Real a_dt)
             CellToEdge(levelcurB, levelnewB_ec);
             CellToEdge(levelmR, levelmR_ec);   // only used for the melting Diff coeff
 
-            m_IBCPtr->resetCovered(*m_suhmoParm, *m_head[lev], *m_overburdenpress[lev]);
+            //m_IBCPtr->resetCovered(*m_suhmoParm, *m_head[lev], *m_overburdenpress[lev]);
 
         }  // loop on levs -- same thing, we should start with consistent b and h GC/BC and all
 
@@ -5588,7 +5589,7 @@ AmrHydro::writePlotFile()
     string ReName("Re"); 
     string meltRateName("meltRate"); 
     string xGradName("GradHead_x");
-    string yGradName("GradHead_y");
+    string yGradName("VelMag");
     string BumpHeight("iceHeight");
     string iceMask("iceMask");
 
@@ -5636,6 +5637,7 @@ AmrHydro::writePlotFile()
         const LevelData<FArrayBox>& levelmR        = *m_meltRate[lev];
         const LevelData<FArrayBox>& levelBH        = *m_iceheight[lev];
         const LevelData<FArrayBox>& levelIM        = *m_iceMask[lev];
+        const LevelData<FArrayBox>& levelMV        = *m_magVel[lev];
         //LevelData<FArrayBox> levelGradPhi;
         //if (m_write_gradPhi)
         //{
@@ -5677,6 +5679,7 @@ AmrHydro::writePlotFile()
             const FArrayBox& thismR         = levelmR[dit];
             const FArrayBox& thisBH         = levelBH[dit];
             const FArrayBox& thisIM         = levelIM[dit];
+            const FArrayBox& thisMV         = levelMV[dit];
 
             thisPlotData.copy(thisHead, 0, comp, 1);
             comp++;
@@ -5698,7 +5701,8 @@ AmrHydro::writePlotFile()
             comp++;
             thisPlotData.copy(thisGradHead, 0, comp, 1);
             comp++;
-            thisPlotData.copy(thisGradHead, 1, comp, 1);
+            //thisPlotData.copy(thisGradHead, 1, comp, 1);
+            thisPlotData.copy(thisMV, 0, comp, 1);
             comp++;
             thisPlotData.copy(thisBH, 0, comp, 1);
             comp++;
