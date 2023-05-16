@@ -127,13 +127,13 @@ FileIBC::initializePi(RealVect& a_dx,
 {
     pout() << "FileIBC::initializePi" << endl;
 
-    //bool verbose = true;
+    bool verbose = true;
 
     /* initialize bed and ice thickness */
-    //const LevelData<FArrayBox>& topoRef  = *(m_refTopography);
-    //const LevelData<FArrayBox>& thickRef = *(m_refThickness);    
-    //FillFromReference(a_zbed, topoRef, a_dx, m_refDx,verbose);
-    //FillFromReference(a_iceHeight, thickRef, a_dx, m_refDx, verbose);
+    const LevelData<FArrayBox>& topoRef  = *(m_refTopography);
+    const LevelData<FArrayBox>& thickRef = *(m_refThickness);    
+    FillFromReference(a_zbed, topoRef, a_dx, m_refDx,verbose);
+    FillFromReference(a_iceHeight, thickRef, a_dx, m_refDx, verbose);
 
     DataIterator dit = a_head.dataIterator();
     for (dit.begin(); dit.ok(); ++dit) {
@@ -160,7 +160,7 @@ FileIBC::initializePi(RealVect& a_dx,
             thispi(iv, 0)        = Params.m_rho_i * Params.m_gravity * std::max(thisiceHeight(iv, 0), 0.0);
 
             /* initial gap height */
-            if (thispi(iv, 0) == 0.0) {
+            if (thispi(iv, 0) < 1.0e-10) {
                 thisGapHeight(iv, 0) = 1.0e-16;
             } else {
                 thisGapHeight(iv, 0) = Params.m_gapInit;
@@ -169,6 +169,7 @@ FileIBC::initializePi(RealVect& a_dx,
         } // end loop over cells
     }     // end loop over boxes
 }
+
 
 void 
 FileIBC::initializeBed(RealVect& a_dx,
@@ -179,6 +180,7 @@ FileIBC::initializeBed(RealVect& a_dx,
 {
     // Do nothing 
 }
+
 
 void 
 FileIBC::resetCovered(suhmo_params Params,     
@@ -199,6 +201,31 @@ FileIBC::resetCovered(suhmo_params Params,
         }
     }
 }
+
+void
+FileIBC::setup_iceMask(LevelData<FArrayBox>& a_Pi,
+                       LevelData<FArrayBox>& a_iceMask)
+{
+    DataIterator dit = a_iceMask.dataIterator();
+    for (dit.begin(); dit.ok(); ++dit) {
+        FArrayBox& thispi        = a_Pi[dit];
+        FArrayBox& thisiceMask   = a_iceMask[dit];
+        
+        BoxIterator bit(thisiceMask.box()); 
+        for (bit.begin(); bit.ok(); ++bit) {
+            IntVect iv = bit();
+
+            /* Where do we disable the gradient computations */
+            if (thispi(iv, 0) > 0.0) {
+                thisiceMask(iv, 0)        = 1.0;
+            } else {
+                thisiceMask(iv, 0)        = -1.0;
+            }
+            
+        } // end loop over cells
+    }     // end loop over boxes
+}
+
 
 /** Set up initial conditions 
  */
@@ -260,21 +287,21 @@ FileIBC::initializeData(RealVect& a_dx,
             Real x_loc = (iv[0]+0.5)*a_dx[0];
             Real y_loc = (iv[1]+0.5)*a_dx[1];
 
-            ///* for Helheim, cut the top right corner out ? */
-            //Real lin_cut = -1.1*x_loc + 100e3;
-            //if ((y_loc > lin_cut) and (y_loc > 30e3)) {
-            //    thisiceHeight(iv, 0) = 0.0;
-            //}
-            //if ((y_loc > 60e3) or (y_loc < 1.5e3)) {
-            //    thisiceHeight(iv, 0) = 0.0;
-            //}
-            ///* for Helheim, cut the weird little ice cap at the outlet */
-            //if ((y_loc > 17e3) and (x_loc > 61e3)){
-            //    thisiceHeight(iv, 0) = 0.0;
-            //}
-            //if ((y_loc < 10e3) and (x_loc > 61e3)){
-            //    thisiceHeight(iv, 0) = 0.0;
-            //}
+            /* for Helheim, cut the top right corner out ? */
+            Real lin_cut = -1.1*x_loc + 100e3;
+            if ((y_loc > lin_cut) and (y_loc > 30e3)) {
+                thisiceHeight(iv, 0) = 0.0;
+            }
+            if ((y_loc > 60e3) or (y_loc < 1.5e3)) {
+                thisiceHeight(iv, 0) = 0.0;
+            }
+            /* for Helheim, cut the weird little ice cap at the outlet */
+            if ((y_loc > 17e3) and (x_loc > 61e3)){
+                thisiceHeight(iv, 0) = 0.0;
+            }
+            if ((y_loc < 10e3) and (x_loc > 61e3)){
+                thisiceHeight(iv, 0) = 0.0;
+            }
 
             /* bed topography --> done  */
             // add randomness
@@ -284,7 +311,7 @@ FileIBC::initializeData(RealVect& a_dx,
             thispi(iv, 0)        = Params.m_rho_i * Params.m_gravity * std::max(thisiceHeight(iv, 0), 0.0);
 
             /* initial gap height */
-            if (thispi(iv, 0) == 0.0) {
+            if (thispi(iv, 0) < 1.0e-10) {
                 thisGapHeight(iv, 0) = 1.0e-16;
             } else {
                 thisGapHeight(iv, 0) = Params.m_gapInit;
@@ -302,7 +329,7 @@ FileIBC::initializeData(RealVect& a_dx,
             thisbumpSpacing(iv, 0)     = Params.m_lr;
             // if randomness
             //thisbumpHeight(iv, 0)      = std::max(thisbumpHeight(iv, 0)  + 0.01*(thiszbed(iv, 0) - (fx + gy*hx)), 0.0);
-            if (thispi(iv, 0) == 0.0) {
+            if (thispi(iv, 0) < 1.0e-10) {
                 thisbumpHeight(iv, 0)      = 0.1 * Params.m_br;
             }
 
@@ -324,10 +351,11 @@ FileIBC::initializeData(RealVect& a_dx,
             } 
             //m/a-> m/s
             thismagVel(iv, 0)  = thismagVel(iv, 0)/3.154e7;
-            if (thispi(iv, 0) == 0.0) {
+            if (thispi(iv, 0) < 1.0e-10) {
                 thismagVel(iv, 0)  = 0.0;
             }
-            //thismagVel(iv, 0)  = 1e-5; // debug
+
+            thismagVel(iv, 0)  = 8.0e-5;
         } // end loop over cells
     }     // end loop over boxes
 
