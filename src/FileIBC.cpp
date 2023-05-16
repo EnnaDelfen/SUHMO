@@ -162,8 +162,6 @@ FileIBC::initializePi(RealVect& a_dx,
             /* initial gap height */
             if (thispi(iv, 0) < 1.0e-10) {
                 thisGapHeight(iv, 0) = 1.0e-16;
-            } else {
-                thisGapHeight(iv, 0) = Params.m_gapInit;
             }
 
         } // end loop over cells
