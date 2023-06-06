@@ -14,11 +14,11 @@ SUHMO relies on the Software for Adaptive Solutions of Partial Differential Equa
 Before starting, make sure that all the dependencies are properly installed and environment variables properly set ! This is explained in the [Quick start](https://ennadelfen.github.io/SUHMO/GettingStarted) section, but the main steps are also recalled below:
 
 ### Get Chombo v3.2
-Start by downloading the `feature_SUHMO` branch of the forked version of Chombo 3.2:
+Start by downloading the `mergeHCSUHMO` branch of the forked version of Chombo 3.2:
 
 ```
 git clone https://github.com/EnnaDelfen/Chombo_3.2.git
-git checkout -b feature_SUHMO remotes/origin/feature_SUHMO
+git checkout -b mergeHCSUHMO remotes/origin/mergeHCSUHMO
 ```
 
 Set up the CHOMBO environment variable:
