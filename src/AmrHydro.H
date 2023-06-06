@@ -357,6 +357,7 @@ protected:
     bool m_use_NL;
     bool m_compute_Bcoeff;
     bool m_use_ImplDiff;
+    bool m_do_intermediate_steps;
 
     /// IBC
     HydroIBC* m_IBCPtr;

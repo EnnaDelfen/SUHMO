@@ -869,7 +869,9 @@ AmrHydro::initialize()
     m_compute_Bcoeff = false;
     m_use_NL         = false;
     m_use_ImplDiff   =  false;
-    ppSolver.get("cut_solve_outside_domain", m_cutOffBcoef);  // max level
+    m_do_intermediate_steps = false;
+    ppSolver.query("do_intermediate_steps", m_do_intermediate_steps);  
+    ppSolver.query("cut_solve_outside_domain", m_cutOffBcoef);  
     ppSolver.query("use_mask_for_gradients", m_use_mask_gradients); // use the mask to compute reduced gradients at fake EB
     ppSolver.query("use_mask_rhs_b", m_use_mask_rhs_b); // use the mask to compute reduced gradients at fake EB
     ppSolver.query("use_fas", m_use_FAS); // use FAS scheme for head 
@@ -1337,17 +1339,19 @@ AmrHydro::run(Real a_max_time, int a_max_step)
 
             /* core */
             //if ( (m_cur_step == 0) || (m_cur_step == m_restart_step) ) {
-            if ( (m_cur_step == 0) || (m_cur_step % m_regrid_interval == 0) || (m_cur_step == m_restart_step) ) {
-                pout() << "Doing intermediate time steps ..." << endl; 
-                int time_step_save = m_cur_step;
-                for (int predt = 0; predt < 4; predt++) {
-                    timeStepFAS(dt/4., false);
-                }
+            if (m_do_intermediate_steps) {
+                if ( (m_cur_step == 0) || (m_cur_step % m_regrid_interval == 0) ) {
+                    pout() << "Doing intermediate time steps ..." << endl; 
+                    int time_step_save = m_cur_step;
+                    for (int predt = 0; predt < 4; predt++) {
+                        timeStepFAS(dt/4., false);
+                    }
 #ifdef CH_USE_HDF5
-                m_cur_step = time_step_save;
-                //writePlotFile();
+                    m_cur_step = time_step_save;
+                    //writePlotFile();
 #endif
-                pout() << "Done with intermediate time steps." << endl; 
+                    pout() << "Done with intermediate time steps." << endl; 
+                }
             }
             timeStepFAS(dt, true);               // we really want to use this
 
