@@ -869,7 +869,7 @@ AmrHydro::initialize()
     m_compute_Bcoeff = false;
     m_use_NL         = false;
     m_use_ImplDiff   =  false;
-    ppSolver.get("cut_solve_outside_domain", m_cutOffBcoef);  // max level
+    ppSolver.query("cut_solve_outside_domain", m_cutOffBcoef);  // max level
     ppSolver.query("use_mask_for_gradients", m_use_mask_gradients); // use the mask to compute reduced gradients at fake EB
     ppSolver.query("use_mask_rhs_b", m_use_mask_rhs_b); // use the mask to compute reduced gradients at fake EB
     ppSolver.query("use_fas", m_use_FAS); // use FAS scheme for head 
