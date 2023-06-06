@@ -124,8 +124,10 @@ public:
                                LevelData<FArrayBox>& a_bumpHeight,
                                LevelData<FArrayBox>& a_bumpSpacing);
 
-    virtual void resetCovered(suhmo_params Params,
+    virtual void resetCovered(RealVect& a_dx,
+                              suhmo_params Params,
                               LevelData<FArrayBox>& a_head,
+                              LevelData<FArrayBox>& a_iceHeight,
                               LevelData<FArrayBox>& a_Pi);
 
 

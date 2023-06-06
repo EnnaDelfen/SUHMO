@@ -108,8 +108,10 @@ HydroIBC::initializeBed(RealVect& a_dx,
 }
 
 void 
-HydroIBC::resetCovered(suhmo_params Params,     
+HydroIBC::resetCovered(RealVect& a_dx,
+                       suhmo_params Params,     
                        LevelData<FArrayBox>& a_head,
+                       LevelData<FArrayBox>& a_iceHeight,
                        LevelData<FArrayBox>& a_Pi)
 {
     // Do nothing 
@@ -133,6 +135,14 @@ HydroIBC::setup_iceMask(LevelData<FArrayBox>& a_Pi,
             
         } // end loop over cells
     }     // end loop over boxes
+}
+
+void
+HydroIBC::correct_iceMask(RealVect& a_dx,
+                          LevelData<FArrayBox>& a_Pi,
+                          LevelData<FArrayBox>& a_iceMask)
+{
+    // Do nothing 
 }
 
 void 

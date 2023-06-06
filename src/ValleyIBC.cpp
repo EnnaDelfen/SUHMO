@@ -174,8 +174,10 @@ ValleyIBC::initializeBed(RealVect& a_dx,
 
 
 void 
-ValleyIBC::resetCovered(suhmo_params Params,     
+ValleyIBC::resetCovered(RealVect& a_dx,
+                        suhmo_params Params,     
                         LevelData<FArrayBox>& a_head,
+                        LevelData<FArrayBox>& a_iceHeight,
                         LevelData<FArrayBox>& a_Pi)
 {
     // Clean neg h in unused covered zones

@@ -134,6 +134,7 @@ FileIBC::initializePi(RealVect& a_dx,
     const LevelData<FArrayBox>& thickRef = *(m_refThickness);    
     FillFromReference(a_zbed, topoRef, a_dx, m_refDx,verbose);
     FillFromReference(a_iceHeight, thickRef, a_dx, m_refDx, verbose);
+    pout() << "a_dx, source dx = " << a_dx << " " << m_refDx << endl;
 
     DataIterator dit = a_head.dataIterator();
     for (dit.begin(); dit.ok(); ++dit) {
@@ -147,12 +148,32 @@ FileIBC::initializePi(RealVect& a_dx,
             Real x_loc = (iv[0]+0.5)*a_dx[0];
             Real y_loc = (iv[1]+0.5)*a_dx[1];
 
+            /* for Helheim, cut the top right corner out ? */
+            Real lin_cut = -1.1*x_loc + 100e3;
+            if ((y_loc > lin_cut) and (y_loc > 30e3)) {
+                thisiceHeight(iv, 0) = 0.0;
+            }
+            if ((y_loc > 60e3) or (y_loc < 1.5e3)) {
+                thisiceHeight(iv, 0) = 0.0;
+            }
             /* for Helheim, cut the weird little ice cap at the outlet */
             if ((y_loc > 17e3) and (x_loc > 61e3)){
                 thisiceHeight(iv, 0) = 0.0;
             }
             if ((y_loc < 10e3) and (x_loc > 61e3)){
                 thisiceHeight(iv, 0) = 0.0;
+            }
+
+            /* attempt to smooth things */
+            if (thisiceHeight(iv, 0) < 20.0){ 
+                thisiceHeight(iv, 0) = 0.0;
+            }
+
+            /* try and remove the island in the middle */
+            if ((x_loc < 55e3) and (y_loc > 5e3) and (y_loc < 30e3)){
+                if (thisiceHeight(iv, 0) < 1.0) {
+                    thisiceHeight(iv, 0) = 1.0;
+                }
             }
 
             /* Ice height  --> done*/
@@ -181,14 +202,18 @@ FileIBC::initializeBed(RealVect& a_dx,
 
 
 void 
-FileIBC::resetCovered(suhmo_params Params,     
+FileIBC::resetCovered(RealVect& a_dx,
+                      suhmo_params Params,     
                       LevelData<FArrayBox>& a_head,
+                      LevelData<FArrayBox>& a_iceHeight, // substitute gap height
                       LevelData<FArrayBox>& a_Pi)
 {
     // Clean neg h in unused covered zones
     DataIterator dit = a_Pi.dataIterator();
     for (dit.begin(); dit.ok(); ++dit) {
         FArrayBox& thisHead      = a_head[dit];
+        FArrayBox& thisiceHeight = a_iceHeight[dit];
+        FArrayBox& thispi        = a_Pi[dit];
 
         BoxIterator bit(thisHead.box()); // Default .box() have ghostcells ?
         for (bit.begin(); bit.ok(); ++bit) {
@@ -196,6 +221,23 @@ FileIBC::resetCovered(suhmo_params Params,
             if (thisHead(iv, 0) < 0.0) {
                 thisHead(iv, 0) = 0.0;
             }
+            if ( (thisHead(iv, 0) > 1000.0) and (thispi(iv, 0) < 0.1) ) {
+                thisHead(iv, 0) = 1000.0;
+            }
+            //if (thisiceHeight(iv, 0) < 0.0) {
+            //    thisiceHeight(iv, 0) = 1.0e-16;
+            //}
+
+            ///* temporary */
+            ///* try and remove the island in the middle */
+            //Real x_loc = (iv[0]+0.5)*a_dx[0];
+            //Real y_loc = (iv[1]+0.5)*a_dx[1];
+            //if ((x_loc < 55e3) and (y_loc > 5e3) and (y_loc < 30e3)){
+            //    if (thisiceHeight(iv, 0) < 1.0) {
+            //        thisiceHeight(iv, 0) = 1.0;
+            //        thispi(iv, 0)        = Params.m_rho_i * Params.m_gravity * std::max(thisiceHeight(iv, 0), 0.0);
+            //    }
+            //}
         }
     }
 }
@@ -218,6 +260,33 @@ FileIBC::setup_iceMask(LevelData<FArrayBox>& a_Pi,
                 thisiceMask(iv, 0)        = 1.0;
             } else {
                 thisiceMask(iv, 0)        = -1.0;
+            }
+            
+        } // end loop over cells
+    }     // end loop over boxes
+}
+
+void
+FileIBC::correct_iceMask(RealVect& a_dx,
+                         LevelData<FArrayBox>& a_Pi,
+                         LevelData<FArrayBox>& a_iceMask)
+{
+    DataIterator dit = a_iceMask.dataIterator();
+    for (dit.begin(); dit.ok(); ++dit) {
+        FArrayBox& thispi        = a_Pi[dit];
+        FArrayBox& thisiceMask   = a_iceMask[dit];
+        
+        BoxIterator bit(thisiceMask.box()); 
+        for (bit.begin(); bit.ok(); ++bit) {
+            IntVect iv = bit();
+            Real x_loc = (iv[0]+0.5)*a_dx[0];
+            Real y_loc = (iv[1]+0.5)*a_dx[1];
+
+            /* for the averaging down */
+            if (thisiceMask(iv, 0) < 1.0) {
+                thisiceMask(iv, 0)        = -1.0;
+            } else {
+                thisiceMask(iv, 0)        = 1.0;
             }
             
         } // end loop over cells
@@ -299,6 +368,18 @@ FileIBC::initializeData(RealVect& a_dx,
             }
             if ((y_loc < 10e3) and (x_loc > 61e3)){
                 thisiceHeight(iv, 0) = 0.0;
+            }
+ 
+            /* attempt to smooth things */
+            if (thisiceHeight(iv, 0) < 20.0){ 
+                thisiceHeight(iv, 0) = 0.0;
+            }
+
+            /* try and remove the island in the middle */
+            if ((x_loc < 55e3) and (y_loc > 5e3) and (y_loc < 30e3)){
+                if (thisiceHeight(iv, 0) < 1.0) {
+                    thisiceHeight(iv, 0) = 1.0;
+                }
             }
 
             /* bed topography --> done  */

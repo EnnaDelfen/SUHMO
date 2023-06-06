@@ -126,9 +126,11 @@ MountainIBC::initializeBed(RealVect& a_dx,
 
 
 void 
-MountainIBC::resetCovered(suhmo_params Params,     
-                        LevelData<FArrayBox>& a_head,
-                        LevelData<FArrayBox>& a_Pi)
+MountainIBC::resetCovered(RealVect& a_dx,
+                          suhmo_params Params,     
+                          LevelData<FArrayBox>& a_head,
+                          LevelData<FArrayBox>& a_iceHeight,
+                          LevelData<FArrayBox>& a_Pi)
 {
     // Clean neg h in unused covered zones
     DataIterator dit = a_Pi.dataIterator();

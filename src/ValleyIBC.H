@@ -103,8 +103,10 @@ public:
     virtual void setup_iceMask(LevelData<FArrayBox>& a_Pi,
                                LevelData<FArrayBox>& a_iceMask);
 
-    virtual void resetCovered(suhmo_params Params,
+    virtual void resetCovered(RealVect& a_dx,
+                              suhmo_params Params,
                               LevelData<FArrayBox>& a_head,
+                              LevelData<FArrayBox>& a_iceHeight,
                               LevelData<FArrayBox>& a_Pi);
 
 

@@ -81,7 +81,7 @@ public:
     /* compute one timestep */
     void timeStep(Real a_dt);
 
-    void timeStepFAS(Real a_dt);
+    void timeStepFAS(Real a_dt, bool do_head);
 
     void NonLinear_level(LevelData<FArrayBox>&        a_NL, 
                          LevelData<FArrayBox>&        a_dNL,
@@ -108,6 +108,9 @@ public:
 
     void compute_grad_zb_ec(int                 lev,
                             LevelData<FluxBox>& a_levelgradZb_ec);
+    void compute_grad_var(int lev, 
+                          Vector<RefCountedPtr<LevelData<FArrayBox> > >& var,
+                          LevelData<FArrayBox>& levelGradvar);
  
     void compute_grad_head(int lev);
 
