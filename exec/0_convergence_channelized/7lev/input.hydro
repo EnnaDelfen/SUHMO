@@ -2,7 +2,7 @@
 main.domain_size=64.00 16.00 # physical dimensions of domain
 main.problem_type=basic
 main.maxTime = 90000000000.0
-main.maxStep= 1500 # 500 heures env 20 jours
+main.maxStep= 1000 # 500 heures env 20 jours
 
 # bc - 0 = diri / 1 = neum
 bc.lo_bc = 0 0
