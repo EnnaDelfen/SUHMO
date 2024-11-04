@@ -819,7 +819,9 @@ AmrHydro::setDefaults()
     m_plot_interval = 10000000;
     m_plot_time_interval = 1.0e+12;
     //m_write_gradPhi = false;
-
+    m_write_magVel = false;
+    m_write_moulin_source = false;
+    
     m_check_prefix = "chk";
     m_check_interval = -1;
     m_check_overwrite = true;
@@ -935,6 +937,9 @@ AmrHydro::initialize()
     ppAmr.query("plot_time_interval", m_plot_time_interval);
     ppAmr.query("plot_prefix", m_plot_prefix);
     //ppAmr.query("write_gradPhi", m_write_gradPhi);  // do not bother with outputing grad for now
+    ppAmr.query("write_magVel", m_write_magVel);
+    ppAmr.query("write_moulin_sources", m_write_moulin_source);
+    
     ppAmr.query("check_interval", m_check_interval);   // not sure
     ppAmr.query("check_prefix", m_check_prefix);
     ppAmr.query("check_overwrite", m_check_overwrite);
@@ -5375,6 +5380,12 @@ AmrHydro::initData(Vector<RefCountedPtr<LevelData<FArrayBox>> >& a_head)
         m_IBCPtr->setup_iceMask_EC(*m_iceMask[lev], *m_iceMask_ec[lev]);
     }
 
+    // if we're writing moulin data to plotfiles, then we should initialize it here as well.
+    if (m_write_moulin_source)
+      {
+        computeMoulinInput();
+      }
+    
     //writePlotFile();
 
     // may be necessary to average down here
@@ -5707,6 +5718,16 @@ AmrHydro::writePlotFile()
 
     // plot comps: head + gapHeight + bedelevation + overburdenPress
     int numPlotComps = 13;
+    
+    // add in optional values, if any
+    if (m_write_magVel)
+      {
+        ++numPlotComps;
+      }
+    if (m_write_moulin_source)
+      {
+        ++numPlotComps;
+      }
 
     // generate data names
     string headName("head");
@@ -5721,23 +5742,52 @@ AmrHydro::writePlotFile()
     string xGradName("GradHead_x");
     string yGradName("VelMag");
     string BumpHeight("iceHeight");
-    string iceMask("iceMask");
+    string iceMaskName("iceMask");
+    string magVelName("magVel");    
+    string moulinSourceName("moulinSource");    
 
     Vector<string> vectName(numPlotComps);
-    vectName[0] = headName;
-    vectName[1] = gapHeightName;
-    vectName[2] = zbedName;
-    vectName[3] = piName;
-    vectName[4] = pwName;
-    vectName[5] = qwName;
-    vectName[6] = qwNameY;
-    vectName[7] = ReName;
-    vectName[8] = meltRateName;
-    vectName[9] = xGradName;
-    vectName[10] = yGradName;
-    vectName[11] = BumpHeight;
-    vectName[12] = iceMask;
+    int comp=0;
+    vectName[comp] = headName;
+    ++comp;
+    vectName[comp] = gapHeightName;
+    ++comp;
+    vectName[comp] = zbedName;
+    ++comp;
+    vectName[comp] = piName;
+    ++comp;
+    vectName[comp] = pwName;
+    ++comp;
+    vectName[comp] = qwName;
+    ++comp;
+    vectName[comp] = qwNameY;
+    ++comp;
+    vectName[comp] = ReName;
+    ++comp;
+    vectName[comp] = meltRateName;
+    ++comp;
+    vectName[comp] = xGradName;
+    ++comp;
+    vectName[comp] = yGradName;
+    ++comp;
+    vectName[comp] = BumpHeight;
+    ++comp;
+    vectName[comp] = iceMaskName;
+    ++comp;
 
+    // optional elements
+    if (m_write_magVel)
+      {    
+        vectName[comp] = magVelName;
+        comp++;
+      }
+    if (m_write_moulin_source)
+      {
+        vectName[comp] = moulinSourceName;
+        comp++;        
+      }
+
+    
     Box domain = m_amrDomains[0].domainBox();
     Real dt = 1.;
     int numLevels = m_finest_level + 1;
@@ -5837,7 +5887,24 @@ AmrHydro::writePlotFile()
             thisPlotData.copy(thisBH, 0, comp, 1);
             comp++;
             thisPlotData.copy(thisIM, 0, comp, 1);
-
+            comp++;
+            
+            // optional elements
+            if (m_write_magVel)
+              {
+                const FArrayBox& thisMagVel = (*m_magVel[lev])[dit];
+                thisPlotData.copy(thisMagVel,0,comp,1);
+                comp++;                
+              }
+            
+            if (m_write_moulin_source)
+              {
+                const FArrayBox& thisMoulinSource = (*m_moulin_source_term[lev])[dit];
+                thisPlotData.copy(thisMoulinSource, 0, comp, 1);
+                comp++;        
+              }
+            
+            
         } // end loop over boxes on this level
 
         // this is just so that visit surface plots look right
@@ -6479,6 +6546,142 @@ AmrHydro::restart(string& a_restart_file)
     for (int lev = 0; lev <= m_finest_level; lev++) {
         m_IBCPtr->setup_iceMask_EC(*m_iceMask[lev], *m_iceMask_ec[lev]); // Hoping GC properly set via copy in readCheckpointFile
     }
+}
+
+
+/// calculate moulin source term and put it in m_moulin_source_term
+void
+AmrHydro::computeMoulinInput()
+{
+  // temp storage
+  Vector<LevelData<FArrayBox>*> moulin_source_term_noNorm;
+  moulin_source_term_noNorm.resize(m_finest_level + 1, NULL);
+
+
+  for (int lev = 0; lev <= m_finest_level; lev++) {  
+    if (m_suhmoParm->m_n_moulins > 0) {
+      moulin_source_term_noNorm[lev]   = new LevelData<FArrayBox>(m_amrGrids[lev], m_suhmoParm->m_n_moulins, IntVect::Zero);
+    }
+  }
+  
+  // Compute MoulinSrc 
+  // UNITS FOR m_moulin_flux SHOULD BE M3/S
+  // UNITS FOR m_distributed_input SHOULD BE M/S
+  if (m_suhmoParm->m_n_moulins > 0) {
+    if (m_regrid) { // useful for insane amount of moulins
+      if (m_verbosity > 3) {
+        pout() <<"        Compute moulins "<< endl;
+      }
+      std::vector<Real> a_moulinsInteg(m_suhmoParm->m_n_moulins, 0.0);    
+      // calc integral over all domain, zeroing overlayed areas 
+      Calc_moulin_integral(a_moulinsInteg, moulin_source_term_noNorm); // m2 and no units
+      for (int lev = 0; lev <= m_finest_level; lev++) {
+        LevelData<FArrayBox>& levelmoulin_source_term         = *m_moulin_source_term[lev];
+        LevelData<FArrayBox>& levelmoulin_source_term_noNorm  = *moulin_source_term_noNorm[lev];
+        Calc_moulin_source_term_distributed(levelmoulin_source_term,        // m/s
+                                            levelmoulin_source_term_noNorm, // no units
+                                            a_moulinsInteg,                 // m2
+                                            lev);
+      }
+      
+      // average down
+      for (int lev = m_finest_level; lev > 0; lev--) {
+        if (m_suhmoParm->m_n_moulins > 0) {
+          if (lev > 0 ) {
+            CoarseAverage averager(m_amrGrids[lev], 1, m_refinement_ratios[lev-1]);
+            averager.averageToCoarse(*m_moulin_source_term[lev - 1], *m_moulin_source_term[lev]);
+          }
+        }
+      }
+      
+      // handle ghost cells on the coarse-fine interface
+      for (int lev = 0; lev <= m_finest_level; lev++) {
+        if (lev > 0) {
+          QuadCFInterp qcfi(m_amrGrids[lev], &m_amrGrids[lev-1],
+                            m_amrDx[lev], m_refinement_ratios[lev-1],  
+                            1,  // num comps
+                            m_amrDomains[lev]);
+          qcfi.coarseFineInterp(*m_moulin_source_term[lev], *m_moulin_source_term[lev-1]);
+        }
+        (*m_moulin_source_term[lev]).exchange();
+        ExtrapGhostCells( (*m_moulin_source_term[lev]), m_amrDomains[lev]);
+      }
+      
+    }
+  } else if (m_suhmoParm->m_n_moulins < 0) {
+    if (m_verbosity > 3) {
+      pout() <<"        Compute distributed water input "<< endl;
+    }
+    for (int lev = 0; lev <= m_finest_level; lev++) {
+      LevelData<FArrayBox>& levelmoulin_source_term = *m_moulin_source_term[lev];
+      LevelData<FArrayBox>& levelIM                 = *m_iceMask[lev];
+      LevelData<FArrayBox>& levelIceHeight          = *m_iceheight[lev];
+      
+      DisjointBoxLayout& levelGrids                 = m_amrGrids[lev];
+      DataIterator dit                              = levelGrids.dataIterator();
+      
+      if (m_suhmoParm->m_time_varying_input) {
+        Real T_K   = -16.0 * std::cos( 2.0 * Pi * (m_time - m_restart_time) / ( 365.*24*60*60.) ) - 5.0 + m_suhmoParm->m_deltaT;
+        for (dit.begin(); dit.ok(); ++dit) {
+          const Box& region = levelmoulin_source_term[dit].box();
+          FORT_COMPUTE_TIMEVARYINGRECHARGE( CHF_FRA(levelIceHeight[dit]),
+                                            CHF_BOX(region),
+                                            CHF_FRA(levelmoulin_source_term[dit]),
+                                            CHF_CONST_REAL(T_K),
+                                            CHF_CONST_REAL(m_suhmoParm->m_distributed_input) );
+        }
+      } else {
+        for (dit.begin(); dit.ok(); ++dit) {
+          FArrayBox& moulinSrc = levelmoulin_source_term[dit];
+          FArrayBox& IM        = levelIM[dit];
+          BoxIterator bit(moulinSrc.box());
+          for (bit.begin(); bit.ok(); ++bit) {
+            IntVect iv = bit();
+            if (IM(iv,0) > 0.0) {
+              moulinSrc(iv,0) = m_suhmoParm->m_distributed_input;
+            } else {
+              moulinSrc(iv,0) = 0.0;
+            }
+          }
+        }
+      }
+      
+      if (lev > 0) {
+        QuadCFInterp qcfi(m_amrGrids[lev], &m_amrGrids[lev-1],
+                          m_amrDx[lev], m_refinement_ratios[lev-1],  
+                          1,  // num comps
+                          m_amrDomains[lev]);
+        qcfi.coarseFineInterp(*m_moulin_source_term[lev], *m_moulin_source_term[lev-1]);
+      }
+      (*m_moulin_source_term[lev]).exchange();
+      ExtrapGhostCells( (*m_moulin_source_term[lev]), m_amrDomains[lev]);
+    }
+    
+  } else {
+    if (m_verbosity > 3) {
+      pout() <<"        No external water input "<< endl;
+    }
+    for (int lev = 0; lev <= m_finest_level; lev++) {
+      LevelData<FArrayBox>& levelmoulin_source_term = *m_moulin_source_term[lev];
+      DisjointBoxLayout& levelGrids                 = m_amrGrids[lev];
+      DataIterator dit                              = levelGrids.dataIterator();
+      for (dit.begin(); dit.ok(); ++dit) {
+        FArrayBox& moulinSrc = levelmoulin_source_term[dit];
+        moulinSrc.setVal(0.0);
+      }
+      if (lev > 0) {
+        QuadCFInterp qcfi(m_amrGrids[lev], &m_amrGrids[lev-1],
+                          m_amrDx[lev], m_refinement_ratios[lev-1],  
+                          1,  // num comps
+                          m_amrDomains[lev]);
+        qcfi.coarseFineInterp(*m_moulin_source_term[lev], *m_moulin_source_term[lev-1]);
+      }
+      (*m_moulin_source_term[lev]).exchange();
+      ExtrapGhostCells( (*m_moulin_source_term[lev]), m_amrDomains[lev]);
+    }
+  }
+
+  
 }
 
 #endif

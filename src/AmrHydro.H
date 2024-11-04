@@ -342,6 +342,8 @@ protected:
     /// initialize data on hierarchy
     void initData(Vector<RefCountedPtr<LevelData<FArrayBox>> >& a_initialVelocity);
 
+  // compute moulin input and store in m_moulin_source_term
+  void computeMoulinInput();
 
     /// compute timestep
     Real computeDt();
@@ -457,7 +459,17 @@ protected:
 
     // debug 
     bool m_PrintCustom;
-   
+  /** if false, turn off standard plotfiles (if we only want the custom one)
+      (default is true) */
+  bool m_PrintStandard;
+
+  // optional variables for plotfiles (default is false);
+  /// write mag(ice velocity)
+  bool m_write_magVel;
+  /// write the water source from moulins
+  bool m_write_moulin_source;
+  
+  
     // Post proc
     bool m_post_proc;
     bool m_post_proc_comparisons;
